@@ -1,21 +1,19 @@
-import fs from "fs/promises"
 import path from "path"
 import yaml from "js-yaml"
 import Handlebars from "handlebars"
 import { z } from "zod"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import {
-    STORAGE_DIR,
     ACTIVE_GROUPS,
     IS_DEFAULT_GROUPS,
     LANG_INSTRUCTION,
     LANG_SETTING,
 } from "../config/env.js"
 import { logger } from "../utils/logger.js"
-import { getFilesRecursively } from "../utils/fileSystem.js"
+import type { StorageDriver } from "../storage/StorageDriver.js"
 import type { PromptDefinition, PromptArgDefinition } from "../types/prompt.js"
 
-// Prompt 定義驗證 Schema
+// Prompt definition validation schema
 const PromptDefinitionSchema = z.object({
     id: z.string().min(1),
     title: z.string().min(1),
@@ -33,33 +31,32 @@ const PromptDefinitionSchema = z.object({
     template: z.string().min(1),
 })
 
-// 錯誤統計
+// Error statistics
 interface LoadError {
     file: string
     error: Error
 }
 
 /**
- * 載入 Handlebars Partials
- * @param storageDir - 儲存目錄
- * @returns 載入的 partial 數量
+ * Load Handlebars Partials
+ * @param driver - Storage Driver instance
+ * @returns Number of partials loaded
  */
-export async function loadPartials(storageDir?: string): Promise<number> {
-    const dir = storageDir ?? STORAGE_DIR
+export async function loadPartials(driver: StorageDriver): Promise<number> {
     logger.debug("Loading Handlebars partials")
-    const allFiles = await getFilesRecursively(dir)
+    const allFiles = await driver.getFilesRecursively("")
     let count = 0
 
     for (const filePath of allFiles) {
         if (!filePath.endsWith(".hbs")) continue
 
         try {
-            const content = await fs.readFile(filePath, "utf-8")
+            const content = await driver.readFile(filePath)
             const partialName = path.parse(filePath).name
 
             Handlebars.registerPartial(partialName, content)
             count++
-            logger.debug({ partialName }, "Partial registered")
+            logger.debug({ partialName, filePath }, "Partial registered")
         } catch (error) {
             logger.warn({ filePath, error }, "Failed to load partial")
         }
@@ -70,9 +67,9 @@ export async function loadPartials(storageDir?: string): Promise<number> {
 }
 
 /**
- * 建構 Zod Schema
- * @param args - Prompt 參數定義（來自 Zod 解析後的結果）
- * @returns Zod Schema 物件
+ * Build Zod Schema
+ * @param args - Prompt argument definitions (from Zod parsing result)
+ * @returns Zod Schema object
  */
 function buildZodSchema(
     args: Record<
@@ -89,7 +86,7 @@ function buildZodSchema(
         for (const [key, config] of Object.entries(args)) {
             let schema: z.ZodTypeAny
 
-            // 根據類型建立基礎 schema
+            // Create base schema based on type
             if (config.type === "number") {
                 schema = z.number()
             } else if (config.type === "boolean") {
@@ -98,26 +95,26 @@ function buildZodSchema(
                 schema = z.string()
             }
 
-            // 判斷參數是否為可選
-            // 1. 如果有 default 值，參數是可選的
-            // 2. 如果 description 中包含 "optional"，參數是可選的
-            // 3. 如果 description 中明確說 "required"，參數是必需的
+            // Determine if parameter is optional
+            // 1. If there's a default value, parameter is optional
+            // 2. If description contains "optional", parameter is optional
+            // 3. If description explicitly says "required", parameter is required
             const hasDefault = config.default !== undefined
             const isOptionalInDesc =
                 config.description?.toLowerCase().includes("optional") ?? false
             const isRequiredInDesc =
                 config.description?.toLowerCase().includes("(required)") ?? false
 
-            // 如果沒有明確標記為 required，且有 default 或標記為 optional，則設為可選
+            // If not explicitly marked as required, and has default or marked as optional, set as optional
             if (!isRequiredInDesc && (hasDefault || isOptionalInDesc)) {
                 schema = schema.optional()
-                // 如果有 default 值，設定預設值
+                // If there's a default value, set the default
                 if (hasDefault) {
                     schema = schema.default(config.default as never)
                 }
             }
 
-            // 設定描述
+            // Set description
             if (config.description) {
                 schema = schema.describe(config.description)
             }
@@ -131,7 +128,7 @@ function buildZodSchema(
 /**
  * 判斷是否應該載入該 prompt
  * 根據檔案路徑和活躍群組列表決定
- * @param relativePath - 相對於儲存目錄的路徑
+ * @param relativePath - 相對於儲存根目錄的路徑（使用 / 作為分隔符）
  * @param activeGroups - 活躍群組列表
  * @returns 包含是否載入和群組名稱的物件
  * @remarks
@@ -146,7 +143,9 @@ function shouldLoadPrompt(
     shouldLoad: boolean
     groupName: string
 } {
-    const pathParts = relativePath.split(path.sep)
+    // Normalize to use / as separator (different drivers may return different formats)
+    const normalizedPath = relativePath.replace(/\\/g, "/")
+    const pathParts = normalizedPath.split("/")
     const groupName = pathParts.length > 1 ? (pathParts[0] ?? "root") : "root"
     const isAlwaysActive = groupName === "root" || groupName === "common"
     const isSelected = activeGroups.includes(groupName)
@@ -158,23 +157,25 @@ function shouldLoadPrompt(
 }
 
 /**
- * 載入並註冊 Prompts 到 MCP Server
+ * Load and register Prompts to MCP Server
  *
- * 此函數會：
- * 1. 掃描儲存目錄中的所有 YAML/YML 檔案
- * 2. 根據群組過濾規則決定是否載入
- * 3. 使用 Zod 驗證 prompt 定義結構
- * 4. 編譯 Handlebars 模板
- * 5. 註冊到 MCP Server
+ * This function will:
+ * 1. Scan all YAML/YML files in the storage directory
+ * 2. Decide whether to load based on group filtering rules
+ * 3. Validate prompt definition structure using Zod
+ * 4. Compile Handlebars templates
+ * 5. Register to MCP Server
  *
- * @param server - MCP Server 實例，用於註冊 prompts
- * @param storageDir - 儲存目錄路徑（可選，預設使用配置中的 STORAGE_DIR）
- * @returns 包含載入成功數量和錯誤列表的物件
- * @throws {Error} 當目錄無法訪問時
+ * @param server - MCP Server instance for registering prompts
+ * @param driver - Storage Driver instance
+ * @returns Object containing number of successfully loaded prompts and error list
+ * @throws {Error} When directory is not accessible
  *
  * @example
  * ```typescript
- * const { loaded, errors } = await loadPrompts(server)
+ * const driver = createStorageDriver()
+ * await driver.initialize()
+ * const { loaded, errors } = await loadPrompts(server, driver)
  * if (errors.length > 0) {
  *   console.warn(`Failed to load ${errors.length} prompts`)
  * }
@@ -196,10 +197,8 @@ const EXCLUDED_FILES = [
 
 export async function loadPrompts(
     server: McpServer,
-    storageDir?: string
+    driver: StorageDriver
 ): Promise<{ loaded: number; errors: LoadError[] }> {
-    const dir = storageDir ?? STORAGE_DIR
-    
     // 明確記錄載入的群組和是否為預設值
     const logContext: Record<string, unknown> = {
         activeGroups: ACTIVE_GROUPS,
@@ -212,11 +211,13 @@ export async function loadPrompts(
     
     logger.info(logContext, "Loading prompts")
 
-    const allFiles = await getFilesRecursively(dir)
+    // 使用 driver 取得所有檔案（相對路徑）
+    const allFiles = await driver.getFilesRecursively("")
     let loadedCount = 0
     const errors: LoadError[] = []
 
     for (const filePath of allFiles) {
+        // filePath 現在是相對路徑（相對於儲存根目錄）
         if (!filePath.endsWith(".yaml") && !filePath.endsWith(".yml")) continue
 
         // 排除非 prompt 檔案
@@ -226,7 +227,8 @@ export async function loadPrompts(
             continue
         }
 
-        const relativePath = path.relative(dir, filePath)
+        // filePath 已經是相對路徑，直接使用
+        const relativePath = filePath
         const { shouldLoad, groupName } = shouldLoadPrompt(
             relativePath,
             ACTIVE_GROUPS
@@ -241,7 +243,7 @@ export async function loadPrompts(
         }
 
         try {
-            const content = await fs.readFile(filePath, "utf-8")
+            const content = await driver.readFile(filePath)
             const yamlData = yaml.load(content)
 
             // 使用 Zod 驗證結構

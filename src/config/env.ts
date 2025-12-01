@@ -3,10 +3,10 @@ import dotenv from "dotenv"
 import path from "path"
 
 /**
- * 載入環境變數
- * 從 .env 檔案或系統環境變數中讀取配置
+ * Load environment variables
+ * Reads configuration from .env file or system environment variables
  */
-// 暫時抑制 stdout 輸出以防止 dotenv 污染 MCP 協議
+// Temporarily suppress stdout output to prevent dotenv from polluting MCP protocol
 const originalWrite = process.stdout.write
 // @ts-ignore
 process.stdout.write = () => true
@@ -14,21 +14,26 @@ dotenv.config()
 process.stdout.write = originalWrite
 
 /**
- * 配置驗證 Schema
- * 使用 Zod 驗證所有環境變數，確保類型安全和格式正確
+ * Configuration validation schema
+ * Uses Zod to validate all environment variables, ensuring type safety and correct format
  */
 const ConfigSchema = z.object({
+    PROMPT_STORAGE: z
+        .enum(["github", "local", "memory", "s3"])
+        .default("local"),
     PROMPT_REPO_URL: z
         .string()
-        .min(1, "PROMPT_REPO_URL is required")
+        .optional()
         .refine(
             (url) => {
-                // 驗證 URL 格式或本地路徑
-                // 不允許路徑遍歷攻擊
+                // If URL is not provided, pass validation (some storage types don't need it)
+                if (!url) return true
+                // Validate URL format or local path
+                // Disallow path traversal attacks
                 if (url.includes("..") || url.includes("\0")) {
                     return false
                 }
-                // 驗證是有效的 URL 或絕對路徑
+                // Validate that it's a valid URL or absolute path
                 try {
                     if (
                         url.startsWith("http://") ||
@@ -37,7 +42,7 @@ const ConfigSchema = z.object({
                     ) {
                         return true
                     }
-                    // 本地路徑必須是絕對路徑
+                    // Local path must be absolute
                     return path.isAbsolute(url)
                 } catch {
                     return false
@@ -54,12 +59,12 @@ const ConfigSchema = z.object({
         .optional()
         .transform((val) => {
             if (!val) return undefined
-            // 驗證並清理群組名稱
+            // Validate and clean group names
             const groups = val
                 .split(",")
                 .map((g) => g.trim())
                 .filter(Boolean)
-            // 驗證每個群組名稱格式
+            // Validate each group name format
             const groupNamePattern = /^[a-zA-Z0-9_-]+$/
             for (const group of groups) {
                 if (!groupNamePattern.test(group)) {
@@ -80,13 +85,36 @@ const ConfigSchema = z.object({
         .string()
         .optional()
         .transform((val) => (val ? parseInt(val, 10) : 3)),
+    // S3 related environment variables (optional, only needed when using S3 storage)
+    S3_BUCKET_NAME: z.string().optional(),
+    S3_REGION: z.string().optional(),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_BASE_URL: z
+        .string()
+        .optional()
+        .refine(
+            (val) => {
+                if (!val || val === "") return true // Allow empty string
+                try {
+                    new URL(val) // Validate if it's a valid URL
+                    return true
+                } catch {
+                    return false
+                }
+            },
+            {
+                message: "S3_BASE_URL must be a valid URL or empty string",
+            }
+        ),
+    S3_PREFIX: z.string().optional(),
 })
 
 /**
- * 驗證群組名稱格式
- * 只允許字母、數字、下劃線和破折號
- * @param group - 群組名稱
- * @returns 是否為有效格式
+ * Validate group name format
+ * Only allows letters, numbers, underscores, and dashes
+ * @param group - Group name
+ * @returns Whether it's a valid format
  * @internal
  */
 function validateGroupName(group: string): boolean {
@@ -94,14 +122,15 @@ function validateGroupName(group: string): boolean {
 }
 
 /**
- * 載入並驗證配置
- * 從環境變數讀取配置並使用 Zod Schema 驗證
- * @returns 驗證後的配置物件
- * @throws {Error} 當配置驗證失敗時，包含詳細的錯誤訊息
+ * Load and validate configuration
+ * Reads configuration from environment variables and validates using Zod Schema
+ * @returns Validated configuration object
+ * @throws {Error} When configuration validation fails, includes detailed error message
  */
 function loadConfig() {
     try {
         const rawConfig = {
+            PROMPT_STORAGE: process.env.PROMPT_STORAGE,
             PROMPT_REPO_URL: process.env.PROMPT_REPO_URL,
             MCP_LANGUAGE: process.env.MCP_LANGUAGE,
             MCP_GROUPS: process.env.MCP_GROUPS,
@@ -109,6 +138,12 @@ function loadConfig() {
             LOG_LEVEL: process.env.LOG_LEVEL,
             GIT_BRANCH: process.env.GIT_BRANCH,
             GIT_MAX_RETRIES: process.env.GIT_MAX_RETRIES,
+            S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+            S3_REGION: process.env.S3_REGION,
+            S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
+            S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+            S3_BASE_URL: process.env.S3_BASE_URL,
+            S3_PREFIX: process.env.S3_PREFIX,
         }
 
         return ConfigSchema.parse(rawConfig)
@@ -123,10 +158,11 @@ function loadConfig() {
     }
 }
 
-// 導出配置
+// Export configuration
 export const config = loadConfig()
 
-// 導出計算後的配置值
+// Export computed configuration values
+export const PROMPT_STORAGE = config.PROMPT_STORAGE
 export const REPO_URL = config.PROMPT_REPO_URL
 export const STORAGE_DIR = config.STORAGE_DIR
     ? path.resolve(process.cwd(), config.STORAGE_DIR)
@@ -134,15 +170,15 @@ export const STORAGE_DIR = config.STORAGE_DIR
 export const LANG_SETTING = config.MCP_LANGUAGE
 
 /**
- * 活躍的 prompt 群組列表
- * 當 MCP_GROUPS 未設定時，預設只載入 common 群組
- * 設定方式：MCP_GROUPS=laravel,vue,react
+ * Active prompt groups list
+ * When MCP_GROUPS is not set, defaults to loading only the common group
+ * Setting format: MCP_GROUPS=laravel,vue,react
  */
 export const ACTIVE_GROUPS = config.MCP_GROUPS || ["common"]
 
 /**
- * 是否使用預設群組（MCP_GROUPS 未設定時）
- * 用於在日誌中明確標示是否為預設行為
+ * Whether using default groups (when MCP_GROUPS is not set)
+ * Used to clearly indicate in logs whether it's default behavior
  */
 export const IS_DEFAULT_GROUPS = !config.MCP_GROUPS
 
@@ -151,8 +187,16 @@ export const LOG_FILE = config.LOG_FILE
 export const GIT_BRANCH = config.GIT_BRANCH || "main"
 export const GIT_MAX_RETRIES = config.GIT_MAX_RETRIES
 
-// 語言指令
+// Language instruction
 export const LANG_INSTRUCTION =
     LANG_SETTING === "zh"
         ? "Please reply in Traditional Chinese (繁體中文). Keep technical terms in English."
         : "Please reply in English."
+
+// S3 related configuration (optional, only needed when using S3 storage)
+export const S3_BUCKET_NAME = config.S3_BUCKET_NAME
+export const S3_REGION = config.S3_REGION
+export const S3_ACCESS_KEY_ID = config.S3_ACCESS_KEY_ID
+export const S3_SECRET_ACCESS_KEY = config.S3_SECRET_ACCESS_KEY
+export const S3_BASE_URL = config.S3_BASE_URL
+export const S3_PREFIX = config.S3_PREFIX

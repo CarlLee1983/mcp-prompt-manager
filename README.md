@@ -1,18 +1,20 @@
-# MCP Prompt Manager (Git-Driven)
+# MCP Prompt Manager (Multi-Storage Support)
 
-這是一個基於 Git 的 Model Context Protocol (MCP) Server，專門用於管理和提供 Prompt 模板。它允許你將 Prompts 存儲在一個獨立的 Git Repository 中，並透過 MCP 協議讓 Cursor、Claude Desktop 等 AI 編輯器直接使用。
+這是一個支援多種儲存方式的 Model Context Protocol (MCP) Server，專門用於管理和提供 Prompt 模板。它允許你將 Prompts 存儲在不同的位置（GitHub、本地 Git、記憶體、S3），並透過 MCP 協議讓 Cursor、Claude Desktop 等 AI 編輯器直接使用。
 
 ## ✨ 特色
 
-- **Git 同步**: Prompts 直接從指定的 Git Repository 同步，確保團隊使用統一的 Prompt 版本。
-- **Handlebars 模板**: 支援強大的 Handlebars 語法，可以建立動態、可重用的 Prompt 模板。
-- **Partials 支援**: 支援 Handlebars Partials，方便拆分和重用 Prompt 片段（例如角色設定、輸出格式）。
-- **本地緩存**: 自動將 Git Repo 內容緩存到本地 `.prompts_cache` 目錄，提高讀取速度。
-- **群組過濾**: 支援按群組過濾載入 prompts，只載入需要的部分。
-- **錯誤處理**: 完整的錯誤統計和報告，確保問題可追蹤。
-- **重試機制**: Git 操作自動重試，提高可靠性。
-- **類型安全**: 使用 Zod 驗證配置和 prompt 定義，確保類型安全。
-- **專業日誌**: 使用 pino 日誌系統，支援結構化日誌和多種日誌級別。
+- **多種儲存方式**: 支援 GitHub、Local Git、Memory、S3 四種儲存驅動器，可透過 `PROMPT_STORAGE` 環境變數輕鬆切換
+- **Git 同步**: Prompts 可直接從指定的 Git Repository 同步（GitHub 模式），確保團隊使用統一的 Prompt 版本
+- **S3 支援**: 支援從 AWS S3 讀取 prompts，可選擇 URL 模式（公開 bucket）或 SDK 模式（私有 bucket）
+- **Handlebars 模板**: 支援強大的 Handlebars 語法，可以建立動態、可重用的 Prompt 模板
+- **Partials 支援**: 支援 Handlebars Partials，方便拆分和重用 Prompt 片段（例如角色設定、輸出格式）
+- **本地緩存**: 自動將 Git Repo 內容緩存到本地目錄，提高讀取速度
+- **群組過濾**: 支援按群組過濾載入 prompts，只載入需要的部分
+- **錯誤處理**: 完整的錯誤統計和報告，確保問題可追蹤
+- **重試機制**: Git 操作自動重試，提高可靠性
+- **類型安全**: 使用 Zod 驗證配置和 prompt 定義，確保類型安全
+- **專業日誌**: 使用 pino 日誌系統，支援結構化日誌和多種日誌級別
 
 ## 🚀 快速開始
 
@@ -36,17 +38,87 @@ pnpm install
 cp .env.example .env
 ```
 
-編輯 `.env` 檔案，設定你的 Prompt Git Repository 路徑或 URL：
+編輯 `.env` 檔案，根據你選擇的儲存方式進行設定：
+
+#### 儲存方式設定
 
 ```bash
-# Git Repository 來源（必填）
+# 儲存驅動器類型（可選，預設 local）
+# 支援: github, local, memory, s3
+PROMPT_STORAGE=local
+```
+
+#### Local Git Storage (預設)
+
+```bash
+PROMPT_STORAGE=local
+
+# 本地 Git repository 路徑（必填）
+# 可以是絕對路徑或相對路徑（相對於當前工作目錄）
+STORAGE_DIR=/path/to/your/local/git/repo
+# 或使用相對路徑
+# STORAGE_DIR=./my-prompts
+
+# 如果不設定 STORAGE_DIR，預設使用 .prompts_cache
+```
+
+#### GitHub Storage
+
+```bash
+PROMPT_STORAGE=github
+
+# Git Repository URL（必填）
 # 本地路徑範例
-PROMPT_REPO_URL=/Users/yourname/Desktop/my-local-prompts
+# PROMPT_REPO_URL=/Users/yourname/Desktop/my-local-prompts
 
 # 或遠端 Git URL 範例
-# PROMPT_REPO_URL=https://github.com/yourusername/my-prompts.git
+PROMPT_REPO_URL=https://github.com/yourusername/my-prompts.git
 # PROMPT_REPO_URL=git@github.com:yourusername/my-prompts.git
 
+# 儲存目錄（可選，預設 .prompts_cache）
+STORAGE_DIR=.prompts_cache
+
+# Git 分支（可選，預設 main）
+GIT_BRANCH=main
+
+# Git 重試次數（可選，預設 3）
+GIT_MAX_RETRIES=3
+```
+
+#### Memory Storage
+
+```bash
+PROMPT_STORAGE=memory
+
+# 不需要額外設定，用於測試或動態載入
+```
+
+#### S3 Storage
+
+```bash
+PROMPT_STORAGE=s3
+
+# S3 bucket 名稱（必填）
+S3_BUCKET_NAME=my-prompts-bucket
+
+# S3 region（可選，預設 us-east-1）
+S3_REGION=us-west-2
+
+# 方式一：使用 SDK 模式（支援私有 bucket）
+S3_ACCESS_KEY_ID=your-access-key-id
+S3_SECRET_ACCESS_KEY=your-secret-access-key
+
+# 方式二：使用 URL 模式（公開 bucket）
+# 如果不提供 credentials，會自動使用 URL 模式
+# S3_BASE_URL=https://my-prompts-bucket.s3.amazonaws.com
+
+# S3 物件前綴（可選，用於限制掃描範圍）
+# S3_PREFIX=prompts/common
+```
+
+#### 通用設定
+
+```bash
 # 輸出語言設定（可選，預設 en）
 MCP_LANGUAGE=en  # 或 zh
 
@@ -54,15 +126,6 @@ MCP_LANGUAGE=en  # 或 zh
 # 設定範例: MCP_GROUPS="laravel,vue,react"
 # 注意：未設定時，系統會在日誌中明確提示使用預設群組
 MCP_GROUPS=laravel,vue
-
-# 自訂儲存目錄（可選，預設 .prompts_cache）
-STORAGE_DIR=/custom/path
-
-# Git 分支（可選，預設 main）
-GIT_BRANCH=main
-
-# Git 重試次數（可選，預設 3）
-GIT_MAX_RETRIES=3
 
 # 日誌級別（可選）
 # 可選值: fatal, error, warn, info, debug, trace, silent
@@ -168,7 +231,8 @@ Inspector 會啟動一個網頁介面，你可以在其中：
             "command": "node",
             "args": ["/path/to/mcp-prompt-manager/dist/index.js"],
             "env": {
-                "PROMPT_REPO_URL": "/Users/yourname/Desktop/my-local-prompts",
+                "PROMPT_STORAGE": "local",
+                "STORAGE_DIR": "/Users/yourname/Desktop/my-local-prompts",
                 "MCP_LANGUAGE": "zh",
                 "MCP_GROUPS": "laravel,vue"
             }
@@ -236,7 +300,8 @@ touch ~/Library/Application\ Support/Claude/claude_desktop_config.json
             "command": "node",
             "args": ["/path/to/mcp-prompt-manager/dist/index.js"],
             "env": {
-                "PROMPT_REPO_URL": "/Users/yourname/Desktop/my-local-prompts",
+                "PROMPT_STORAGE": "github",
+                "PROMPT_REPO_URL": "https://github.com/yourusername/my-prompts.git",
                 "MCP_LANGUAGE": "zh",
                 "MCP_GROUPS": "laravel,vue"
             }
@@ -278,7 +343,8 @@ VS Code 可以透過 MCP 擴充功能來使用 MCP Server。
             "command": "node",
             "args": ["/absolute/path/to/mcp-prompt-manager/dist/index.js"],
             "env": {
-                "PROMPT_REPO_URL": "/path/to/your/repo",
+                "PROMPT_STORAGE": "local",
+                "STORAGE_DIR": "/path/to/your/repo",
                 "MCP_LANGUAGE": "zh",
                 "MCP_GROUPS": "laravel,vue"
             }
@@ -322,7 +388,8 @@ Continue 是一個開源的 AI 程式碼助手，支援 MCP。
             "command": "node",
             "args": ["/absolute/path/to/mcp-prompt-manager/dist/index.js"],
             "env": {
-                "PROMPT_REPO_URL": "/path/to/your/repo",
+                "PROMPT_STORAGE": "local",
+                "STORAGE_DIR": "/path/to/your/repo",
                 "MCP_LANGUAGE": "zh",
                 "MCP_GROUPS": "laravel,vue"
             }
@@ -346,7 +413,8 @@ Aider 是一個 AI 程式碼編輯器，支援 MCP。
             "command": "node",
             "args": ["/absolute/path/to/mcp-prompt-manager/dist/index.js"],
             "env": {
-                "PROMPT_REPO_URL": "/path/to/your/repo"
+                "PROMPT_STORAGE": "local",
+                "STORAGE_DIR": "/path/to/your/repo"
             }
         }
     }
@@ -380,7 +448,8 @@ const transport = new StdioClientTransport({
     command: "node",
     args: ["/path/to/mcp-prompt-manager/dist/index.js"],
     env: {
-        PROMPT_REPO_URL: "/path/to/repo",
+        PROMPT_STORAGE: "local",
+        STORAGE_DIR: "/path/to/repo",
         MCP_LANGUAGE: "zh",
     },
 })
@@ -414,8 +483,9 @@ async def main():
         command="node",
         args=["/path/to/mcp-prompt-manager/dist/index.js"],
         env={
-            "PROMPT_REPO_URL": "/path/to/repo",
-            "MCP_LANGUAGE": "zh"
+        "PROMPT_STORAGE": "local",
+        "STORAGE_DIR": "/path/to/repo",
+        "MCP_LANGUAGE": "zh"
         }
     )
 
@@ -466,7 +536,8 @@ async def main():
             "command": "node",
             "args": ["/absolute/path/to/mcp-prompt-manager/dist/index.js"],
             "env": {
-                "PROMPT_REPO_URL": "your-repo-url-or-path",
+                "PROMPT_STORAGE": "local",
+                "STORAGE_DIR": "/path/to/your/repo",
                 "MCP_LANGUAGE": "en",
                 "MCP_GROUPS": "common",
                 "LOG_LEVEL": "info"
@@ -480,14 +551,21 @@ async def main():
 
 - **`command`**: 執行命令（通常是 `node`）
 - **`args`**: 命令參數陣列，必須包含編譯後的 `dist/index.js` 的絕對路徑
-- **`env`**: 環境變數物件（可選）
-    - `PROMPT_REPO_URL`: Git 倉庫 URL 或本地路徑（必填）
-    - `MCP_LANGUAGE`: 輸出語言，`en` 或 `zh`（可選，預設 `en`）
-    - `MCP_GROUPS`: 要載入的群組，逗號分隔（可選，未設定時預設只載入 `common` 群組，系統會在日誌中提示）
-    - `STORAGE_DIR`: 本地緩存目錄（可選）
-    - `GIT_BRANCH`: Git 分支（可選，預設 `main`）
-    - `GIT_MAX_RETRIES`: Git 重試次數（可選，預設 `3`）
-    - `LOG_LEVEL`: 日誌級別（可選，預設 `info`）
+- **`env`**: Environment variables object (optional)
+    - `PROMPT_STORAGE`: Storage driver type, `github`, `local`, `memory`, `s3` (optional, default `local`)
+    - `STORAGE_DIR`: Local storage directory (optional, default `.prompts_cache`, used by local/github types)
+    - `PROMPT_REPO_URL`: Git repository URL or local path (required for github storage type)
+    - `MCP_LANGUAGE`: Output language, `en` or `zh` (optional, default `en`)
+    - `MCP_GROUPS`: Groups to load, comma-separated (optional, defaults to `common` when not set, system will log a hint)
+    - `GIT_BRANCH`: Git branch (optional, default `main`, used by github type)
+    - `GIT_MAX_RETRIES`: Git retry count (optional, default `3`, used by github type)
+    - `S3_BUCKET_NAME`: S3 bucket name (required for s3 storage type)
+    - `S3_REGION`: AWS region (optional, default `us-east-1`, used by s3 type)
+    - `S3_ACCESS_KEY_ID`: AWS Access Key (optional, used by s3 type SDK mode)
+    - `S3_SECRET_ACCESS_KEY`: AWS Secret Key (optional, used by s3 type SDK mode)
+    - `S3_BASE_URL`: S3 public URL (optional, used by s3 type URL mode)
+    - `S3_PREFIX`: S3 object prefix (optional, used by s3 type)
+    - `LOG_LEVEL`: Log level (optional, default `info`)
 
 #### 重要注意事項
 
@@ -531,7 +609,8 @@ pnpm run inspector:dev
             "command": "node",
             "args": ["/path/to/mcp-prompt-manager/dist/index.js"],
             "env": {
-                "PROMPT_REPO_URL": "/path/to/repo",
+                "PROMPT_STORAGE": "local",
+                "STORAGE_DIR": "/path/to/repo",
                 "LOG_LEVEL": "debug"
             }
         }
@@ -583,12 +662,15 @@ ls -la /path/to/mcp-prompt-manager/.prompts_cache
 
 **解決方案**:
 
-1. 確認 `PROMPT_REPO_URL` 正確
+1. 確認 `PROMPT_STORAGE` 和對應的設定正確
+   - `local`: 檢查 `STORAGE_DIR` 是否正確且目錄可訪問
+   - `github`: 檢查 `PROMPT_REPO_URL` 是否正確
+   - `s3`: 檢查 `S3_BUCKET_NAME` 和相關設定是否正確
 2. 檢查 `MCP_GROUPS` 設定是否包含你想要的群組
    - **注意**：如果 `MCP_GROUPS` 未設定，系統預設只載入 `common` 群組
    - 查看日誌中的提示訊息，確認是否使用了預設群組
    - 設定 `MCP_GROUPS=laravel,vue` 等來載入其他群組
-3. 確認 Git 倉庫中有 `.yaml` 或 `.yml` 檔案
+3. 確認儲存位置中有 `.yaml` 或 `.yml` 檔案
 4. 使用 `LOG_LEVEL=debug` 查看詳細日誌，確認哪些群組被載入
 
 ## 📂 Prompt Repository 結構
@@ -674,6 +756,14 @@ mcp-prompt-manager/
 │   ├── index.ts              # 主程式入口
 │   ├── config/
 │   │   └── env.ts            # 環境變數配置和驗證
+│   ├── storage/              # 儲存驅動器
+│   │   ├── StorageDriver.ts           # 儲存驅動器介面
+│   │   ├── StorageDriverFactory.ts   # 驅動器工廠
+│   │   └── drivers/
+│   │       ├── LocalGitStorageDriver.ts   # 本地 Git 驅動器
+│   │       ├── GitHubStorageDriver.ts     # GitHub 驅動器
+│   │       ├── MemoryStorageDriver.ts     # 記憶體驅動器
+│   │       └── S3StorageDriver.ts         # S3 驅動器
 │   ├── services/
 │   │   ├── git.ts            # Git 同步服務
 │   │   └── loaders.ts        # Prompt 和 Partials 載入器
@@ -688,6 +778,7 @@ mcp-prompt-manager/
 │   ├── utils.test.ts
 │   └── integration.test.ts  # 整合測試
 ├── dist/                      # 編譯輸出
+├── .env.example              # 環境變數範例檔
 ├── package.json
 ├── tsconfig.json
 └── vitest.config.ts
@@ -772,15 +863,58 @@ pnpm test:ui
 
 ### 環境變數
 
-| 變數名            | 必填 | 預設值           | 說明                     |
-| ----------------- | ---- | ---------------- | ------------------------ |
-| `PROMPT_REPO_URL` | ✅   | -                | Git 倉庫 URL 或本地路徑  |
-| `MCP_LANGUAGE`    | ❌   | `en`             | 輸出語言 (`en` 或 `zh`)  |
-| `MCP_GROUPS`      | ❌   | `common`         | 要載入的群組（逗號分隔），未設定時會在日誌中提示預設行為 |
-| `STORAGE_DIR`     | ❌   | `.prompts_cache` | 本地緩存目錄             |
-| `GIT_BRANCH`      | ❌   | `main`           | Git 分支名稱             |
-| `GIT_MAX_RETRIES` | ❌   | `3`              | Git 操作最大重試次數     |
-| `LOG_LEVEL`       | ❌   | `warn` (生產) / `info` (開發) | 日誌級別，生產環境預設只輸出警告和錯誤 |
+#### Storage Driver Settings
+
+| Variable Name      | Required | Default | Description |
+| ------------------ | -------- | ------- | ----------- |
+| `PROMPT_STORAGE`   | ❌       | `local` | Storage driver type: `github`, `local`, `memory`, `s3` |
+
+#### Local Git Storage Settings (PROMPT_STORAGE=local)
+
+| Variable Name | Required | Default           | Description |
+| ------------- | -------- | ----------------- | ----------- |
+| `STORAGE_DIR` | ❌       | `.prompts_cache`  | Local Git repository path (absolute or relative to current working directory) |
+
+#### GitHub Storage Settings (PROMPT_STORAGE=github)
+
+| Variable Name    | Required | Default           | Description |
+| ---------------- | -------- | ----------------- | ----------- |
+| `PROMPT_REPO_URL`| ✅*      | -                 | Git repository URL or local path (required for github storage type) |
+| `STORAGE_DIR`    | ❌       | `.prompts_cache`  | Local cache directory |
+| `GIT_BRANCH`     | ❌       | `main`            | Git branch name |
+| `GIT_MAX_RETRIES`| ❌       | `3`               | Maximum retry count for Git operations |
+
+#### Memory Storage Settings (PROMPT_STORAGE=memory)
+
+| Variable Name | Required | Default | Description |
+| ------------- | -------- | ------- | ----------- |
+| -             | -        | -       | No additional configuration needed (used for testing or dynamic loading) |
+
+#### S3 Storage Settings (PROMPT_STORAGE=s3)
+
+| Variable Name         | Required | Default      | Description |
+| --------------------- | -------- | ------------ | ----------- |
+| `S3_BUCKET_NAME`      | ✅*      | -            | S3 bucket name (required for s3 storage type) |
+| `S3_REGION`           | ❌       | `us-east-1`  | AWS region |
+| `S3_ACCESS_KEY_ID`    | ❌       | -            | AWS Access Key (SDK mode, supports private buckets) |
+| `S3_SECRET_ACCESS_KEY`| ❌       | -            | AWS Secret Key (SDK mode, supports private buckets) |
+| `S3_BASE_URL`         | ❌       | Auto-generated | S3 public URL (URL mode, for public buckets) |
+| `S3_PREFIX`           | ❌       | -            | S3 object prefix (used to limit scan scope) |
+
+**S3 Mode Selection:**
+- **SDK Mode**: Automatically used when both `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` are provided (supports private buckets)
+- **URL Mode**: Automatically used when credentials are not provided (for public buckets)
+
+#### General Settings
+
+| Variable Name | Required | Default                    | Description |
+| ------------- | -------- | -------------------------- | ----------- |
+| `MCP_LANGUAGE`| ❌       | `en`                       | Output language (`en` or `zh`) |
+| `MCP_GROUPS`  | ❌       | `common`                   | Groups to load (comma-separated), system will log a hint when using default |
+| `LOG_LEVEL`   | ❌       | `warn` (prod) / `info` (dev) | Log level, production defaults to warnings and errors only |
+| `LOG_FILE`    | ❌       | -                          | Log file path (optional, strongly recommended) |
+
+**Note**: Variables marked with ✅* are required for the corresponding storage type.
 
 ### 安全性
 
@@ -819,23 +953,25 @@ export LOG_LEVEL=debug
 
 ## 🐛 故障排除
 
-### 問題：Git 同步失敗
+### 問題：Git 同步失敗（僅適用於 GitHub Storage）
 
 **解決方案**:
 
-1. 檢查 `PROMPT_REPO_URL` 是否正確
-2. 確認網路連線正常
-3. 檢查 Git 憑證是否正確
-4. 查看日誌了解詳細錯誤訊息
+1. 確認 `PROMPT_STORAGE=github` 已設定
+2. 檢查 `PROMPT_REPO_URL` 是否正確
+3. 確認網路連線正常
+4. 檢查 Git 憑證是否正確
+5. 查看日誌了解詳細錯誤訊息
 
 ### 問題：沒有載入任何 prompts
 
 **解決方案**:
 
-1. 檢查 `MCP_GROUPS` 設定是否正確
-2. 確認 prompts 檔案在正確的目錄結構中
-3. 檢查 YAML 檔案格式是否正確
-4. 查看日誌中的錯誤訊息
+1. 確認 `PROMPT_STORAGE` 和對應的設定正確（例如 `STORAGE_DIR` 或 `PROMPT_REPO_URL`）
+2. 檢查 `MCP_GROUPS` 設定是否正確
+3. 確認 prompts 檔案在正確的目錄結構中
+4. 檢查 YAML 檔案格式是否正確
+5. 查看日誌中的錯誤訊息
 
 ### 問題：Partials 無法使用
 

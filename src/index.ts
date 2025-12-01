@@ -1,33 +1,34 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
-import { STORAGE_DIR, ACTIVE_GROUPS, IS_DEFAULT_GROUPS } from "./config/env.js"
+import { ACTIVE_GROUPS, IS_DEFAULT_GROUPS } from "./config/env.js"
 import { logger } from "./utils/logger.js"
-import { syncRepo } from "./services/git.js"
+import { createStorageDriver } from "./storage/StorageDriverFactory.js"
 import { loadPartials, loadPrompts } from "./services/loaders.js"
 
-// 初始化 MCP Server
+// Initialize MCP Server
 const server = new McpServer({
     name: "mcp-prompt-manager",
     version: "1.0.0",
 })
 
 /**
- * 主程式入口
- * 負責初始化並啟動 MCP Server
+ * Main program entry point
+ * Responsible for initializing and starting the MCP Server
  */
 async function main() {
     try {
         logger.info("Starting MCP Prompt Manager")
 
-        // 1. 同步 Git 倉庫
-        await syncRepo()
+        // 1. Create and initialize Storage Driver
+        const driver = createStorageDriver()
+        await driver.initialize()
 
-        // 2. 載入 Handlebars Partials
-        const partialsCount = await loadPartials(STORAGE_DIR)
+        // 2. Load Handlebars Partials
+        const partialsCount = await loadPartials(driver)
         logger.info({ count: partialsCount }, "Partials loaded")
 
-        // 3. 載入並註冊 Prompts
-        // 在載入前提示用戶（如果是預設值）
+        // 3. Load and register Prompts
+        // Prompt user before loading (if using default values)
         if (IS_DEFAULT_GROUPS) {
             logger.info(
                 {
@@ -38,7 +39,7 @@ async function main() {
             )
         }
 
-        const { loaded, errors } = await loadPrompts(server, STORAGE_DIR)
+        const { loaded, errors } = await loadPrompts(server, driver)
 
         if (errors.length > 0) {
             logger.warn(
@@ -62,7 +63,7 @@ async function main() {
             )
         }
 
-        // 4. 啟動 MCP Server
+        // 4. Start MCP Server
         const transport = new StdioServerTransport()
         await server.connect(transport)
         logger.info("MCP Server is running!")
@@ -74,5 +75,5 @@ async function main() {
     }
 }
 
-// 啟動應用程式
+// Start the application
 main()
