@@ -74,6 +74,7 @@ const ConfigSchema = z.object({
     LOG_LEVEL: z
         .enum(["fatal", "error", "warn", "info", "debug", "trace"])
         .default("info"),
+    LOG_FILE: z.string().optional(),
     GIT_BRANCH: z.string().optional(),
     GIT_MAX_RETRIES: z
         .string()
@@ -146,6 +147,7 @@ export const ACTIVE_GROUPS = config.MCP_GROUPS || ["common"]
 export const IS_DEFAULT_GROUPS = !config.MCP_GROUPS
 
 export const LOG_LEVEL = config.LOG_LEVEL
+export const LOG_FILE = config.LOG_FILE
 export const GIT_BRANCH = config.GIT_BRANCH || "main"
 export const GIT_MAX_RETRIES = config.GIT_MAX_RETRIES
 

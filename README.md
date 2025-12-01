@@ -66,9 +66,24 @@ GIT_MAX_RETRIES=3
 
 # 日誌級別（可選）
 # 可選值: fatal, error, warn, info, debug, trace, silent
-# 注意：生產環境預設為 warn（只輸出警告和錯誤），開發環境預設為 info
-# 設定 silent 可完全禁用日誌輸出
+# 注意：
+# - stderr 只輸出 warn/error/fatal 級別的日誌（避免被標記為 error）
+# - info/debug/trace 級別的日誌只輸出到檔案（如果設定了 LOG_FILE）
+# - 如果沒有設定 LOG_FILE，info 級別的日誌完全不輸出（避免誤會）
+# - 生產環境預設為 warn（只輸出警告和錯誤），開發環境預設為 info
+# - 設定 silent 可完全禁用日誌輸出
 LOG_LEVEL=info
+
+# 日誌檔案路徑（可選，強烈建議設定）
+# 設定此變數後，所有級別的日誌都會寫入檔案（JSON 格式）
+# stderr 仍然只輸出 warn/error/fatal（避免被標記為 error）
+# 可以是絕對路徑或相對路徑（相對於專案根目錄）
+# 範例：
+# LOG_FILE=/tmp/mcp-prompt-manager.log
+# LOG_FILE=logs/mcp.log
+# 注意：檔案會以 append 模式寫入，不會覆蓋現有內容
+# 建議：設定此變數以便查看完整的日誌（包括 info 級別）
+LOG_FILE=logs/mcp.log
 ```
 
 ### 3. 編譯

@@ -13,7 +13,7 @@ import {
 } from "../config/env.js"
 import { logger } from "../utils/logger.js"
 import { getFilesRecursively } from "../utils/fileSystem.js"
-import type { PromptDefinition } from "../types/prompt.js"
+import type { PromptDefinition, PromptArgDefinition } from "../types/prompt.js"
 
 // Prompt 定義驗證 Schema
 const PromptDefinitionSchema = z.object({
@@ -26,6 +26,7 @@ const PromptDefinitionSchema = z.object({
             z.object({
                 type: z.enum(["string", "number", "boolean"]),
                 description: z.string().optional(),
+                default: z.union([z.string(), z.number(), z.boolean()]).optional(),
             })
         )
         .optional(),
@@ -70,24 +71,57 @@ export async function loadPartials(storageDir?: string): Promise<number> {
 
 /**
  * 建構 Zod Schema
- * @param args - Prompt 參數定義
+ * @param args - Prompt 參數定義（來自 Zod 解析後的結果）
  * @returns Zod Schema 物件
  */
 function buildZodSchema(
     args: Record<
         string,
-        { type: "string" | "number" | "boolean"; description?: string }
+        {
+            type: "string" | "number" | "boolean"
+            description?: string
+            default?: string | number | boolean
+        }
     >
-): Record<string, z.ZodTypeAny> {
+): z.ZodRawShape {
     const zodShape: Record<string, z.ZodTypeAny> = {}
     if (args) {
         for (const [key, config] of Object.entries(args)) {
             let schema: z.ZodTypeAny
-            if (config.type === "number") schema = z.number()
-            else if (config.type === "boolean") schema = z.boolean()
-            else schema = z.string()
 
-            if (config.description) schema = schema.describe(config.description)
+            // 根據類型建立基礎 schema
+            if (config.type === "number") {
+                schema = z.number()
+            } else if (config.type === "boolean") {
+                schema = z.boolean()
+            } else {
+                schema = z.string()
+            }
+
+            // 判斷參數是否為可選
+            // 1. 如果有 default 值，參數是可選的
+            // 2. 如果 description 中包含 "optional"，參數是可選的
+            // 3. 如果 description 中明確說 "required"，參數是必需的
+            const hasDefault = config.default !== undefined
+            const isOptionalInDesc =
+                config.description?.toLowerCase().includes("optional") ?? false
+            const isRequiredInDesc =
+                config.description?.toLowerCase().includes("(required)") ?? false
+
+            // 如果沒有明確標記為 required，且有 default 或標記為 optional，則設為可選
+            if (!isRequiredInDesc && (hasDefault || isOptionalInDesc)) {
+                schema = schema.optional()
+                // 如果有 default 值，設定預設值
+                if (hasDefault) {
+                    schema = schema.default(config.default as never)
+                }
+            }
+
+            // 設定描述
+            if (config.description) {
+                schema = schema.describe(config.description)
+            }
+
             zodShape[key] = schema
         }
     }
@@ -227,16 +261,15 @@ export async function loadPrompts(
             const promptDef = parseResult.data
 
             // 建構 Zod Schema
-            const zodShape = promptDef.args
-                ? buildZodSchema(
-                      promptDef.args as Record<
-                          string,
-                          {
-                              type: "string" | "number" | "boolean"
-                              description?: string
-                          }
-                      >
-                  )
+            const zodShape: z.ZodRawShape = promptDef.args
+                ? buildZodSchema(promptDef.args as Record<
+                      string,
+                      {
+                          type: "string" | "number" | "boolean"
+                          description?: string
+                          default?: string | number | boolean
+                      }
+                  >)
                 : {}
 
             // 編譯 Handlebars 模板
@@ -261,9 +294,19 @@ export async function loadPrompts(
                 continue
             }
 
-            // 註冊 Prompt
-            server.prompt(promptDef.id, zodShape, (args) => {
+            // 建立 prompt 處理函數（可重用於 prompt 和 tool）
+            const promptHandler = (args: Record<string, unknown>) => {
                 try {
+                    // 記錄 prompt 被調用
+                    logger.info(
+                        {
+                            promptId: promptDef.id,
+                            promptTitle: promptDef.title,
+                            args: Object.keys(args),
+                        },
+                        "Prompt invoked"
+                    )
+
                     // 自動注入語言指令與參數
                     const context = {
                         ...args,
@@ -271,11 +314,21 @@ export async function loadPrompts(
                         sys_lang: LANG_SETTING,
                     }
                     const message = templateDelegate(context)
+                    
+                    // 記錄模板渲染成功
+                    logger.debug(
+                        {
+                            promptId: promptDef.id,
+                            messageLength: message.length,
+                        },
+                        "Template rendered successfully"
+                    )
+                    
                     return {
                         messages: [
                             {
-                                role: "user",
-                                content: { type: "text", text: message },
+                                role: "user" as const,
+                                content: { type: "text" as const, text: message },
                             },
                         ],
                     }
@@ -290,7 +343,80 @@ export async function loadPrompts(
                     )
                     throw execError
                 }
-            })
+            }
+
+            // 註冊 Prompt
+            server.prompt(promptDef.id, zodShape, promptHandler)
+
+            // 同時註冊為 Tool，讓 AI 可以自動調用
+            // 從 description 中提取 TRIGGER 資訊用於 tool 描述
+            const description = promptDef.description || ""
+            const triggerMatch = description.match(/TRIGGER:\s*(.+?)(?:\n|$)/i)
+            const triggerText = triggerMatch && triggerMatch[1]
+                ? triggerMatch[1].trim()
+                : `When user needs ${promptDef.title.toLowerCase()}`
+
+            // 建立 tool 的 inputSchema（與 prompt 的 args 相同）
+            const toolInputSchema = Object.keys(zodShape).length > 0
+                ? z.object(zodShape)
+                : z.object({})
+
+            // 註冊 Tool（使用 registerTool，推薦的 API）
+            server.registerTool(
+                promptDef.id,
+                {
+                    title: promptDef.title,
+                    description: `${description}\n\n${triggerText}`,
+                    inputSchema: toolInputSchema,
+                },
+                async (args: Record<string, unknown>) => {
+                    // 記錄 tool 被調用（使用 info 級別，更容易看到）
+                    logger.info(
+                        {
+                            toolId: promptDef.id,
+                            toolTitle: promptDef.title,
+                            args: Object.keys(args),
+                            argsValues: Object.fromEntries(
+                                Object.entries(args).map(([key, value]) => [
+                                    key,
+                                    typeof value === "string" && value.length > 100
+                                        ? `${value.substring(0, 100)}...`
+                                        : value,
+                                ])
+                            ),
+                        },
+                        "🔧 Tool invoked (calling prompt)"
+                    )
+
+                    // 調用 prompt handler 並返回結果
+                    const result = promptHandler(args)
+                    
+                    // 記錄 tool 執行成功
+                    const firstMessage = result.messages[0]
+                    const messageText =
+                        firstMessage?.content && "text" in firstMessage.content
+                            ? firstMessage.content.text
+                            : ""
+                    
+                    logger.info(
+                        {
+                            toolId: promptDef.id,
+                            messageLength: messageText.length,
+                        },
+                        "✅ Tool execution completed"
+                    )
+                    
+                    // Tool 需要返回 content 格式
+                    return {
+                        content: [
+                            {
+                                type: "text" as const,
+                                text: messageText,
+                            },
+                        ],
+                    }
+                }
+            )
 
             loadedCount++
             logger.debug({ groupName, promptId: promptDef.id }, "Prompt loaded")
