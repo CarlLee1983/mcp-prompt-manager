@@ -6,7 +6,12 @@ import path from "path"
  * 載入環境變數
  * 從 .env 檔案或系統環境變數中讀取配置
  */
+// 暫時抑制 stdout 輸出以防止 dotenv 污染 MCP 協議
+const originalWrite = process.stdout.write
+// @ts-ignore
+process.stdout.write = () => true
 dotenv.config()
+process.stdout.write = originalWrite
 
 /**
  * 配置驗證 Schema

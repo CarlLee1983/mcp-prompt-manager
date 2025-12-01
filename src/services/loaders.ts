@@ -145,6 +145,20 @@ function shouldLoadPrompt(
  * }
  * ```
  */
+// 排除的非 prompt 檔案名稱（不區分大小寫）
+const EXCLUDED_FILES = [
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "package-lock.json",
+    "package.json",
+    "composer.lock",
+    "go.sum",
+    "requirements.txt",
+    "poetry.lock",
+    "pom.xml",
+    "build.gradle",
+]
+
 export async function loadPrompts(
     server: McpServer,
     storageDir?: string
@@ -158,6 +172,13 @@ export async function loadPrompts(
 
     for (const filePath of allFiles) {
         if (!filePath.endsWith(".yaml") && !filePath.endsWith(".yml")) continue
+
+        // 排除非 prompt 檔案
+        const fileName = path.basename(filePath).toLowerCase()
+        if (EXCLUDED_FILES.some((excluded) => fileName === excluded.toLowerCase())) {
+            logger.debug({ filePath }, "Skipping excluded file")
+            continue
+        }
 
         const relativePath = path.relative(dir, filePath)
         const { shouldLoad, groupName } = shouldLoadPrompt(
