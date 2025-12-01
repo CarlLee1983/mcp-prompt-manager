@@ -45,10 +45,32 @@ export async function syncRepo(
                     await ensureDirectoryAccess(STORAGE_DIR)
 
                     const git = simpleGit(gitOptions)
-                    await git.pull()
+                    
+                    // 先 fetch 獲取遠端更新
+                    await git.fetch()
+                    
+                    // 檢查當前分支
+                    const currentBranch = await git.revparse(["--abbrev-ref", "HEAD"])
+                    const branchName = currentBranch.trim() || GIT_BRANCH
+                    
+                    // 嘗試 pull with rebase（優先策略）
+                    try {
+                        await git.pull(["--rebase"])
+                        logger.info({ branch: branchName }, "Git pull with rebase successful")
+                    } catch (rebaseError) {
+                        // 如果 rebase 失敗（可能是因為有分歧），使用 reset 強制同步到遠端
+                        logger.warn(
+                            { branch: branchName, error: rebaseError },
+                            "Git pull with rebase failed, resetting to remote branch"
+                        )
+                        const remoteBranch = `origin/${branchName}`
+                        await git.reset(["--hard", remoteBranch])
+                        logger.info({ branch: branchName }, "Git reset to remote branch successful")
+                    }
+                    
                     // 清除緩存以確保數據一致性
                     clearFileCache(STORAGE_DIR)
-                    logger.info("Git pull successful")
+                    logger.info("Git sync successful")
                     return
                 } else {
                     // 目錄存在但不是 git repo，重新 clone
