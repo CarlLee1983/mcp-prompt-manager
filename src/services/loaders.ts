@@ -7,6 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import {
     STORAGE_DIR,
     ACTIVE_GROUPS,
+    IS_DEFAULT_GROUPS,
     LANG_INSTRUCTION,
     LANG_SETTING,
 } from "../config/env.js"
@@ -164,7 +165,18 @@ export async function loadPrompts(
     storageDir?: string
 ): Promise<{ loaded: number; errors: LoadError[] }> {
     const dir = storageDir ?? STORAGE_DIR
-    logger.info({ activeGroups: ACTIVE_GROUPS }, "Loading prompts")
+    
+    // 明確記錄載入的群組和是否為預設值
+    const logContext: Record<string, unknown> = {
+        activeGroups: ACTIVE_GROUPS,
+    }
+    
+    if (IS_DEFAULT_GROUPS) {
+        logContext.isDefault = true
+        logContext.hint = "Set MCP_GROUPS to load additional groups"
+    }
+    
+    logger.info(logContext, "Loading prompts")
 
     const allFiles = await getFilesRecursively(dir)
     let loadedCount = 0

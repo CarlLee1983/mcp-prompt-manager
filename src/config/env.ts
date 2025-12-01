@@ -131,7 +131,20 @@ export const STORAGE_DIR = config.STORAGE_DIR
     ? path.resolve(process.cwd(), config.STORAGE_DIR)
     : path.resolve(process.cwd(), ".prompts_cache")
 export const LANG_SETTING = config.MCP_LANGUAGE
+
+/**
+ * 活躍的 prompt 群組列表
+ * 當 MCP_GROUPS 未設定時，預設只載入 common 群組
+ * 設定方式：MCP_GROUPS=laravel,vue,react
+ */
 export const ACTIVE_GROUPS = config.MCP_GROUPS || ["common"]
+
+/**
+ * 是否使用預設群組（MCP_GROUPS 未設定時）
+ * 用於在日誌中明確標示是否為預設行為
+ */
+export const IS_DEFAULT_GROUPS = !config.MCP_GROUPS
+
 export const LOG_LEVEL = config.LOG_LEVEL
 export const GIT_BRANCH = config.GIT_BRANCH || "main"
 export const GIT_MAX_RETRIES = config.GIT_MAX_RETRIES

@@ -50,8 +50,9 @@ PROMPT_REPO_URL=/Users/yourname/Desktop/my-local-prompts
 # 輸出語言設定（可選，預設 en）
 MCP_LANGUAGE=en  # 或 zh
 
-# 群組過濾設定（可選，預設只載入 common）
+# 群組過濾設定（可選，未設定時預設只載入 common 群組）
 # 設定範例: MCP_GROUPS="laravel,vue,react"
+# 注意：未設定時，系統會在日誌中明確提示使用預設群組
 MCP_GROUPS=laravel,vue
 
 # 自訂儲存目錄（可選，預設 .prompts_cache）
@@ -63,8 +64,10 @@ GIT_BRANCH=main
 # Git 重試次數（可選，預設 3）
 GIT_MAX_RETRIES=3
 
-# 日誌級別（可選，預設 info）
-# 可選值: fatal, error, warn, info, debug, trace
+# 日誌級別（可選）
+# 可選值: fatal, error, warn, info, debug, trace, silent
+# 注意：生產環境預設為 warn（只輸出警告和錯誤），開發環境預設為 info
+# 設定 silent 可完全禁用日誌輸出
 LOG_LEVEL=info
 ```
 
@@ -465,7 +468,7 @@ async def main():
 - **`env`**: 環境變數物件（可選）
     - `PROMPT_REPO_URL`: Git 倉庫 URL 或本地路徑（必填）
     - `MCP_LANGUAGE`: 輸出語言，`en` 或 `zh`（可選，預設 `en`）
-    - `MCP_GROUPS`: 要載入的群組，逗號分隔（可選，預設 `common`）
+    - `MCP_GROUPS`: 要載入的群組，逗號分隔（可選，未設定時預設只載入 `common` 群組，系統會在日誌中提示）
     - `STORAGE_DIR`: 本地緩存目錄（可選）
     - `GIT_BRANCH`: Git 分支（可選，預設 `main`）
     - `GIT_MAX_RETRIES`: Git 重試次數（可選，預設 `3`）
@@ -567,8 +570,11 @@ ls -la /path/to/mcp-prompt-manager/.prompts_cache
 
 1. 確認 `PROMPT_REPO_URL` 正確
 2. 檢查 `MCP_GROUPS` 設定是否包含你想要的群組
+   - **注意**：如果 `MCP_GROUPS` 未設定，系統預設只載入 `common` 群組
+   - 查看日誌中的提示訊息，確認是否使用了預設群組
+   - 設定 `MCP_GROUPS=laravel,vue` 等來載入其他群組
 3. 確認 Git 倉庫中有 `.yaml` 或 `.yml` 檔案
-4. 使用 `LOG_LEVEL=debug` 查看詳細日誌
+4. 使用 `LOG_LEVEL=debug` 查看詳細日誌，確認哪些群組被載入
 
 ## 📂 Prompt Repository 結構
 
@@ -597,10 +603,17 @@ my-prompts/
 - **common 群組** (`common/`): 永遠載入
 - **其他群組**: 只有在 `MCP_GROUPS` 環境變數中指定時才載入
 
-範例：
+#### 預設行為
+
+當 `MCP_GROUPS` **未設定**時：
+- 系統會自動載入 `common` 群組（以及根目錄的 prompts）
+- 啟動時會在日誌中明確提示使用預設群組
+- 日誌會包含提示訊息，建議設定 `MCP_GROUPS` 以載入更多群組
+
+#### 範例
 
 - `MCP_GROUPS=laravel,vue` → 載入根目錄、common、laravel、vue
-- `MCP_GROUPS=` → 只載入根目錄和 common
+- `MCP_GROUPS=` 或未設定 → 只載入根目錄和 common（系統會提示使用預設值）
 
 ### Prompt 定義檔範例 (`.yaml`)
 
@@ -748,11 +761,11 @@ pnpm test:ui
 | ----------------- | ---- | ---------------- | ------------------------ |
 | `PROMPT_REPO_URL` | ✅   | -                | Git 倉庫 URL 或本地路徑  |
 | `MCP_LANGUAGE`    | ❌   | `en`             | 輸出語言 (`en` 或 `zh`)  |
-| `MCP_GROUPS`      | ❌   | `common`         | 要載入的群組（逗號分隔） |
+| `MCP_GROUPS`      | ❌   | `common`         | 要載入的群組（逗號分隔），未設定時會在日誌中提示預設行為 |
 | `STORAGE_DIR`     | ❌   | `.prompts_cache` | 本地緩存目錄             |
 | `GIT_BRANCH`      | ❌   | `main`           | Git 分支名稱             |
 | `GIT_MAX_RETRIES` | ❌   | `3`              | Git 操作最大重試次數     |
-| `LOG_LEVEL`       | ❌   | `info`           | 日誌級別                 |
+| `LOG_LEVEL`       | ❌   | `warn` (生產) / `info` (開發) | 日誌級別，生產環境預設只輸出警告和錯誤 |
 
 ### 安全性
 
@@ -769,9 +782,15 @@ pnpm test:ui
 - `fatal`: 致命錯誤，導致程序退出
 - `error`: 錯誤訊息
 - `warn`: 警告訊息
-- `info`: 一般資訊（預設）
+- `info`: 一般資訊
 - `debug`: 除錯訊息
 - `trace`: 追蹤訊息
+- `silent`: 完全禁用日誌輸出
+
+**預設行為**：
+- **生產環境**（`NODE_ENV` 未設定或不是 `development`）：預設為 `warn`，只輸出警告和錯誤
+- **開發環境**（`NODE_ENV=development`）：預設為 `info`，輸出所有資訊級別以上的日誌
+- 可通過 `LOG_LEVEL` 環境變數覆蓋預設值
 
 ### 設定日誌級別
 
