@@ -13,6 +13,8 @@ import {
     loadPrompts,
     reloadPrompts,
     getAllPromptRuntimes,
+    getPromptStats,
+    getPromptRuntime,
 } from './services/loaders.js'
 import { startCacheCleanup, stopCacheCleanup } from './utils/fileSystem.js'
 import { getHealthStatus } from './services/health.js'
@@ -78,18 +80,18 @@ async function main() {
             )
         }
 
-        // 4. Register reloadPrompts tool
+        // 4. Register mcp.reload() tool
         server.registerTool(
-            'reloadPrompts',
+            'mcp.reload',
             {
                 title: 'Reload Prompts',
                 description:
-                    'Reload all prompts from Git repository without restarting the server. This will: 1) Pull latest changes from Git, 2) Clear cache, 3) Reload all Handlebars partials, 4) Reload all prompts and tools.',
+                    'Reload all prompts from Git repository without restarting the server. This will: 1) Pull latest changes from Git, 2) Clear cache, 3) Reload all Handlebars partials, 4) Reload all prompts and tools (zero-downtime).',
                 inputSchema: z.object({}),
             },
             async () => {
                 try {
-                    logger.info('Reload prompts tool invoked')
+                    logger.info('mcp.reload tool invoked')
                     const result = await reloadPrompts(server, STORAGE_DIR)
 
                     const message = `Successfully reloaded ${result.loaded} prompts. ${result.errors.length} error(s) occurred.`
@@ -146,9 +148,252 @@ async function main() {
                 }
             }
         )
-        logger.info('Reload prompts tool registered')
+        logger.info('mcp.reload tool registered')
 
-        // 5. Register system.health Resource
+        // 5. Register mcp.stats() tool
+        server.registerTool(
+            'mcp.stats',
+            {
+                title: 'Get Prompt Statistics',
+                description:
+                    'Get statistics about all prompts including counts by runtime state (active, legacy, invalid, disabled, warning).',
+                inputSchema: z.object({}),
+            },
+            async () => {
+                try {
+                    logger.info('mcp.stats tool invoked')
+                    const stats = getPromptStats()
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify(stats, null, 2),
+                            },
+                        ],
+                        structuredContent: stats,
+                    }
+                } catch (error) {
+                    const statsError =
+                        error instanceof Error
+                            ? error
+                            : new Error(String(error))
+                    logger.error({ error: statsError }, 'Failed to get stats')
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify({
+                                    success: false,
+                                    error: statsError.message,
+                                }),
+                            },
+                        ],
+                        structuredContent: {
+                            success: false,
+                            error: statsError.message,
+                        },
+                        isError: true,
+                    }
+                }
+            }
+        )
+        logger.info('mcp.stats tool registered')
+
+        // 6. Register mcp.list() tool
+        server.registerTool(
+            'mcp.list',
+            {
+                title: 'List Prompts',
+                description:
+                    'List all prompts with optional filtering by status, group, or tag. Returns prompt metadata including runtime state, version, tags, and use cases.',
+                inputSchema: z.object({
+                    status: z
+                        .enum(['draft', 'stable', 'deprecated', 'legacy'])
+                        .optional()
+                        .describe('Filter by prompt status'),
+                    group: z
+                        .string()
+                        .optional()
+                        .describe('Filter by group name'),
+                    tag: z
+                        .string()
+                        .optional()
+                        .describe('Filter by tag (prompts must have this tag)'),
+                    runtime_state: z
+                        .enum(['active', 'legacy', 'invalid', 'disabled', 'warning'])
+                        .optional()
+                        .describe('Filter by runtime state'),
+                }),
+            },
+            async (args) => {
+                try {
+                    logger.info({ args }, 'mcp.list tool invoked')
+                    let runtimes = getAllPromptRuntimes()
+
+                    // 篩選 by status
+                    if (args.status) {
+                        runtimes = runtimes.filter(
+                            (r) => r.status === args.status
+                        )
+                    }
+
+                    // 篩選 by group
+                    if (args.group) {
+                        runtimes = runtimes.filter(
+                            (r) => r.group === args.group
+                        )
+                    }
+
+                    // 篩選 by tag
+                    if (args.tag) {
+                        runtimes = runtimes.filter((r) =>
+                            r.tags.includes(args.tag!)
+                        )
+                    }
+
+                    // 篩選 by runtime_state
+                    if (args.runtime_state) {
+                        runtimes = runtimes.filter(
+                            (r) => r.runtime_state === args.runtime_state
+                        )
+                    }
+
+                    // 轉換為輸出格式
+                    const prompts = runtimes.map((runtime) => ({
+                        id: runtime.id,
+                        title: runtime.title,
+                        version: runtime.version,
+                        status: runtime.status,
+                        runtime_state: runtime.runtime_state,
+                        source: runtime.source,
+                        tags: runtime.tags,
+                        use_cases: runtime.use_cases,
+                        group: runtime.group,
+                        visibility: runtime.visibility,
+                    }))
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify(
+                                    {
+                                        total: prompts.length,
+                                        prompts,
+                                    },
+                                    null,
+                                    2
+                                ),
+                            },
+                        ],
+                        structuredContent: {
+                            total: prompts.length,
+                            prompts,
+                        },
+                    }
+                } catch (error) {
+                    const listError =
+                        error instanceof Error
+                            ? error
+                            : new Error(String(error))
+                    logger.error({ error: listError }, 'Failed to list prompts')
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify({
+                                    success: false,
+                                    error: listError.message,
+                                }),
+                            },
+                        ],
+                        structuredContent: {
+                            success: false,
+                            error: listError.message,
+                        },
+                        isError: true,
+                    }
+                }
+            }
+        )
+        logger.info('mcp.list tool registered')
+
+        // 7. Register mcp.inspect() tool
+        server.registerTool(
+            'mcp.inspect',
+            {
+                title: 'Inspect Prompt',
+                description:
+                    'Get detailed runtime information for a specific prompt by ID. Returns complete runtime metadata including state, source, version, status, tags, and use cases.',
+                inputSchema: z.object({
+                    id: z.string().describe('Prompt ID to inspect'),
+                }),
+            },
+            async (args) => {
+                try {
+                    logger.info({ id: args.id }, 'mcp.inspect tool invoked')
+                    const runtime = getPromptRuntime(args.id)
+
+                    if (!runtime) {
+                        return {
+                            content: [
+                                {
+                                    type: 'text' as const,
+                                    text: JSON.stringify({
+                                        success: false,
+                                        error: `Prompt with ID "${args.id}" not found`,
+                                    }),
+                                },
+                            ],
+                            structuredContent: {
+                                success: false,
+                                error: `Prompt with ID "${args.id}" not found`,
+                            },
+                            isError: true,
+                        }
+                    }
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify(runtime, null, 2),
+                            },
+                        ],
+                        structuredContent: runtime,
+                    }
+                } catch (error) {
+                    const inspectError =
+                        error instanceof Error
+                            ? error
+                            : new Error(String(error))
+                    logger.error({ error: inspectError }, 'Failed to inspect prompt')
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify({
+                                    success: false,
+                                    error: inspectError.message,
+                                }),
+                            },
+                        ],
+                        structuredContent: {
+                            success: false,
+                            error: inspectError.message,
+                        },
+                        isError: true,
+                    }
+                }
+            }
+        )
+        logger.info('mcp.inspect tool registered')
+
+        // 8. Register system.health Resource
         server.registerResource(
             'system-health',
             'system://health',
@@ -179,7 +424,7 @@ async function main() {
         )
         logger.info('System health resource registered')
 
-        // 6. Register prompts list resource (提供完整的 prompt metadata 資訊)
+        // 9. Register prompts list resource (提供完整的 prompt metadata 資訊)
         server.registerResource(
             'prompts-list',
             'prompts://list',
@@ -224,12 +469,12 @@ async function main() {
         )
         logger.info('Prompts list resource registered')
 
-        // 7. Start MCP Server
+        // 10. Start MCP Server
         const transport = new StdioServerTransport()
         await server.connect(transport)
         logger.info('MCP Server is running!')
 
-        // 8. Initialize cache cleanup mechanism
+        // 11. Initialize cache cleanup mechanism
         const cleanupInterval = CACHE_CLEANUP_INTERVAL ?? 10000 // Default: 10 seconds (CACHE_TTL * 2)
         startCacheCleanup(cleanupInterval, (cleaned) => {
             if (cleaned > 0) {
