@@ -12,8 +12,14 @@ import {
     LANG_SETTING,
 } from '../config/env.js'
 import { logger } from '../utils/logger.js'
-import { getFilesRecursively } from '../utils/fileSystem.js'
+import { getFilesRecursively, clearFileCache } from '../utils/fileSystem.js'
+import { syncRepo } from './git.js'
 import type { PromptDefinition, PromptArgDefinition } from '../types/prompt.js'
+
+// Track registered prompts, tools, and partials for reload functionality
+const registeredPromptIds = new Set<string>()
+const registeredToolRefs = new Map<string, { remove: () => void }>()
+const registeredPartials = new Set<string>()
 
 // Prompt definition validation schema
 const PromptDefinitionSchema = z.object({
@@ -59,6 +65,7 @@ export async function loadPartials(storageDir?: string): Promise<number> {
             const partialName = path.parse(filePath).name
 
             Handlebars.registerPartial(partialName, content)
+            registeredPartials.add(partialName)
             count++
             logger.debug({ partialName }, 'Partial registered')
         } catch (error) {
@@ -369,6 +376,7 @@ export async function loadPrompts(
 
             // Register Prompt
             server.prompt(promptDef.id, zodShape, promptHandler)
+            registeredPromptIds.add(promptDef.id)
 
             // Also register as Tool so AI can automatically invoke it
             // Extract TRIGGER information from description for tool description
@@ -384,7 +392,7 @@ export async function loadPrompts(
                 : z.object({})
 
             // Register Tool (using registerTool, recommended API)
-            server.registerTool(
+            const toolRef = server.registerTool(
                 promptDef.id,
                 {
                     title: promptDef.title,
@@ -439,6 +447,7 @@ export async function loadPrompts(
                     }
                 }
             )
+            registeredToolRefs.set(promptDef.id, toolRef)
 
             loadedCount++
             logger.debug({ groupName, promptId: promptDef.id }, 'Prompt loaded')
@@ -468,4 +477,108 @@ export async function loadPrompts(
     }
 
     return { loaded: loadedCount, errors }
+}
+
+/**
+ * Clear all registered Handlebars partials
+ * Unregisters all partials that were registered during loadPartials()
+ */
+function clearAllPartials(): void {
+    for (const partialName of registeredPartials) {
+        try {
+            Handlebars.unregisterPartial(partialName)
+            logger.debug({ partialName }, 'Partial unregistered')
+        } catch (error) {
+            logger.warn({ partialName, error }, 'Failed to unregister partial')
+        }
+    }
+    registeredPartials.clear()
+    logger.info('All partials cleared')
+}
+
+/**
+ * Clear all registered prompts and tools
+ * Removes all tools using their .remove() method
+ * Note: Prompts are cleared by re-registering (overwriting) them
+ */
+function clearAllPrompts(): void {
+    // Remove all registered tools
+    for (const [toolId, toolRef] of registeredToolRefs.entries()) {
+        try {
+            toolRef.remove()
+            logger.debug({ toolId }, 'Tool removed')
+        } catch (error) {
+            logger.warn({ toolId, error }, 'Failed to remove tool')
+        }
+    }
+    
+    // Clear tracking sets
+    registeredToolRefs.clear()
+    registeredPromptIds.clear()
+    logger.info('All prompts and tools cleared')
+}
+
+/**
+ * Reload all prompts from Git repository
+ * 
+ * This function performs a complete reload of prompts:
+ * 1. Syncs Git repository (pulls latest changes)
+ * 2. Clears file cache
+ * 3. Clears all Handlebars partials
+ * 4. Clears all registered prompts/tools
+ * 5. Reloads Handlebars partials
+ * 6. Reloads all prompts and tools
+ * 
+ * @param server - MCP Server instance for registering prompts
+ * @param storageDir - Storage directory path (optional, defaults to STORAGE_DIR from config)
+ * @returns Object containing number of successfully loaded prompts and error list
+ * @throws {Error} When Git sync fails or directory cannot be accessed
+ * 
+ * @example
+ * ```typescript
+ * const result = await reloadPrompts(server)
+ * console.log(`Reloaded ${result.loaded} prompts`)
+ * ```
+ */
+export async function reloadPrompts(
+    server: McpServer,
+    storageDir?: string
+): Promise<{ loaded: number; errors: LoadError[] }> {
+    logger.info('Starting prompts reload')
+    
+    try {
+        // 1. Sync Git repository
+        await syncRepo()
+        logger.info('Git repository synced')
+        
+        // 2. Clear file cache
+        const dir = storageDir ?? STORAGE_DIR
+        clearFileCache(dir)
+        logger.debug('File cache cleared')
+        
+        // 3. Clear all partials
+        clearAllPartials()
+        
+        // 4. Clear all registered prompts/tools
+        clearAllPrompts()
+        
+        // 5. Reload Handlebars partials
+        const partialsCount = await loadPartials(storageDir)
+        logger.info({ count: partialsCount }, 'Partials reloaded')
+        
+        // 6. Reload all prompts
+        const result = await loadPrompts(server, storageDir)
+        
+        logger.info(
+            { loaded: result.loaded, errors: result.errors.length },
+            'Prompts reload completed'
+        )
+        
+        return result
+    } catch (error) {
+        const reloadError =
+            error instanceof Error ? error : new Error(String(error))
+        logger.error({ error: reloadError }, 'Failed to reload prompts')
+        throw reloadError
+    }
 }

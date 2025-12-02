@@ -8,8 +8,9 @@ import {
 } from './config/env.js'
 import { logger } from './utils/logger.js'
 import { syncRepo } from './services/git.js'
-import { loadPartials, loadPrompts } from './services/loaders.js'
+import { loadPartials, loadPrompts, reloadPrompts } from './services/loaders.js'
 import { startCacheCleanup, stopCacheCleanup } from './utils/fileSystem.js'
+import { z } from 'zod'
 
 // Initialize MCP Server
 const server = new McpServer({
@@ -68,12 +69,82 @@ async function main() {
             )
         }
 
-        // 4. Start MCP Server
+        // 4. Register reloadPrompts tool
+        server.registerTool(
+            'reloadPrompts',
+            {
+                title: 'Reload Prompts',
+                description:
+                    'Reload all prompts from Git repository without restarting the server. This will: 1) Pull latest changes from Git, 2) Clear cache, 3) Reload all Handlebars partials, 4) Reload all prompts and tools.',
+                inputSchema: z.object({}),
+            },
+            async () => {
+                try {
+                    logger.info('Reload prompts tool invoked')
+                    const result = await reloadPrompts(server, STORAGE_DIR)
+
+                    const message = `Successfully reloaded ${result.loaded} prompts. ${result.errors.length} error(s) occurred.`
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify({
+                                    success: true,
+                                    loaded: result.loaded,
+                                    errors: result.errors.length,
+                                    message,
+                                }),
+                            },
+                        ],
+                        structuredContent: {
+                            success: true,
+                            loaded: result.loaded,
+                            errors: result.errors.length,
+                            message,
+                            errorDetails:
+                                result.errors.length > 0
+                                    ? result.errors.map((e) => ({
+                                          file: e.file,
+                                          message: e.error.message,
+                                      }))
+                                    : [],
+                        },
+                    }
+                } catch (error) {
+                    const reloadError =
+                        error instanceof Error
+                            ? error
+                            : new Error(String(error))
+                    logger.error({ error: reloadError }, 'Reload prompts failed')
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify({
+                                    success: false,
+                                    error: reloadError.message,
+                                }),
+                            },
+                        ],
+                        structuredContent: {
+                            success: false,
+                            error: reloadError.message,
+                        },
+                        isError: true,
+                    }
+                }
+            }
+        )
+        logger.info('Reload prompts tool registered')
+
+        // 5. Start MCP Server
         const transport = new StdioServerTransport()
         await server.connect(transport)
         logger.info('MCP Server is running!')
 
-        // 5. Initialize cache cleanup mechanism
+        // 6. Initialize cache cleanup mechanism
         const cleanupInterval = CACHE_CLEANUP_INTERVAL ?? 10000 // Default: 10 seconds (CACHE_TTL * 2)
         startCacheCleanup(cleanupInterval, (cleaned) => {
             if (cleaned > 0) {
