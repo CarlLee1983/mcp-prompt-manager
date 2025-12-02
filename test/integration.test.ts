@@ -133,17 +133,17 @@ template: 'Hello {{name}}'
             // 建立 prompts
             await fs.writeFile(
                 path.join(testDir, 'common', 'common-prompt.yaml'),
-                'id: 'common-prompt'\ntitle: 'Common'\ntemplate: 'Common template''
+                "id: 'common-prompt'\ntitle: 'Common'\ntemplate: 'Common template'"
             )
 
             await fs.writeFile(
                 path.join(testDir, 'laravel', 'laravel-prompt.yaml'),
-                'id: 'laravel-prompt'\ntitle: 'Laravel'\ntemplate: 'Laravel template''
+                "id: 'laravel-prompt'\ntitle: 'Laravel'\ntemplate: 'Laravel template'"
             )
 
             await fs.writeFile(
                 path.join(testDir, 'vue', 'vue-prompt.yaml'),
-                'id: 'vue-prompt'\ntitle: 'Vue'\ntemplate: 'Vue template''
+                "id: 'vue-prompt'\ntitle: 'Vue'\ntemplate: 'Vue template'"
             )
 
             // 測試只載入 common 和 laravel
@@ -168,7 +168,7 @@ template: 'Hello {{name}}'
             // 建立有效的 prompt
             await fs.writeFile(
                 path.join(testDir, 'common', 'valid.yaml'),
-                'id: 'valid'\ntitle: 'Valid'\ntemplate: 'Valid template''
+                "id: 'valid'\ntitle: 'Valid'\ntemplate: 'Valid template'"
             )
 
             const { loaded, errors } = await loadPrompts(server, testDir)
@@ -185,13 +185,13 @@ template: 'Hello {{name}}'
             // 缺少 id
             await fs.writeFile(
                 path.join(testDir, 'common', 'no-id.yaml'),
-                'title: 'No ID'\ntemplate: 'Template''
+                "title: 'No ID'\ntemplate: 'Template'"
             )
 
             // 缺少 template
             await fs.writeFile(
                 path.join(testDir, 'common', 'no-template.yaml'),
-                'id: 'no-template'\ntitle: 'No Template''
+                "id: 'no-template'\ntitle: 'No Template'"
             )
 
             const { loaded, errors } = await loadPrompts(server, testDir)
@@ -248,13 +248,13 @@ template: 'Hello {{name}}'
             // 建立一個有效的 prompt
             await fs.writeFile(
                 path.join(testDir, 'common', 'valid.yaml'),
-                'id: 'valid'\ntitle: 'Valid'\ntemplate: 'Valid''
+                "id: 'valid'\ntitle: 'Valid'\ntemplate: 'Valid'"
             )
 
             // 建立一個無效的 prompt（缺少 template）
             await fs.writeFile(
                 path.join(testDir, 'common', 'invalid.yaml'),
-                'id: 'invalid'\ntitle: 'Invalid''
+                "id: 'invalid'\ntitle: 'Invalid'"
             )
 
             const { loaded, errors } = await loadPrompts(server, testDir)
@@ -271,17 +271,17 @@ template: 'Hello {{name}}'
             // 建立多個 prompts，其中一個無效
             await fs.writeFile(
                 path.join(testDir, 'common', 'prompt1.yaml'),
-                'id: 'prompt1'\ntitle: 'Prompt 1'\ntemplate: 'Template 1''
+                "id: 'prompt1'\ntitle: 'Prompt 1'\ntemplate: 'Template 1'"
             )
 
             await fs.writeFile(
                 path.join(testDir, 'common', 'prompt2.yaml'),
-                'id: 'prompt2'\ntitle: 'Prompt 2''
+                "id: 'prompt2'\ntitle: 'Prompt 2'"
             )
 
             await fs.writeFile(
                 path.join(testDir, 'common', 'prompt3.yaml'),
-                'id: 'prompt3'\ntitle: 'Prompt 3'\ntemplate: 'Template 3''
+                "id: 'prompt3'\ntitle: 'Prompt 3'\ntemplate: 'Template 3'"
             )
 
             const { loaded, errors } = await loadPrompts(server, testDir)

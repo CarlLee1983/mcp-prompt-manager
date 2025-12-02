@@ -7,6 +7,9 @@ const HIDDEN_FILE_PREFIX = '.'
 const fileCache = new Map<string, { files: string[]; timestamp: number }>()
 const CACHE_TTL = 5000 // Cache validity period: 5 seconds
 
+// Cache cleanup timer reference
+let cleanupTimer: NodeJS.Timeout | null = null
+
 /**
  * Recursively read all files in a directory (with caching)
  * @param dir - Directory path to scan
@@ -59,6 +62,91 @@ export function clearFileCache(dir?: string): void {
         fileCache.delete(dir)
     } else {
         fileCache.clear()
+    }
+}
+
+/**
+ * Clean up expired cache entries
+ * Removes all cache entries that have exceeded their TTL
+ * @returns Number of cache entries cleaned up
+ */
+export function cleanupExpiredCache(): number {
+    const now = Date.now()
+    let cleaned = 0
+    const expiredDirs: string[] = []
+
+    // Collect expired entries
+    for (const [dir, cache] of fileCache.entries()) {
+        if (now - cache.timestamp >= CACHE_TTL) {
+            expiredDirs.push(dir)
+        }
+    }
+
+    // Remove expired entries
+    for (const dir of expiredDirs) {
+        fileCache.delete(dir)
+        cleaned++
+    }
+
+    return cleaned
+}
+
+/**
+ * Start periodic cache cleanup
+ * Automatically removes expired cache entries at specified intervals
+ * @param interval - Cleanup interval in milliseconds (default: CACHE_TTL * 2)
+ * @param onCleanup - Optional callback function called after each cleanup with number of cleaned entries
+ */
+export function startCacheCleanup(
+    interval: number = CACHE_TTL * 2,
+    onCleanup?: (cleaned: number) => void
+): void {
+    // Stop existing cleanup if running
+    stopCacheCleanup()
+
+    // Start periodic cleanup
+    cleanupTimer = setInterval(() => {
+        const cleaned = cleanupExpiredCache()
+        if (onCleanup) {
+            onCleanup(cleaned)
+        }
+    }, interval)
+}
+
+/**
+ * Stop periodic cache cleanup
+ * Clears the cleanup timer if it's running
+ */
+export function stopCacheCleanup(): void {
+    if (cleanupTimer !== null) {
+        clearInterval(cleanupTimer)
+        cleanupTimer = null
+    }
+}
+
+/**
+ * Get cache statistics
+ * @returns Object containing cache size and other statistics
+ */
+export function getCacheStats(): {
+    size: number
+    entries: Array<{ dir: string; age: number; expired: boolean }>
+} {
+    const now = Date.now()
+    const entries: Array<{ dir: string; age: number; expired: boolean }> = []
+
+    for (const [dir, cache] of fileCache.entries()) {
+        const age = now - cache.timestamp
+        entries.push({
+            dir,
+            age,
+            expired: age >= CACHE_TTL,
+        })
+    }
+
+    return {
+        size: fileCache.size,
+        entries,
     }
 }
 

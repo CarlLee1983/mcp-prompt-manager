@@ -348,10 +348,10 @@ template: '簡單模板'
             expect(result.length).toBeGreaterThanOrEqual(1000)
         })
 
-        it('應該處理特殊字符', () => {
+        it('should handle special characters', () => {
             const template = Handlebars.compile('{{text}}', { noEscape: true })
 
-            const specialChars = '<>&\'''
+            const specialChars = '<>&"\''
             const result = template({ text: specialChars })
 
             expect(result).toBe(specialChars)

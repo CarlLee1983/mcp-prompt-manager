@@ -80,6 +80,10 @@ const ConfigSchema = z.object({
         .string()
         .optional()
         .transform((val) => (val ? parseInt(val, 10) : 3)),
+    CACHE_CLEANUP_INTERVAL: z
+        .string()
+        .optional()
+        .transform((val) => (val ? parseInt(val, 10) : undefined)),
 })
 
 /**
@@ -109,6 +113,7 @@ function loadConfig() {
             LOG_LEVEL: process.env.LOG_LEVEL,
             GIT_BRANCH: process.env.GIT_BRANCH,
             GIT_MAX_RETRIES: process.env.GIT_MAX_RETRIES,
+            CACHE_CLEANUP_INTERVAL: process.env.CACHE_CLEANUP_INTERVAL,
         }
 
         return ConfigSchema.parse(rawConfig)
@@ -150,6 +155,13 @@ export const LOG_LEVEL = config.LOG_LEVEL
 export const LOG_FILE = config.LOG_FILE
 export const GIT_BRANCH = config.GIT_BRANCH || 'main'
 export const GIT_MAX_RETRIES = config.GIT_MAX_RETRIES
+
+/**
+ * Cache cleanup interval in milliseconds
+ * Defaults to CACHE_TTL * 2 (10 seconds) if not specified
+ * This ensures expired cache entries are cleaned up regularly
+ */
+export const CACHE_CLEANUP_INTERVAL = config.CACHE_CLEANUP_INTERVAL
 
 // Language instruction
 export const LANG_INSTRUCTION =

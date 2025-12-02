@@ -13,13 +13,13 @@ describe('環境變數配置測試', () => {
     })
 
     describe('MCP_LANGUAGE', () => {
-        it('應該預設為 'en'', () => {
+        it('should default to en', () => {
             delete process.env.MCP_LANGUAGE
             const lang = process.env.MCP_LANGUAGE || 'en'
             expect(lang).toBe('en')
         })
 
-        it('應該支援 'zh' 設定', () => {
+        it('should support zh setting', () => {
             process.env.MCP_LANGUAGE = 'zh'
             const lang = process.env.MCP_LANGUAGE || 'en'
             expect(lang).toBe('zh')
@@ -33,7 +33,7 @@ describe('環境變數配置測試', () => {
     })
 
     describe('MCP_GROUPS', () => {
-        it('應該預設為 ['common']', () => {
+        it('should default to [common]', () => {
             delete process.env.MCP_GROUPS
             const groups = process.env.MCP_GROUPS
                 ? process.env.MCP_GROUPS.split(',').map((g) => g.trim())
@@ -102,8 +102,8 @@ describe('環境變數配置測試', () => {
         })
     })
 
-    describe('語言指令生成', () => {
-        it('應該為 'zh' 生成繁體中文指令', () => {
+    describe('Language instruction generation', () => {
+        it('should generate Traditional Chinese instruction for zh', () => {
             const lang = 'zh'
             const instruction =
                 lang === 'zh'
@@ -122,7 +122,7 @@ describe('環境變數配置測試', () => {
             expect(instruction).toBe('Please reply in English.')
         })
 
-        it('應該為 'ja' 生成英文指令', () => {
+        it('should generate English instruction for ja', () => {
             const lang = 'ja'
             const instruction =
                 lang === 'zh'

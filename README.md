@@ -8,6 +8,7 @@
 - **Handlebars 模板**: 支援強大的 Handlebars 語法，可以建立動態、可重用的 Prompt 模板。
 - **Partials 支援**: 支援 Handlebars Partials，方便拆分和重用 Prompt 片段（例如角色設定、輸出格式）。
 - **本地緩存**: 自動將 Git Repo 內容緩存到本地 `.prompts_cache` 目錄，提高讀取速度。
+- **快取失效策略**: 自動定期清理過期快取項目，避免記憶體洩漏，確保資料一致性。
 - **群組過濾**: 支援按群組過濾載入 prompts，只載入需要的部分。
 - **錯誤處理**: 完整的錯誤統計和報告，確保問題可追蹤。
 - **重試機制**: Git 操作自動重試，提高可靠性。
@@ -63,6 +64,12 @@ GIT_BRANCH=main
 
 # Git 重試次數（可選，預設 3）
 GIT_MAX_RETRIES=3
+
+# 快取清理間隔（可選，預設 10000 毫秒）
+# 設定定期清理過期快取項目的間隔時間（毫秒）
+# 預設值為 10 秒（CACHE_TTL * 2），確保過期項目能被及時清理
+# 建議值：5000-30000 毫秒，根據使用頻率調整
+CACHE_CLEANUP_INTERVAL=10000
 
 # 日誌級別（可選）
 # 可選值: fatal, error, warn, info, debug, trace, silent
@@ -487,6 +494,7 @@ async def main():
     - `STORAGE_DIR`: 本地緩存目錄（可選）
     - `GIT_BRANCH`: Git 分支（可選，預設 `main`）
     - `GIT_MAX_RETRIES`: Git 重試次數（可選，預設 `3`）
+    - `CACHE_CLEANUP_INTERVAL`: 快取清理間隔，毫秒（可選，預設 `10000`）
     - `LOG_LEVEL`: 日誌級別（可選，預設 `info`）
 
 #### 重要注意事項
@@ -772,15 +780,56 @@ pnpm test:ui
 
 ### 環境變數
 
-| 變數名            | 必填 | 預設值           | 說明                     |
-| ----------------- | ---- | ---------------- | ------------------------ |
-| `PROMPT_REPO_URL` | ✅   | -                | Git 倉庫 URL 或本地路徑  |
-| `MCP_LANGUAGE`    | ❌   | `en`             | 輸出語言 (`en` 或 `zh`)  |
-| `MCP_GROUPS`      | ❌   | `common`         | 要載入的群組（逗號分隔），未設定時會在日誌中提示預設行為 |
-| `STORAGE_DIR`     | ❌   | `.prompts_cache` | 本地緩存目錄             |
-| `GIT_BRANCH`      | ❌   | `main`           | Git 分支名稱             |
-| `GIT_MAX_RETRIES` | ❌   | `3`              | Git 操作最大重試次數     |
-| `LOG_LEVEL`       | ❌   | `warn` (生產) / `info` (開發) | 日誌級別，生產環境預設只輸出警告和錯誤 |
+| 變數名                  | 必填 | 預設值           | 說明                     |
+| ----------------------- | ---- | ---------------- | ------------------------ |
+| `PROMPT_REPO_URL`       | ✅   | -                | Git 倉庫 URL 或本地路徑  |
+| `MCP_LANGUAGE`          | ❌   | `en`             | 輸出語言 (`en` 或 `zh`)  |
+| `MCP_GROUPS`            | ❌   | `common`         | 要載入的群組（逗號分隔），未設定時會在日誌中提示預設行為 |
+| `STORAGE_DIR`           | ❌   | `.prompts_cache` | 本地緩存目錄             |
+| `GIT_BRANCH`            | ❌   | `main`           | Git 分支名稱             |
+| `GIT_MAX_RETRIES`       | ❌   | `3`              | Git 操作最大重試次數     |
+| `CACHE_CLEANUP_INTERVAL` | ❌   | `10000`          | 快取清理間隔（毫秒），定期清理過期快取項目 |
+| `LOG_LEVEL`             | ❌   | `warn` (生產) / `info` (開發) | 日誌級別，生產環境預設只輸出警告和錯誤 |
+
+### 快取失效策略
+
+系統使用 TTL-based 定期清理機制來管理檔案列表快取，確保記憶體使用效率。
+
+#### 快取機制
+
+- **快取 TTL**: 5 秒（硬編碼）
+- **清理間隔**: 預設 10 秒（`CACHE_TTL * 2`），可透過 `CACHE_CLEANUP_INTERVAL` 環境變數調整
+- **自動清理**: 應用程式啟動時自動啟動清理機制
+- **優雅關閉**: 應用程式關閉時自動停止清理定時器
+
+#### 工作原理
+
+1. **快取建立**: 當 `getFilesRecursively()` 被調用時，會將掃描結果快取 5 秒
+2. **定期清理**: 每 10 秒（或設定的間隔）自動掃描並移除過期的快取項目
+3. **記憶體管理**: 防止快取無限增長，避免記憶體洩漏
+
+#### 配置範例
+
+```bash
+# 設定較短的清理間隔（用於測試）
+CACHE_CLEANUP_INTERVAL=2000  # 2 秒清理一次
+
+# 設定較長的清理間隔（用於生產環境，減少清理頻率）
+CACHE_CLEANUP_INTERVAL=30000  # 30 秒清理一次
+```
+
+#### 監控快取狀態
+
+可以透過日誌查看快取清理狀態（需要設定 `LOG_LEVEL=debug`）：
+
+```
+[DEBUG] Cache cleanup mechanism started { interval: 10000 }
+[DEBUG] Cache cleanup completed { cleaned: 2 }
+```
+
+#### 驗證快取機制
+
+詳見 [CACHE_VERIFICATION.md](./CACHE_VERIFICATION.md) 文件，包含完整的驗證方法和測試指南。
 
 ### 安全性
 

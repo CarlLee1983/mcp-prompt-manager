@@ -1,9 +1,15 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { STORAGE_DIR, ACTIVE_GROUPS, IS_DEFAULT_GROUPS } from './config/env.js'
+import {
+    STORAGE_DIR,
+    ACTIVE_GROUPS,
+    IS_DEFAULT_GROUPS,
+    CACHE_CLEANUP_INTERVAL,
+} from './config/env.js'
 import { logger } from './utils/logger.js'
 import { syncRepo } from './services/git.js'
 import { loadPartials, loadPrompts } from './services/loaders.js'
+import { startCacheCleanup, stopCacheCleanup } from './utils/fileSystem.js'
 
 // Initialize MCP Server
 const server = new McpServer({
@@ -66,10 +72,34 @@ async function main() {
         const transport = new StdioServerTransport()
         await server.connect(transport)
         logger.info('MCP Server is running!')
+
+        // 5. Initialize cache cleanup mechanism
+        const cleanupInterval = CACHE_CLEANUP_INTERVAL ?? 10000 // Default: 10 seconds (CACHE_TTL * 2)
+        startCacheCleanup(cleanupInterval, (cleaned) => {
+            if (cleaned > 0) {
+                logger.debug({ cleaned }, 'Cache cleanup completed')
+            }
+        })
+        logger.debug(
+            { interval: cleanupInterval },
+            'Cache cleanup mechanism started'
+        )
+
+        // Register graceful shutdown handlers
+        const shutdown = () => {
+            logger.info('Shutting down gracefully...')
+            stopCacheCleanup()
+            logger.debug('Cache cleanup stopped')
+            process.exit(0)
+        }
+
+        process.on('SIGINT', shutdown)
+        process.on('SIGTERM', shutdown)
     } catch (error) {
         const fatalError =
             error instanceof Error ? error : new Error(String(error))
         logger.fatal({ error: fatalError }, 'Fatal error occurred')
+        stopCacheCleanup()
         process.exit(1)
     }
 }
