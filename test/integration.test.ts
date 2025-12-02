@@ -9,8 +9,12 @@ import { getFilesRecursively, clearFileCache } from '../src/utils/fileSystem.js'
 describe('整合測試', () => {
     let testDir: string
     let server: McpServer
+    const originalEnv = process.env
 
     beforeEach(async () => {
+        // 設定測試環境變數
+        process.env.PROMPT_REPO_URL = '/tmp/test-repo'
+        process.env.MCP_GROUPS = 'common'
         // 建立臨時測試目錄
         testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcp-integration-test-'))
         server = new McpServer({
@@ -19,6 +23,11 @@ describe('整合測試', () => {
         })
         // 清除緩存
         clearFileCache()
+    })
+
+    afterEach(() => {
+        // 還原環境變數
+        process.env = originalEnv
     })
 
     afterEach(async () => {

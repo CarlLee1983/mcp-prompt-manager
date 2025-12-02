@@ -18,13 +18,22 @@ import type { PromptRuntime } from '../src/types/promptRuntime.js'
 describe('Prompt Metadata 測試', () => {
     let testDir: string
     let server: McpServer
+    const originalEnv = process.env
 
     beforeEach(async () => {
+        // 設定測試環境變數
+        process.env.PROMPT_REPO_URL = '/tmp/test-repo'
+        process.env.MCP_GROUPS = 'common'
         testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcp-metadata-test-'))
         server = new McpServer({
             name: 'test-server',
             version: '1.0.0',
         })
+    })
+
+    afterEach(() => {
+        // 還原環境變數
+        process.env = originalEnv
     })
 
     afterEach(async () => {

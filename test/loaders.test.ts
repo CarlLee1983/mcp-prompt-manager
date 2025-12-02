@@ -39,6 +39,8 @@ async function loadPartials(storageDir: string) {
 interface PromptArgDefinition {
     type: 'string' | 'number' | 'boolean'
     description?: string
+    default?: string | number | boolean
+    required?: boolean
 }
 
 interface PromptDefinition {

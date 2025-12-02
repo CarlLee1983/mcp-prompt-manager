@@ -17,7 +17,25 @@ import { ensureDirectoryAccess, clearFileCache } from '../utils/fileSystem.js'
  * @throws {Error} When Git operation fails
  */
 /**
- * 從本地目錄複製檔案到目標目錄（排除 .git 目錄）
+ * 需要排除的目錄和檔案名稱（不區分大小寫）
+ */
+const EXCLUDED_ITEMS = new Set([
+    '.git',
+    'node_modules',
+    '.DS_Store',
+    '.vscode',
+    '.idea',
+    'dist',
+    'build',
+    '.next',
+    '.nuxt',
+    '.cache',
+    'coverage',
+    '.nyc_output',
+])
+
+/**
+ * 從本地目錄複製檔案到目標目錄（排除不需要的目錄和檔案）
  * @param sourceDir - 來源目錄
  * @param targetDir - 目標目錄
  */
@@ -32,20 +50,29 @@ async function copyLocalRepository(
     const entries = await fs.readdir(sourceDir, { withFileTypes: true })
 
     for (const entry of entries) {
-        const sourcePath = path.join(sourceDir, entry.name)
-        const targetPath = path.join(targetDir, entry.name)
-
-        // 跳過 .git 目錄
-        if (entry.name === '.git') {
+        // 跳過排除的項目
+        if (EXCLUDED_ITEMS.has(entry.name.toLowerCase())) {
             continue
         }
 
-        if (entry.isDirectory()) {
-            // 遞迴複製子目錄
-            await copyLocalRepository(sourcePath, targetPath)
-        } else {
-            // 複製檔案
-            await fs.copyFile(sourcePath, targetPath)
+        const sourcePath = path.join(sourceDir, entry.name)
+        const targetPath = path.join(targetDir, entry.name)
+
+        try {
+            if (entry.isDirectory()) {
+                // 遞迴複製子目錄
+                await copyLocalRepository(sourcePath, targetPath)
+            } else if (entry.isFile()) {
+                // 只複製普通檔案（跳過符號連結等特殊檔案）
+                await fs.copyFile(sourcePath, targetPath)
+            }
+            // 跳過符號連結、FIFO 等特殊檔案類型
+        } catch (error) {
+            // 如果複製失敗，記錄警告但繼續處理其他檔案
+            logger.warn(
+                { sourcePath, targetPath, error },
+                'Failed to copy file, skipping'
+            )
         }
     }
 }

@@ -322,8 +322,8 @@ const EXCLUDED_FILES = [
 
 /**
  * 判斷 YAML 資料是否為 Metadata Prompt
- * 檢查 version 是否符合 semver 格式（^\d+\.\d+\.\d+$）且 status 在允許的值中
- * 這可以避免誤判舊格式 prompt（例如包含 version: "1.0" 和 status: stable）為 metadata prompt
+ * 只要檢查是否有 version 和 status 欄位即可，格式驗證由 PromptMetadataSchema 負責
+ * 這可以讓格式錯誤的 metadata 被標記為 warning，而不是 legacy
  */
 function isMetadataPrompt(yamlData: unknown): boolean {
     if (typeof yamlData !== 'object' || yamlData === null) {
@@ -331,17 +331,12 @@ function isMetadataPrompt(yamlData: unknown): boolean {
     }
     const data = yamlData as Record<string, unknown>
     
-    // 檢查 version 是否符合 semver 格式（例如 "1.0.0"）
-    const semverPattern = /^\d+\.\d+\.\d+$/
-    const hasValidVersion =
-        typeof data.version === 'string' && semverPattern.test(data.version)
+    // 只要檢查是否有 version 和 status 欄位即可
+    // 格式驗證由 PromptMetadataSchema 負責
+    const hasVersion = typeof data.version === 'string' && data.version.length > 0
+    const hasStatus = typeof data.status === 'string' && data.status.length > 0
     
-    // 檢查 status 是否在允許的值中
-    const hasValidStatus =
-        typeof data.status === 'string' &&
-        ['draft', 'stable', 'deprecated'].includes(data.status)
-    
-    return hasValidVersion && hasValidStatus
+    return hasVersion && hasStatus
 }
 
 /**
