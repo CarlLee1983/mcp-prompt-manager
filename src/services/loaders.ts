@@ -599,3 +599,19 @@ export async function reloadPrompts(
     
     return reloadingPromise
 }
+
+/**
+ * 取得已載入的 prompt 數量
+ * @returns 已載入的 prompt 數量
+ */
+export function getLoadedPromptCount(): number {
+    return registeredPromptIds.size
+}
+
+/**
+ * 取得已註冊的 prompt ID 清單
+ * @returns 已註冊的 prompt ID 陣列
+ */
+export function getRegisteredPromptIds(): string[] {
+    return Array.from(registeredPromptIds)
+}

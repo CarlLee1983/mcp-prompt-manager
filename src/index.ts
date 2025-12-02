@@ -10,6 +10,7 @@ import { logger } from './utils/logger.js'
 import { syncRepo } from './services/git.js'
 import { loadPartials, loadPrompts, reloadPrompts } from './services/loaders.js'
 import { startCacheCleanup, stopCacheCleanup } from './utils/fileSystem.js'
+import { getHealthStatus } from './services/health.js'
 import { z } from 'zod'
 
 // Initialize MCP Server
@@ -23,6 +24,9 @@ const server = new McpServer({
  * Initializes and starts the MCP Server
  */
 async function main() {
+    // 記錄啟動時間，用於計算 uptime
+    const startTime = Date.now()
+    
     try {
         logger.info('Starting MCP Prompt Manager')
 
@@ -139,12 +143,43 @@ async function main() {
         )
         logger.info('Reload prompts tool registered')
 
-        // 5. Start MCP Server
+        // 5. Register system.health Resource
+        server.registerResource(
+            'system-health',
+            'system://health',
+            {
+                title: 'System Health',
+                description: 'System health status including Git info, prompts, cache, and system metrics',
+                mimeType: 'application/json',
+            },
+            async () => {
+                try {
+                    const healthStatus = await getHealthStatus(startTime)
+                    return {
+                        contents: [
+                            {
+                                uri: 'system://health',
+                                mimeType: 'application/json',
+                                text: JSON.stringify(healthStatus, null, 2),
+                            },
+                        ],
+                    }
+                } catch (error) {
+                    const healthError =
+                        error instanceof Error ? error : new Error(String(error))
+                    logger.error({ error: healthError }, 'Failed to get health status')
+                    throw healthError
+                }
+            }
+        )
+        logger.info('System health resource registered')
+
+        // 6. Start MCP Server
         const transport = new StdioServerTransport()
         await server.connect(transport)
         logger.info('MCP Server is running!')
 
-        // 6. Initialize cache cleanup mechanism
+        // 7. Initialize cache cleanup mechanism
         const cleanupInterval = CACHE_CLEANUP_INTERVAL ?? 10000 // Default: 10 seconds (CACHE_TTL * 2)
         startCacheCleanup(cleanupInterval, (cleaned) => {
             if (cleaned > 0) {
