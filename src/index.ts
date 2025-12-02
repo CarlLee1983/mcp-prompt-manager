@@ -5,29 +5,29 @@ import { logger } from './utils/logger.js'
 import { syncRepo } from './services/git.js'
 import { loadPartials, loadPrompts } from './services/loaders.js'
 
-// 初始化 MCP Server
+// Initialize MCP Server
 const server = new McpServer({
     name: 'mcp-prompt-manager',
     version: '1.0.0',
 })
 
 /**
- * 主程式入口
- * 負責初始化並啟動 MCP Server
+ * Main entry point
+ * Initializes and starts the MCP Server
  */
 async function main() {
     try {
         logger.info('Starting MCP Prompt Manager')
 
-        // 1. 同步 Git 倉庫
+        // 1. Sync Git repository
         await syncRepo()
 
-        // 2. 載入 Handlebars Partials
+        // 2. Load Handlebars Partials
         const partialsCount = await loadPartials(STORAGE_DIR)
         logger.info({ count: partialsCount }, 'Partials loaded')
 
-        // 3. 載入並註冊 Prompts
-        // 在載入前提示用戶（如果是預設值）
+        // 3. Load and register Prompts
+        // Notify user before loading (if using default values)
         if (IS_DEFAULT_GROUPS) {
             logger.info(
                 {
@@ -62,7 +62,7 @@ async function main() {
             )
         }
 
-        // 4. 啟動 MCP Server
+        // 4. Start MCP Server
         const transport = new StdioServerTransport()
         await server.connect(transport)
         logger.info('MCP Server is running!')
@@ -74,5 +74,5 @@ async function main() {
     }
 }
 
-// 啟動應用程式
+// Start the application
 main()

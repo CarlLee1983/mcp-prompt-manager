@@ -3,10 +3,10 @@ import dotenv from 'dotenv'
 import path from 'path'
 
 /**
- * 載入環境變數
- * 從 .env 檔案或系統環境變數中讀取配置
+ * Load environment variables
+ * Reads configuration from .env file or system environment variables
  */
-// 暫時抑制 stdout 輸出以防止 dotenv 污染 MCP 協議
+// Temporarily suppress stdout output to prevent dotenv from polluting MCP protocol
 const originalWrite = process.stdout.write
 // @ts-ignore
 process.stdout.write = () => true
@@ -14,8 +14,8 @@ dotenv.config()
 process.stdout.write = originalWrite
 
 /**
- * 配置驗證 Schema
- * 使用 Zod 驗證所有環境變數，確保類型安全和格式正確
+ * Configuration validation schema
+ * Uses Zod to validate all environment variables, ensuring type safety and correct format
  */
 const ConfigSchema = z.object({
     PROMPT_REPO_URL: z
@@ -23,12 +23,12 @@ const ConfigSchema = z.object({
         .min(1, 'PROMPT_REPO_URL is required')
         .refine(
             (url) => {
-                // 驗證 URL 格式或本地路徑
-                // 不允許路徑遍歷攻擊
+                // Validate URL format or local path
+                // Disallow path traversal attacks
                 if (url.includes('..') || url.includes('\0')) {
                     return false
                 }
-                // 驗證是有效的 URL 或絕對路徑
+                // Validate that it's a valid URL or absolute path
                 try {
                     if (
                         url.startsWith('http://') ||
@@ -37,7 +37,7 @@ const ConfigSchema = z.object({
                     ) {
                         return true
                     }
-                    // 本地路徑必須是絕對路徑
+                    // Local paths must be absolute paths
                     return path.isAbsolute(url)
                 } catch {
                     return false
@@ -54,12 +54,12 @@ const ConfigSchema = z.object({
         .optional()
         .transform((val) => {
             if (!val) return undefined
-            // 驗證並清理群組名稱
+            // Validate and clean group names
             const groups = val
                 .split(',')
                 .map((g) => g.trim())
                 .filter(Boolean)
-            // 驗證每個群組名稱格式
+            // Validate each group name format
             const groupNamePattern = /^[a-zA-Z0-9_-]+$/
             for (const group of groups) {
                 if (!groupNamePattern.test(group)) {
@@ -83,10 +83,10 @@ const ConfigSchema = z.object({
 })
 
 /**
- * 驗證群組名稱格式
- * 只允許字母、數字、下劃線和破折號
- * @param group - 群組名稱
- * @returns 是否為有效格式
+ * Validate group name format
+ * Only allows letters, numbers, underscores, and dashes
+ * @param group - Group name
+ * @returns Whether the format is valid
  * @internal
  */
 function validateGroupName(group: string): boolean {
@@ -94,10 +94,10 @@ function validateGroupName(group: string): boolean {
 }
 
 /**
- * 載入並驗證配置
- * 從環境變數讀取配置並使用 Zod Schema 驗證
- * @returns 驗證後的配置物件
- * @throws {Error} 當配置驗證失敗時，包含詳細的錯誤訊息
+ * Load and validate configuration
+ * Reads configuration from environment variables and validates using Zod schema
+ * @returns Validated configuration object
+ * @throws {Error} When configuration validation fails, includes detailed error message
  */
 function loadConfig() {
     try {
@@ -123,10 +123,10 @@ function loadConfig() {
     }
 }
 
-// 導出配置
+// Export configuration
 export const config = loadConfig()
 
-// 導出計算後的配置值
+// Export computed configuration values
 export const REPO_URL = config.PROMPT_REPO_URL
 export const STORAGE_DIR = config.STORAGE_DIR
     ? path.resolve(process.cwd(), config.STORAGE_DIR)
@@ -134,15 +134,15 @@ export const STORAGE_DIR = config.STORAGE_DIR
 export const LANG_SETTING = config.MCP_LANGUAGE
 
 /**
- * 活躍的 prompt 群組列表
- * 當 MCP_GROUPS 未設定時，預設只載入 common 群組
- * 設定方式：MCP_GROUPS=laravel,vue,react
+ * Active prompt groups list
+ * When MCP_GROUPS is not set, only the 'common' group is loaded by default
+ * Configuration: MCP_GROUPS=laravel,vue,react
  */
 export const ACTIVE_GROUPS = config.MCP_GROUPS || ['common']
 
 /**
- * 是否使用預設群組（MCP_GROUPS 未設定時）
- * 用於在日誌中明確標示是否為預設行為
+ * Whether using default groups (when MCP_GROUPS is not set)
+ * Used to explicitly indicate in logs whether this is default behavior
  */
 export const IS_DEFAULT_GROUPS = !config.MCP_GROUPS
 
@@ -151,7 +151,7 @@ export const LOG_FILE = config.LOG_FILE
 export const GIT_BRANCH = config.GIT_BRANCH || 'main'
 export const GIT_MAX_RETRIES = config.GIT_MAX_RETRIES
 
-// 語言指令
+// Language instruction
 export const LANG_INSTRUCTION =
     LANG_SETTING === 'zh'
         ? 'Please reply in Traditional Chinese (繁體中文). Keep technical terms in English.'

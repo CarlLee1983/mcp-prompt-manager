@@ -1,14 +1,14 @@
 /**
- * Prompt 參數類型定義
+ * Prompt argument type definition
  * 
- * 支援的參數類型：字串、數字、布林值
+ * Supported argument types: string, number, boolean
  */
 export type PromptArgType = 'string' | 'number' | 'boolean'
 
 /**
- * Prompt 參數定義
+ * Prompt argument definition
  * 
- * 定義一個 Prompt 參數的結構，包括類型、描述和預設值。
+ * Defines the structure of a Prompt argument, including type, description, and default value.
  * 
  * @example
  * ```typescript
@@ -30,20 +30,20 @@ export type PromptArgType = 'string' | 'number' | 'boolean'
  * ```
  */
 export interface PromptArgDefinition {
-    /** 參數類型 */
+    /** Argument type */
     readonly type: PromptArgType
-    /** 參數描述，可包含 '(required)' 或 'optional' 關鍵字來標示是否為必需（用於向後相容） */
+    /** Argument description, may contain '(required)' or 'optional' keywords to indicate if required (for backward compatibility) */
     readonly description?: string
-    /** 參數預設值，如果提供則該參數為可選 */
+    /** Argument default value, if provided the argument is optional */
     readonly default?: string | number | boolean
-    /** 參數是否為必需，明確指定此欄位將優先於從 description 解析的結果 */
+    /** Whether the argument is required, explicitly specifying this field takes priority over parsing from description */
     readonly required?: boolean
 }
 
 /**
- * Prompt 定義介面
+ * Prompt definition interface
  * 
- * 定義一個完整的 Prompt 模板結構，包括 ID、標題、描述、參數和 Handlebars 模板。
+ * Defines a complete Prompt template structure, including ID, title, description, arguments, and Handlebars template.
  * 
  * @example
  * ```typescript
@@ -67,14 +67,14 @@ export interface PromptArgDefinition {
  * ```
  */
 export interface PromptDefinition {
-    /** Prompt 的唯一識別碼 */
+    /** Unique identifier for the Prompt */
     readonly id: string
-    /** Prompt 的標題 */
+    /** Title of the Prompt */
     readonly title: string
-    /** Prompt 的描述，可包含 TRIGGER 和 RULES 資訊 */
+    /** Description of the Prompt, may contain TRIGGER and RULES information */
     readonly description?: string
-    /** Prompt 的參數定義，鍵為參數名稱，值為參數定義 */
+    /** Prompt argument definitions, key is argument name, value is argument definition */
     readonly args?: Readonly<Record<string, PromptArgDefinition>>
-    /** Handlebars 模板字串，用於生成最終的 Prompt 內容 */
+    /** Handlebars template string for generating the final Prompt content */
     readonly template: string
 }

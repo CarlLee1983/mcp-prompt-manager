@@ -3,16 +3,16 @@ import path from 'path'
 
 const HIDDEN_FILE_PREFIX = '.'
 
-// 檔案列表緩存
+// File list cache
 const fileCache = new Map<string, { files: string[]; timestamp: number }>()
-const CACHE_TTL = 5000 // 緩存有效期 5 秒
+const CACHE_TTL = 5000 // Cache validity period: 5 seconds
 
 /**
- * 遞迴讀取目錄中的所有檔案（帶緩存）
- * @param dir - 要掃描的目錄路徑
- * @param useCache - 是否使用緩存（預設 true）
- * @returns 檔案路徑陣列
- * @throws {Error} 當目錄不存在或無法讀取時
+ * Recursively read all files in a directory (with caching)
+ * @param dir - Directory path to scan
+ * @param useCache - Whether to use cache (default: true)
+ * @returns Array of file paths
+ * @throws {Error} When directory does not exist or cannot be read
  */
 export async function getFilesRecursively(
     dir: string,
@@ -21,16 +21,16 @@ export async function getFilesRecursively(
     const now = Date.now()
     const cached = fileCache.get(dir)
 
-    // 檢查緩存是否有效
+    // Check if cache is valid
     if (useCache && cached && now - cached.timestamp < CACHE_TTL) {
         return cached.files
     }
 
-    // 掃描檔案系統
+    // Scan file system
     let results: string[] = []
     const list = await fs.readdir(dir)
     for (const file of list) {
-        if (file.startsWith(HIDDEN_FILE_PREFIX)) continue // 忽略 .git 和隱藏檔案
+        if (file.startsWith(HIDDEN_FILE_PREFIX)) continue // Ignore .git and hidden files
         const filePath = path.resolve(dir, file)
         const stat = await fs.stat(filePath)
         if (stat && stat.isDirectory()) {
@@ -42,7 +42,7 @@ export async function getFilesRecursively(
         }
     }
 
-    // 更新緩存
+    // Update cache
     if (useCache) {
         fileCache.set(dir, { files: results, timestamp: now })
     }
@@ -51,8 +51,8 @@ export async function getFilesRecursively(
 }
 
 /**
- * 清除指定目錄的緩存
- * @param dir - 目錄路徑（可選，不提供則清除所有緩存）
+ * Clear cache for specified directory
+ * @param dir - Directory path (optional, if not provided clears all cache)
  */
 export function clearFileCache(dir?: string): void {
     if (dir) {
@@ -63,9 +63,9 @@ export function clearFileCache(dir?: string): void {
 }
 
 /**
- * 確保目錄存在且有讀寫權限
- * @param dir - 目錄路徑
- * @throws {Error} 當目錄無法訪問時
+ * Ensure directory exists and has read/write permissions
+ * @param dir - Directory path
+ * @throws {Error} When directory cannot be accessed
  */
 export async function ensureDirectoryAccess(dir: string): Promise<void> {
     try {

@@ -15,7 +15,7 @@ import { logger } from '../utils/logger.js'
 import { getFilesRecursively } from '../utils/fileSystem.js'
 import type { PromptDefinition, PromptArgDefinition } from '../types/prompt.js'
 
-// Prompt 定義驗證 Schema
+// Prompt definition validation schema
 const PromptDefinitionSchema = z.object({
     id: z.string().min(1),
     title: z.string().min(1),
@@ -34,16 +34,16 @@ const PromptDefinitionSchema = z.object({
     template: z.string().min(1),
 })
 
-// 錯誤統計
+// Error statistics
 interface LoadError {
     file: string
     error: Error
 }
 
 /**
- * 載入 Handlebars Partials
- * @param storageDir - 儲存目錄
- * @returns 載入的 partial 數量
+ * Load Handlebars Partials
+ * @param storageDir - Storage directory
+ * @returns Number of partials loaded
  */
 export async function loadPartials(storageDir?: string): Promise<number> {
     const dir = storageDir ?? STORAGE_DIR
@@ -71,9 +71,9 @@ export async function loadPartials(storageDir?: string): Promise<number> {
 }
 
 /**
- * 建構 Zod Schema
- * @param args - Prompt 參數定義（來自 Zod 解析後的結果）
- * @returns Zod Schema 物件
+ * Build Zod Schema
+ * @param args - Prompt argument definitions (from Zod parsed result)
+ * @returns Zod Schema object
  */
 function buildZodSchema(
     args: Record<
@@ -150,15 +150,15 @@ function buildZodSchema(
 }
 
 /**
- * 判斷是否應該載入該 prompt
- * 根據檔案路徑和活躍群組列表決定
- * @param relativePath - 相對於儲存目錄的路徑
- * @param activeGroups - 活躍群組列表
- * @returns 包含是否載入和群組名稱的物件
+ * Determine whether a prompt should be loaded
+ * Based on file path and active groups list
+ * @param relativePath - Path relative to storage directory
+ * @param activeGroups - Active groups list
+ * @returns Object containing whether to load and group name
  * @remarks
- * - 根目錄的檔案永遠載入
- * - common 群組的檔案永遠載入
- * - 其他群組只有在 activeGroups 中時才載入
+ * - Files in root directory are always loaded
+ * - Files in 'common' group are always loaded
+ * - Other groups are only loaded when in activeGroups
  */
 function shouldLoadPrompt(
     relativePath: string,
@@ -179,19 +179,19 @@ function shouldLoadPrompt(
 }
 
 /**
- * 載入並註冊 Prompts 到 MCP Server
+ * Load and register Prompts to MCP Server
  *
- * 此函數會：
- * 1. 掃描儲存目錄中的所有 YAML/YML 檔案
- * 2. 根據群組過濾規則決定是否載入
- * 3. 使用 Zod 驗證 prompt 定義結構
- * 4. 編譯 Handlebars 模板
- * 5. 註冊到 MCP Server
+ * This function will:
+ * 1. Scan all YAML/YML files in the storage directory
+ * 2. Determine whether to load based on group filtering rules
+ * 3. Validate prompt definition structure using Zod
+ * 4. Compile Handlebars templates
+ * 5. Register to MCP Server
  *
- * @param server - MCP Server 實例，用於註冊 prompts
- * @param storageDir - 儲存目錄路徑（可選，預設使用配置中的 STORAGE_DIR）
- * @returns 包含載入成功數量和錯誤列表的物件
- * @throws {Error} 當目錄無法訪問時
+ * @param server - MCP Server instance for registering prompts
+ * @param storageDir - Storage directory path (optional, defaults to STORAGE_DIR from config)
+ * @returns Object containing number of successfully loaded prompts and error list
+ * @throws {Error} When directory cannot be accessed
  *
  * @example
  * ```typescript
@@ -201,7 +201,7 @@ function shouldLoadPrompt(
  * }
  * ```
  */
-// 排除的非 prompt 檔案名稱（不區分大小寫）
+// Excluded non-prompt file names (case-insensitive)
 const EXCLUDED_FILES = [
     'pnpm-lock.yaml',
     'yarn.lock',
@@ -221,7 +221,7 @@ export async function loadPrompts(
 ): Promise<{ loaded: number; errors: LoadError[] }> {
     const dir = storageDir ?? STORAGE_DIR
     
-    // 明確記錄載入的群組和是否為預設值
+    // Explicitly log loaded groups and whether using default values
     const logContext: Record<string, unknown> = {
         activeGroups: ACTIVE_GROUPS,
     }
@@ -240,7 +240,7 @@ export async function loadPrompts(
     for (const filePath of allFiles) {
         if (!filePath.endsWith('.yaml') && !filePath.endsWith('.yml')) continue
 
-        // 排除非 prompt 檔案
+        // Exclude non-prompt files
         const fileName = path.basename(filePath).toLowerCase()
         if (EXCLUDED_FILES.some((excluded) => fileName === excluded.toLowerCase())) {
             logger.debug({ filePath }, 'Skipping excluded file')
@@ -265,7 +265,7 @@ export async function loadPrompts(
             const content = await fs.readFile(filePath, 'utf-8')
             const yamlData = yaml.load(content)
 
-            // 使用 Zod 驗證結構
+            // Validate structure using Zod
             const parseResult = PromptDefinitionSchema.safeParse(yamlData)
             if (!parseResult.success) {
                 const error = new Error(
@@ -281,7 +281,7 @@ export async function loadPrompts(
 
             const promptDef = parseResult.data
 
-            // 建構 Zod Schema
+            // Build Zod Schema
             const zodShape: z.ZodRawShape = promptDef.args
                 ? buildZodSchema(promptDef.args as Record<
                       string,
@@ -294,7 +294,7 @@ export async function loadPrompts(
                   >)
                 : {}
 
-            // 編譯 Handlebars 模板
+            // Compile Handlebars template
             let templateDelegate: HandlebarsTemplateDelegate
             try {
                 templateDelegate = Handlebars.compile(promptDef.template, {
@@ -316,10 +316,10 @@ export async function loadPrompts(
                 continue
             }
 
-            // 建立 prompt 處理函數（可重用於 prompt 和 tool）
+            // Create prompt handler function (reusable for both prompt and tool)
             const promptHandler = (args: Record<string, unknown>) => {
                 try {
-                    // 記錄 prompt 被調用
+                    // Log prompt invocation
                     logger.info(
                         {
                             promptId: promptDef.id,
@@ -329,7 +329,7 @@ export async function loadPrompts(
                         'Prompt invoked'
                     )
 
-                    // 自動注入語言指令與參數
+                    // Automatically inject language instruction and parameters
                     const context = {
                         ...args,
                         output_lang_rule: LANG_INSTRUCTION,
@@ -337,7 +337,7 @@ export async function loadPrompts(
                     }
                     const message = templateDelegate(context)
                     
-                    // 記錄模板渲染成功
+                    // Log successful template rendering
                     logger.debug(
                         {
                             promptId: promptDef.id,
@@ -367,23 +367,23 @@ export async function loadPrompts(
                 }
             }
 
-            // 註冊 Prompt
+            // Register Prompt
             server.prompt(promptDef.id, zodShape, promptHandler)
 
-            // 同時註冊為 Tool，讓 AI 可以自動調用
-            // 從 description 中提取 TRIGGER 資訊用於 tool 描述
+            // Also register as Tool so AI can automatically invoke it
+            // Extract TRIGGER information from description for tool description
             const description = promptDef.description || ''
             const triggerMatch = description.match(/TRIGGER:\s*(.+?)(?:\n|$)/i)
             const triggerText = triggerMatch && triggerMatch[1]
                 ? triggerMatch[1].trim()
                 : `When user needs ${promptDef.title.toLowerCase()}`
 
-            // 建立 tool 的 inputSchema（與 prompt 的 args 相同）
+            // Create tool's inputSchema (same as prompt's args)
             const toolInputSchema = Object.keys(zodShape).length > 0
                 ? z.object(zodShape)
                 : z.object({})
 
-            // 註冊 Tool（使用 registerTool，推薦的 API）
+            // Register Tool (using registerTool, recommended API)
             server.registerTool(
                 promptDef.id,
                 {
@@ -392,7 +392,7 @@ export async function loadPrompts(
                     inputSchema: toolInputSchema,
                 },
                 async (args: Record<string, unknown>) => {
-                    // 記錄 tool 被調用（使用 info 級別，更容易看到）
+                    // Log tool invocation (using info level for better visibility)
                     logger.info(
                         {
                             toolId: promptDef.id,
@@ -410,10 +410,10 @@ export async function loadPrompts(
                         '🔧 Tool invoked (calling prompt)'
                     )
 
-                    // 調用 prompt handler 並返回結果
+                    // Call prompt handler and return result
                     const result = promptHandler(args)
                     
-                    // 記錄 tool 執行成功
+                    // Log successful tool execution
                     const firstMessage = result.messages[0]
                     const messageText =
                         firstMessage?.content && 'text' in firstMessage.content
@@ -428,7 +428,7 @@ export async function loadPrompts(
                         '✅ Tool execution completed'
                     )
                     
-                    // Tool 需要返回 content 格式
+                    // Tool needs to return content format
                     return {
                         content: [
                             {

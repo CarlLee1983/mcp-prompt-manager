@@ -4,64 +4,64 @@ import fs from 'fs'
 import path from 'path'
 
 /**
- * MCP 服務器日誌配置
+ * MCP server logging configuration
  * 
- * 注意：MCP 協議使用 stdout 進行通信，因此所有日誌都輸出到 stderr。
- * 為了避免客戶端將正常日誌視為錯誤，我們採用以下策略：
- * 1. stderr 只輸出 warn/error/fatal 級別的日誌（避免被標記為 error）
- * 2. info/debug/trace 級別的日誌只輸出到檔案（如果設定了 LOG_FILE）
- * 3. 如果沒有設定 LOG_FILE，info 級別的日誌完全不輸出（避免誤會）
- * 4. 使用 silent 模式來完全禁用日誌（當 LOG_LEVEL=silent 時）
+ * Note: MCP protocol uses stdout for communication, so all logs are output to stderr.
+ * To prevent clients from treating normal logs as errors, we adopt the following strategy:
+ * 1. stderr only outputs warn/error/fatal level logs (to avoid being marked as error)
+ * 2. info/debug/trace level logs only output to file (if LOG_FILE is set)
+ * 3. If LOG_FILE is not set, info level logs are not output at all (to avoid confusion)
+ * 4. Use silent mode to completely disable logging (when LOG_LEVEL=silent)
  */
 const logLevel = LOG_LEVEL || (process.env.NODE_ENV === 'development' ? 'info' : 'warn')
 
-// stderr 的日誌級別：只輸出 warn/error/fatal，避免 info 被標記為 error
+// stderr log level: only output warn/error/fatal, avoid info being marked as error
 const stderrLogLevel = 'warn'
 
-// 建立 logger 實例
+// Create logger instance
 const loggerOptions: pino.LoggerOptions = {
     level: logLevel,
 }
 
-// 建立 logger
+// Create logger
 let logger: pino.Logger
 
-// 如果設定了 LOG_FILE，使用 multistream 分別輸出到 stderr 和檔案
+// If LOG_FILE is set, use multistream to output to stderr and file separately
 if (LOG_FILE) {
     const logFilePath = path.isAbsolute(LOG_FILE)
         ? LOG_FILE
         : path.resolve(process.cwd(), LOG_FILE)
 
-    // 確保日誌檔案的目錄存在
+    // Ensure log file directory exists
     const logDir = path.dirname(logFilePath)
     if (!fs.existsSync(logDir)) {
         fs.mkdirSync(logDir, { recursive: true })
     }
 
-    // 建立輸出流陣列
+    // Create output stream array
     const streams = [
-        // stderr 輸出：只輸出 warn/error/fatal（避免 info 被標記為 error）
+        // stderr output: only output warn/error/fatal (to avoid info being marked as error)
         {
             level: stderrLogLevel,
             stream: pino.destination(2),
         },
-        // 檔案輸出：輸出所有級別的日誌（原始 JSON 格式，方便解析和搜尋）
+        // File output: output all level logs (raw JSON format, convenient for parsing and searching)
         {
             level: logLevel,
             stream: fs.createWriteStream(logFilePath, { flags: 'a' }),
         },
     ]
 
-    // 使用 multistream 同時輸出到多個目標
-    // 注意：當使用 multistream 時，transport 選項會被忽略
-    // 如果需要格式化輸出，可以在客戶端使用工具（如 pino-pretty）來查看檔案
+    // Use multistream to output to multiple targets simultaneously
+    // Note: When using multistream, transport option is ignored
+    // If formatted output is needed, use tools (such as pino-pretty) on the client side to view files
     logger = pino(loggerOptions, pino.multistream(streams))
 } else {
-    // 沒有設定 LOG_FILE，只輸出 warn/error/fatal 到 stderr
-    // info/debug/trace 級別的日誌不輸出（避免被標記為 error）
+    // LOG_FILE not set, only output warn/error/fatal to stderr
+    // info/debug/trace level logs are not output (to avoid being marked as error)
     loggerOptions.level = stderrLogLevel
 
-    // 只在開發環境中使用 pino-pretty 格式化輸出
+    // Only use pino-pretty for formatted output in development environment
     if (process.env.NODE_ENV === 'development') {
         loggerOptions.transport = {
             target: 'pino-pretty',
@@ -73,7 +73,7 @@ if (LOG_FILE) {
         }
     }
 
-    // 輸出到 stderr（MCP 協議要求 stdout 用於協議通信）
+    // Output to stderr (MCP protocol requires stdout for protocol communication)
     logger = pino(loggerOptions, pino.destination(2))
 }
 
