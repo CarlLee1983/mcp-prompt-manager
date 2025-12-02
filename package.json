@@ -5,6 +5,7 @@
     "type": "module",
     "main": "dist/index.js",
     "scripts": {
+        "preinstall": "node ./scripts/enforce-pnpm.mjs",
         "build": "tsc",
         "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
         "inspector:dev": "pnpm run build && pnpm run inspector",

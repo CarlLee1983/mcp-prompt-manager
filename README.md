@@ -51,6 +51,8 @@ npm install
 pnpm install
 ```
 
+> Note: Installs are enforced with pnpm; npm/yarn will fail because of the preinstall check.
+
 ### 2. Configure Environment Variables
 
 Copy the example configuration file and create `.env`:
