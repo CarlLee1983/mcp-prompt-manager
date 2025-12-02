@@ -37,6 +37,87 @@ const promptRuntimeMap = new Map<string, PromptRuntime>()
 // 重入保護鎖：追蹤當前正在執行的 reload Promise
 let reloadingPromise: Promise<{ loaded: number; errors: LoadError[] }> | null = null
 
+// 待註冊的 prompt 資訊（用於排序）
+interface PendingPromptRegistration {
+    promptDef: PromptDefinition
+    promptRuntime: PromptRuntime
+    zodShape: z.ZodRawShape
+    templateDelegate: HandlebarsTemplateDelegate
+    filePath: string
+    relativePath: string
+}
+
+/**
+ * 比較版本號（semver）
+ * @param version1 - 版本號 1
+ * @param version2 - 版本號 2
+ * @returns 比較結果：-1 (v1 < v2), 0 (v1 === v2), 1 (v1 > v2)
+ */
+function compareVersions(version1: string, version2: string): number {
+    const v1Parts = version1.split('.').map(Number)
+    const v2Parts = version2.split('.').map(Number)
+    
+    const maxLength = Math.max(v1Parts.length, v2Parts.length)
+    for (let i = 0; i < maxLength; i++) {
+        const v1Part = v1Parts[i] ?? 0
+        const v2Part = v2Parts[i] ?? 0
+        if (v1Part < v2Part) return 1 // 較新版本優先，所以返回 1
+        if (v1Part > v2Part) return -1
+    }
+    return 0
+}
+
+/**
+ * 對 prompts 進行優先權排序
+ * 排序規則：
+ * 1. status 優先級：stable > draft > deprecated > legacy
+ * 2. version（較新版本優先）
+ * 3. source 優先級：registry > embedded > legacy
+ * 
+ * @param prompts - 待排序的 prompts
+ * @returns 排序後的 prompts
+ */
+function sortPromptsByPriority(
+    prompts: PendingPromptRegistration[]
+): PendingPromptRegistration[] {
+    const statusPriority: Record<string, number> = {
+        stable: 4,
+        draft: 3,
+        deprecated: 2,
+        legacy: 1,
+    }
+
+    const sourcePriority: Record<string, number> = {
+        registry: 3,
+        embedded: 2,
+        legacy: 1,
+    }
+
+    return prompts.sort((a, b) => {
+        const runtimeA = a.promptRuntime
+        const runtimeB = b.promptRuntime
+
+        // 1. status 優先級（較高優先）
+        const statusA = statusPriority[runtimeA.status] ?? 0
+        const statusB = statusPriority[runtimeB.status] ?? 0
+        const statusDiff = statusB - statusA
+        if (statusDiff !== 0) return statusDiff
+
+        // 2. version（較新版本優先）
+        const versionDiff = compareVersions(runtimeA.version, runtimeB.version)
+        if (versionDiff !== 0) return versionDiff
+
+        // 3. source 優先級（較高優先）
+        const sourceA = sourcePriority[runtimeA.source] ?? 0
+        const sourceB = sourcePriority[runtimeB.source] ?? 0
+        const sourceDiff = sourceB - sourceA
+        if (sourceDiff !== 0) return sourceDiff
+
+        // 4. 最後按 ID 字母順序（確保穩定性）
+        return a.promptDef.id.localeCompare(b.promptDef.id)
+    })
+}
+
 // Prompt definition validation schema
 const PromptDefinitionSchema = z.object({
     id: z.string().min(1),
@@ -412,6 +493,9 @@ export async function loadPrompts(
     const allFiles = await getFilesRecursively(dir)
     let loadedCount = 0
     const errors: LoadError[] = []
+    
+    // 收集所有待註冊的 prompts（用於排序）
+    const pendingRegistrations: PendingPromptRegistration[] = []
 
     for (const filePath of allFiles) {
         if (!filePath.endsWith('.yaml') && !filePath.endsWith('.yml')) continue
@@ -495,27 +579,26 @@ export async function loadPrompts(
                 source
             )
 
-            // 如果 runtime_state 是 invalid 或 disabled，仍然記錄但不註冊到 MCP
-            if (promptRuntime.runtime_state === 'invalid') {
-                promptRuntimeMap.set(promptDef.id, promptRuntime)
-                logger.warn(
-                    {
-                        promptId: promptDef.id,
-                        filePath,
-                    },
-                    'Prompt marked as invalid, skipping registration'
-                )
-                continue
-            }
+            // 儲存 runtime 資訊（無論狀態如何）
+            promptRuntimeMap.set(promptDef.id, promptRuntime)
 
-            if (promptRuntime.runtime_state === 'disabled') {
-                promptRuntimeMap.set(promptDef.id, promptRuntime)
+            // 只註冊 runtime_state === 'active' 的 prompts 作為 tools
+            // 其他狀態（invalid, disabled, legacy, warning）不註冊為 tools，但仍記錄在 runtime map 中
+            if (promptRuntime.runtime_state !== 'active') {
+                const stateReason = {
+                    invalid: 'Prompt marked as invalid',
+                    disabled: 'Prompt disabled by registry',
+                    legacy: 'Legacy prompt (not registered as tool)',
+                    warning: 'Prompt has metadata validation warnings',
+                }[promptRuntime.runtime_state] || 'Unknown state'
+
                 logger.debug(
                     {
                         promptId: promptDef.id,
                         filePath,
+                        runtime_state: promptRuntime.runtime_state,
                     },
-                    'Prompt disabled by registry, skipping registration'
+                    `${stateReason}, skipping tool registration`
                 )
                 continue
             }
@@ -555,6 +638,40 @@ export async function loadPrompts(
                 continue
             }
 
+            // 收集待註冊的 prompt（稍後排序並註冊）
+            pendingRegistrations.push({
+                promptDef: promptDef as PromptDefinition,
+                promptRuntime,
+                zodShape,
+                templateDelegate,
+                filePath,
+                relativePath,
+            })
+        } catch (error) {
+            const loadError =
+                error instanceof Error ? error : new Error(String(error))
+            errors.push({ file: relativePath, error: loadError })
+            logger.warn({ filePath, error: loadError }, 'Failed to load prompt')
+        }
+    }
+
+    // 對待註冊的 prompts 進行優先權排序
+    const sortedRegistrations = sortPromptsByPriority(pendingRegistrations)
+    logger.debug(
+        { total: sortedRegistrations.length },
+        'Prompts sorted by priority (status > version > source)'
+    )
+
+    // 按照排序後的順序註冊 prompts 和 tools
+    for (const {
+        promptDef,
+        promptRuntime,
+        zodShape,
+        templateDelegate,
+        filePath,
+        relativePath,
+    } of sortedRegistrations) {
+        try {
             // Create prompt handler function (reusable for both prompt and tool)
             const promptHandler = (args: Record<string, unknown>) => {
                 try {
@@ -618,6 +735,22 @@ export async function loadPrompts(
                 ? triggerMatch[1].trim()
                 : `When user needs ${promptDef.title.toLowerCase()}`
 
+            // 構建增強的工具描述，包含 tags 和 use_cases 供 Agent 判斷
+            let enhancedDescription = description
+            if (triggerText) {
+                enhancedDescription += `\n\nTRIGGER: ${triggerText}`
+            }
+
+            // 加入 tags 資訊（如果有的話）
+            if (promptRuntime.tags && promptRuntime.tags.length > 0) {
+                enhancedDescription += `\n\nTags: ${promptRuntime.tags.join(', ')}`
+            }
+
+            // 加入 use_cases 資訊（如果有的話）
+            if (promptRuntime.use_cases && promptRuntime.use_cases.length > 0) {
+                enhancedDescription += `\n\nUse Cases: ${promptRuntime.use_cases.join(', ')}`
+            }
+
             // Create tool's inputSchema (same as prompt's args)
             const toolInputSchema = Object.keys(zodShape).length > 0
                 ? z.object(zodShape)
@@ -626,11 +759,13 @@ export async function loadPrompts(
             // Register Tool (using registerTool, recommended API)
             // 雙 registry swap：先註冊新的 tool（MCP SDK 可能會覆蓋舊的，或暫時並存）
             // 舊的 tool 會在 reloadPrompts 的最後階段移除，確保零空窗期
+            // 只註冊 runtime_state === 'active' 的 prompts 作為 tools
+            // 按照優先權排序後的順序註冊，讓 Agent 能夠優先選擇高優先權的 tools
             const toolRef = server.registerTool(
                 promptDef.id,
                 {
                     title: promptDef.title,
-                    description: `${description}\n\n${triggerText}`,
+                    description: enhancedDescription,
                     inputSchema: toolInputSchema,
                 },
                 async (args: Record<string, unknown>) => {
@@ -692,24 +827,21 @@ export async function loadPrompts(
             registeredToolRefs.set(promptDef.id, toolRef)
             newToolIds.add(promptDef.id)
 
-            // 儲存 runtime 資訊
-            promptRuntimeMap.set(promptDef.id, promptRuntime)
-
             loadedCount++
             logger.debug(
                 {
-                    groupName,
                     promptId: promptDef.id,
                     runtimeState: promptRuntime.runtime_state,
                     source: promptRuntime.source,
+                    status: promptRuntime.status,
                 },
-                'Prompt loaded'
+                'Prompt loaded and registered'
             )
         } catch (error) {
             const loadError =
                 error instanceof Error ? error : new Error(String(error))
             errors.push({ file: relativePath, error: loadError })
-            logger.warn({ filePath, error: loadError }, 'Failed to load prompt')
+            logger.warn({ filePath, error: loadError }, 'Failed to register prompt')
         }
     }
 
