@@ -1,7 +1,7 @@
-import fs from "fs/promises"
-import path from "path"
+import fs from 'fs/promises'
+import path from 'path'
 
-const HIDDEN_FILE_PREFIX = "."
+const HIDDEN_FILE_PREFIX = '.'
 
 // 檔案列表緩存
 const fileCache = new Map<string, { files: string[]; timestamp: number }>()

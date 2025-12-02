@@ -1,19 +1,19 @@
-import fs from "fs/promises"
-import path from "path"
-import yaml from "js-yaml"
-import Handlebars from "handlebars"
-import { z } from "zod"
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import fs from 'fs/promises'
+import path from 'path'
+import yaml from 'js-yaml'
+import Handlebars from 'handlebars'
+import { z } from 'zod'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import {
     STORAGE_DIR,
     ACTIVE_GROUPS,
     IS_DEFAULT_GROUPS,
     LANG_INSTRUCTION,
     LANG_SETTING,
-} from "../config/env.js"
-import { logger } from "../utils/logger.js"
-import { getFilesRecursively } from "../utils/fileSystem.js"
-import type { PromptDefinition, PromptArgDefinition } from "../types/prompt.js"
+} from '../config/env.js'
+import { logger } from '../utils/logger.js'
+import { getFilesRecursively } from '../utils/fileSystem.js'
+import type { PromptDefinition, PromptArgDefinition } from '../types/prompt.js'
 
 // Prompt 定義驗證 Schema
 const PromptDefinitionSchema = z.object({
@@ -24,9 +24,10 @@ const PromptDefinitionSchema = z.object({
         .record(
             z.string(),
             z.object({
-                type: z.enum(["string", "number", "boolean"]),
+                type: z.enum(['string', 'number', 'boolean']),
                 description: z.string().optional(),
                 default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+                required: z.boolean().optional(),
             })
         )
         .optional(),
@@ -46,26 +47,26 @@ interface LoadError {
  */
 export async function loadPartials(storageDir?: string): Promise<number> {
     const dir = storageDir ?? STORAGE_DIR
-    logger.debug("Loading Handlebars partials")
+    logger.debug('Loading Handlebars partials')
     const allFiles = await getFilesRecursively(dir)
     let count = 0
 
     for (const filePath of allFiles) {
-        if (!filePath.endsWith(".hbs")) continue
+        if (!filePath.endsWith('.hbs')) continue
 
         try {
-            const content = await fs.readFile(filePath, "utf-8")
+            const content = await fs.readFile(filePath, 'utf-8')
             const partialName = path.parse(filePath).name
 
             Handlebars.registerPartial(partialName, content)
             count++
-            logger.debug({ partialName }, "Partial registered")
+            logger.debug({ partialName }, 'Partial registered')
         } catch (error) {
-            logger.warn({ filePath, error }, "Failed to load partial")
+            logger.warn({ filePath, error }, 'Failed to load partial')
         }
     }
 
-    logger.info({ count }, "Partials loaded")
+    logger.info({ count }, 'Partials loaded')
     return count
 }
 
@@ -78,9 +79,10 @@ function buildZodSchema(
     args: Record<
         string,
         {
-            type: "string" | "number" | "boolean"
+            type: 'string' | 'number' | 'boolean'
             description?: string
             default?: string | number | boolean
+            required?: boolean
         }
     >
 ): z.ZodRawShape {
@@ -89,35 +91,54 @@ function buildZodSchema(
         for (const [key, config] of Object.entries(args)) {
             let schema: z.ZodTypeAny
 
-            // 根據類型建立基礎 schema
-            if (config.type === "number") {
-                schema = z.number()
-            } else if (config.type === "boolean") {
-                schema = z.boolean()
+            // Create base schema based on type with coercion support
+            // Use z.coerce to automatically convert string 'true'/'false' to boolean
+            // and string numbers to numbers (for MCP clients that send strings)
+            if (config.type === 'number') {
+                schema = z.coerce.number()
+            } else if (config.type === 'boolean') {
+                schema = z.coerce.boolean()
             } else {
                 schema = z.string()
             }
 
-            // 判斷參數是否為可選
-            // 1. 如果有 default 值，參數是可選的
-            // 2. 如果 description 中包含 "optional"，參數是可選的
-            // 3. 如果 description 中明確說 "required"，參數是必需的
             const hasDefault = config.default !== undefined
-            const isOptionalInDesc =
-                config.description?.toLowerCase().includes("optional") ?? false
-            const isRequiredInDesc =
-                config.description?.toLowerCase().includes("(required)") ?? false
 
-            // 如果沒有明確標記為 required，且有 default 或標記為 optional，則設為可選
-            if (!isRequiredInDesc && (hasDefault || isOptionalInDesc)) {
-                schema = schema.optional()
-                // 如果有 default 值，設定預設值
-                if (hasDefault) {
-                    schema = schema.default(config.default as never)
+            // Priority 1: Use explicit required field if present
+            if (config.required !== undefined) {
+                if (config.required === true) {
+                    // Parameter is required - don't make it optional
+                    // (schema remains as-is, which means required)
+                } else {
+                    // Parameter is explicitly optional
+                    schema = schema.optional()
+                    // If there's a default value, set the default
+                    if (hasDefault) {
+                        schema = schema.default(config.default as never)
+                    }
                 }
+            } else {
+                // Priority 2: Fallback to existing logic for backward compatibility
+                // 1. If there's a default value, parameter is optional
+                // 2. If description contains 'optional', parameter is optional
+                // 3. If description explicitly says 'required', parameter is required
+                const isOptionalInDesc =
+                    config.description?.toLowerCase().includes('optional') ?? false
+                const isRequiredInDesc =
+                    config.description?.toLowerCase().includes('(required)') ?? false
+
+                // If not explicitly marked as required, and has default or marked as optional, set as optional
+                if (!isRequiredInDesc && (hasDefault || isOptionalInDesc)) {
+                    schema = schema.optional()
+                    // If there's a default value, set the default
+                    if (hasDefault) {
+                        schema = schema.default(config.default as never)
+                    }
+                }
+                // If isRequiredInDesc is true, schema remains required (no change needed)
             }
 
-            // 設定描述
+            // Set description
             if (config.description) {
                 schema = schema.describe(config.description)
             }
@@ -147,8 +168,8 @@ function shouldLoadPrompt(
     groupName: string
 } {
     const pathParts = relativePath.split(path.sep)
-    const groupName = pathParts.length > 1 ? (pathParts[0] ?? "root") : "root"
-    const isAlwaysActive = groupName === "root" || groupName === "common"
+    const groupName = pathParts.length > 1 ? (pathParts[0] ?? 'root') : 'root'
+    const isAlwaysActive = groupName === 'root' || groupName === 'common'
     const isSelected = activeGroups.includes(groupName)
 
     return {
@@ -182,16 +203,16 @@ function shouldLoadPrompt(
  */
 // 排除的非 prompt 檔案名稱（不區分大小寫）
 const EXCLUDED_FILES = [
-    "pnpm-lock.yaml",
-    "yarn.lock",
-    "package-lock.json",
-    "package.json",
-    "composer.lock",
-    "go.sum",
-    "requirements.txt",
-    "poetry.lock",
-    "pom.xml",
-    "build.gradle",
+    'pnpm-lock.yaml',
+    'yarn.lock',
+    'package-lock.json',
+    'package.json',
+    'composer.lock',
+    'go.sum',
+    'requirements.txt',
+    'poetry.lock',
+    'pom.xml',
+    'build.gradle',
 ]
 
 export async function loadPrompts(
@@ -207,22 +228,22 @@ export async function loadPrompts(
     
     if (IS_DEFAULT_GROUPS) {
         logContext.isDefault = true
-        logContext.hint = "Set MCP_GROUPS to load additional groups"
+        logContext.hint = 'Set MCP_GROUPS to load additional groups'
     }
     
-    logger.info(logContext, "Loading prompts")
+    logger.info(logContext, 'Loading prompts')
 
     const allFiles = await getFilesRecursively(dir)
     let loadedCount = 0
     const errors: LoadError[] = []
 
     for (const filePath of allFiles) {
-        if (!filePath.endsWith(".yaml") && !filePath.endsWith(".yml")) continue
+        if (!filePath.endsWith('.yaml') && !filePath.endsWith('.yml')) continue
 
         // 排除非 prompt 檔案
         const fileName = path.basename(filePath).toLowerCase()
         if (EXCLUDED_FILES.some((excluded) => fileName === excluded.toLowerCase())) {
-            logger.debug({ filePath }, "Skipping excluded file")
+            logger.debug({ filePath }, 'Skipping excluded file')
             continue
         }
 
@@ -235,25 +256,25 @@ export async function loadPrompts(
         if (!shouldLoad) {
             logger.debug(
                 { filePath, groupName },
-                "Skipping prompt (not in active groups)"
+                'Skipping prompt (not in active groups)'
             )
             continue
         }
 
         try {
-            const content = await fs.readFile(filePath, "utf-8")
+            const content = await fs.readFile(filePath, 'utf-8')
             const yamlData = yaml.load(content)
 
             // 使用 Zod 驗證結構
             const parseResult = PromptDefinitionSchema.safeParse(yamlData)
             if (!parseResult.success) {
                 const error = new Error(
-                    `Invalid prompt definition: ${parseResult.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`
+                    `Invalid prompt definition: ${parseResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
                 )
                 errors.push({ file: relativePath, error })
                 logger.warn(
                     { filePath, error: parseResult.error },
-                    "Failed to validate prompt definition"
+                    'Failed to validate prompt definition'
                 )
                 continue
             }
@@ -265,9 +286,10 @@ export async function loadPrompts(
                 ? buildZodSchema(promptDef.args as Record<
                       string,
                       {
-                          type: "string" | "number" | "boolean"
+                          type: 'string' | 'number' | 'boolean'
                           description?: string
                           default?: string | number | boolean
+                          required?: boolean
                       }
                   >)
                 : {}
@@ -289,7 +311,7 @@ export async function loadPrompts(
                 })
                 logger.warn(
                     { filePath, error: compileError },
-                    "Failed to compile Handlebars template"
+                    'Failed to compile Handlebars template'
                 )
                 continue
             }
@@ -304,7 +326,7 @@ export async function loadPrompts(
                             promptTitle: promptDef.title,
                             args: Object.keys(args),
                         },
-                        "Prompt invoked"
+                        'Prompt invoked'
                     )
 
                     // 自動注入語言指令與參數
@@ -321,14 +343,14 @@ export async function loadPrompts(
                             promptId: promptDef.id,
                             messageLength: message.length,
                         },
-                        "Template rendered successfully"
+                        'Template rendered successfully'
                     )
                     
                     return {
                         messages: [
                             {
-                                role: "user" as const,
-                                content: { type: "text" as const, text: message },
+                                role: 'user' as const,
+                                content: { type: 'text' as const, text: message },
                             },
                         ],
                     }
@@ -339,7 +361,7 @@ export async function loadPrompts(
                             : new Error(String(error))
                     logger.error(
                         { promptId: promptDef.id, error: execError },
-                        "Template execution failed"
+                        'Template execution failed'
                     )
                     throw execError
                 }
@@ -350,7 +372,7 @@ export async function loadPrompts(
 
             // 同時註冊為 Tool，讓 AI 可以自動調用
             // 從 description 中提取 TRIGGER 資訊用於 tool 描述
-            const description = promptDef.description || ""
+            const description = promptDef.description || ''
             const triggerMatch = description.match(/TRIGGER:\s*(.+?)(?:\n|$)/i)
             const triggerText = triggerMatch && triggerMatch[1]
                 ? triggerMatch[1].trim()
@@ -379,13 +401,13 @@ export async function loadPrompts(
                             argsValues: Object.fromEntries(
                                 Object.entries(args).map(([key, value]) => [
                                     key,
-                                    typeof value === "string" && value.length > 100
+                                    typeof value === 'string' && value.length > 100
                                         ? `${value.substring(0, 100)}...`
                                         : value,
                                 ])
                             ),
                         },
-                        "🔧 Tool invoked (calling prompt)"
+                        '🔧 Tool invoked (calling prompt)'
                     )
 
                     // 調用 prompt handler 並返回結果
@@ -394,23 +416,23 @@ export async function loadPrompts(
                     // 記錄 tool 執行成功
                     const firstMessage = result.messages[0]
                     const messageText =
-                        firstMessage?.content && "text" in firstMessage.content
+                        firstMessage?.content && 'text' in firstMessage.content
                             ? firstMessage.content.text
-                            : ""
+                            : ''
                     
                     logger.info(
                         {
                             toolId: promptDef.id,
                             messageLength: messageText.length,
                         },
-                        "✅ Tool execution completed"
+                        '✅ Tool execution completed'
                     )
                     
                     // Tool 需要返回 content 格式
                     return {
                         content: [
                             {
-                                type: "text" as const,
+                                type: 'text' as const,
                                 text: messageText,
                             },
                         ],
@@ -419,18 +441,18 @@ export async function loadPrompts(
             )
 
             loadedCount++
-            logger.debug({ groupName, promptId: promptDef.id }, "Prompt loaded")
+            logger.debug({ groupName, promptId: promptDef.id }, 'Prompt loaded')
         } catch (error) {
             const loadError =
                 error instanceof Error ? error : new Error(String(error))
             errors.push({ file: relativePath, error: loadError })
-            logger.warn({ filePath, error: loadError }, "Failed to load prompt")
+            logger.warn({ filePath, error: loadError }, 'Failed to load prompt')
         }
     }
 
     logger.info(
         { loaded: loadedCount, errors: errors.length },
-        "Prompts loading completed"
+        'Prompts loading completed'
     )
 
     if (errors.length > 0) {
@@ -441,7 +463,7 @@ export async function loadPrompts(
                     message: e.error.message,
                 })),
             },
-            "Some prompts failed to load"
+            'Some prompts failed to load'
         )
     }
 

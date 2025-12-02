@@ -1,7 +1,7 @@
-import pino from "pino"
-import { LOG_LEVEL, LOG_FILE } from "../config/env.js"
-import fs from "fs"
-import path from "path"
+import pino from 'pino'
+import { LOG_LEVEL, LOG_FILE } from '../config/env.js'
+import fs from 'fs'
+import path from 'path'
 
 /**
  * MCP 服務器日誌配置
@@ -13,10 +13,10 @@ import path from "path"
  * 3. 如果沒有設定 LOG_FILE，info 級別的日誌完全不輸出（避免誤會）
  * 4. 使用 silent 模式來完全禁用日誌（當 LOG_LEVEL=silent 時）
  */
-const logLevel = LOG_LEVEL || (process.env.NODE_ENV === "development" ? "info" : "warn")
+const logLevel = LOG_LEVEL || (process.env.NODE_ENV === 'development' ? 'info' : 'warn')
 
 // stderr 的日誌級別：只輸出 warn/error/fatal，避免 info 被標記為 error
-const stderrLogLevel = "warn"
+const stderrLogLevel = 'warn'
 
 // 建立 logger 實例
 const loggerOptions: pino.LoggerOptions = {
@@ -48,7 +48,7 @@ if (LOG_FILE) {
         // 檔案輸出：輸出所有級別的日誌（原始 JSON 格式，方便解析和搜尋）
         {
             level: logLevel,
-            stream: fs.createWriteStream(logFilePath, { flags: "a" }),
+            stream: fs.createWriteStream(logFilePath, { flags: 'a' }),
         },
     ]
 
@@ -62,13 +62,13 @@ if (LOG_FILE) {
     loggerOptions.level = stderrLogLevel
 
     // 只在開發環境中使用 pino-pretty 格式化輸出
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === 'development') {
         loggerOptions.transport = {
-            target: "pino-pretty",
+            target: 'pino-pretty',
             options: {
                 colorize: true,
-                translateTime: "SYS:standard",
-                ignore: "pid,hostname",
+                translateTime: 'SYS:standard',
+                ignore: 'pid,hostname',
             },
         }
     }

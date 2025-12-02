@@ -1,6 +1,6 @@
-import { z } from "zod"
-import dotenv from "dotenv"
-import path from "path"
+import { z } from 'zod'
+import dotenv from 'dotenv'
+import path from 'path'
 
 /**
  * 載入環境變數
@@ -20,20 +20,20 @@ process.stdout.write = originalWrite
 const ConfigSchema = z.object({
     PROMPT_REPO_URL: z
         .string()
-        .min(1, "PROMPT_REPO_URL is required")
+        .min(1, 'PROMPT_REPO_URL is required')
         .refine(
             (url) => {
                 // 驗證 URL 格式或本地路徑
                 // 不允許路徑遍歷攻擊
-                if (url.includes("..") || url.includes("\0")) {
+                if (url.includes('..') || url.includes('\0')) {
                     return false
                 }
                 // 驗證是有效的 URL 或絕對路徑
                 try {
                     if (
-                        url.startsWith("http://") ||
-                        url.startsWith("https://") ||
-                        url.startsWith("git@")
+                        url.startsWith('http://') ||
+                        url.startsWith('https://') ||
+                        url.startsWith('git@')
                     ) {
                         return true
                     }
@@ -45,10 +45,10 @@ const ConfigSchema = z.object({
             },
             {
                 message:
-                    "Invalid REPO_URL: must be a valid URL or absolute path",
+                    'Invalid REPO_URL: must be a valid URL or absolute path',
             }
         ),
-    MCP_LANGUAGE: z.enum(["en", "zh"]).default("en"),
+    MCP_LANGUAGE: z.enum(['en', 'zh']).default('en'),
     MCP_GROUPS: z
         .string()
         .optional()
@@ -56,7 +56,7 @@ const ConfigSchema = z.object({
             if (!val) return undefined
             // 驗證並清理群組名稱
             const groups = val
-                .split(",")
+                .split(',')
                 .map((g) => g.trim())
                 .filter(Boolean)
             // 驗證每個群組名稱格式
@@ -72,8 +72,8 @@ const ConfigSchema = z.object({
         }),
     STORAGE_DIR: z.string().optional(),
     LOG_LEVEL: z
-        .enum(["fatal", "error", "warn", "info", "debug", "trace"])
-        .default("info"),
+        .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
+        .default('info'),
     LOG_FILE: z.string().optional(),
     GIT_BRANCH: z.string().optional(),
     GIT_MAX_RETRIES: z
@@ -115,8 +115,8 @@ function loadConfig() {
     } catch (error) {
         if (error instanceof z.ZodError) {
             const messages = error.issues
-                .map((e) => `${e.path.join(".")}: ${e.message}`)
-                .join("\n")
+                .map((e) => `${e.path.join('.')}: ${e.message}`)
+                .join('\n')
             throw new Error(`Configuration validation failed:\n${messages}`)
         }
         throw error
@@ -130,7 +130,7 @@ export const config = loadConfig()
 export const REPO_URL = config.PROMPT_REPO_URL
 export const STORAGE_DIR = config.STORAGE_DIR
     ? path.resolve(process.cwd(), config.STORAGE_DIR)
-    : path.resolve(process.cwd(), ".prompts_cache")
+    : path.resolve(process.cwd(), '.prompts_cache')
 export const LANG_SETTING = config.MCP_LANGUAGE
 
 /**
@@ -138,7 +138,7 @@ export const LANG_SETTING = config.MCP_LANGUAGE
  * 當 MCP_GROUPS 未設定時，預設只載入 common 群組
  * 設定方式：MCP_GROUPS=laravel,vue,react
  */
-export const ACTIVE_GROUPS = config.MCP_GROUPS || ["common"]
+export const ACTIVE_GROUPS = config.MCP_GROUPS || ['common']
 
 /**
  * 是否使用預設群組（MCP_GROUPS 未設定時）
@@ -148,11 +148,11 @@ export const IS_DEFAULT_GROUPS = !config.MCP_GROUPS
 
 export const LOG_LEVEL = config.LOG_LEVEL
 export const LOG_FILE = config.LOG_FILE
-export const GIT_BRANCH = config.GIT_BRANCH || "main"
+export const GIT_BRANCH = config.GIT_BRANCH || 'main'
 export const GIT_MAX_RETRIES = config.GIT_MAX_RETRIES
 
 // 語言指令
 export const LANG_INSTRUCTION =
-    LANG_SETTING === "zh"
-        ? "Please reply in Traditional Chinese (繁體中文). Keep technical terms in English."
-        : "Please reply in English."
+    LANG_SETTING === 'zh'
+        ? 'Please reply in Traditional Chinese (繁體中文). Keep technical terms in English.'
+        : 'Please reply in English.'
