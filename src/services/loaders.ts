@@ -21,6 +21,9 @@ const registeredPromptIds = new Set<string>()
 const registeredToolRefs = new Map<string, { remove: () => void }>()
 const registeredPartials = new Set<string>()
 
+// 重入保護鎖：追蹤當前正在執行的 reload Promise
+let reloadingPromise: Promise<{ loaded: number; errors: LoadError[] }> | null = null
+
 // Prompt definition validation schema
 const PromptDefinitionSchema = z.object({
     id: z.string().min(1),
@@ -544,41 +547,55 @@ export async function reloadPrompts(
     server: McpServer,
     storageDir?: string
 ): Promise<{ loaded: number; errors: LoadError[] }> {
-    logger.info('Starting prompts reload')
-    
-    try {
-        // 1. Sync Git repository
-        await syncRepo()
-        logger.info('Git repository synced')
-        
-        // 2. Clear file cache
-        const dir = storageDir ?? STORAGE_DIR
-        clearFileCache(dir)
-        logger.debug('File cache cleared')
-        
-        // 3. Clear all partials
-        clearAllPartials()
-        
-        // 4. Clear all registered prompts/tools
-        clearAllPrompts()
-        
-        // 5. Reload Handlebars partials
-        const partialsCount = await loadPartials(storageDir)
-        logger.info({ count: partialsCount }, 'Partials reloaded')
-        
-        // 6. Reload all prompts
-        const result = await loadPrompts(server, storageDir)
-        
-        logger.info(
-            { loaded: result.loaded, errors: result.errors.length },
-            'Prompts reload completed'
-        )
-        
-        return result
-    } catch (error) {
-        const reloadError =
-            error instanceof Error ? error : new Error(String(error))
-        logger.error({ error: reloadError }, 'Failed to reload prompts')
-        throw reloadError
+    // 重入保護：如果已經有正在執行的 reload，直接返回該 Promise
+    if (reloadingPromise !== null) {
+        logger.warn('Reload already in progress, returning existing promise')
+        return reloadingPromise
     }
+    
+    // 建立新的 reload Promise
+    reloadingPromise = (async () => {
+        logger.info('Starting prompts reload')
+        
+        try {
+            // 1. Sync Git repository
+            await syncRepo()
+            logger.info('Git repository synced')
+            
+            // 2. Clear file cache
+            const dir = storageDir ?? STORAGE_DIR
+            clearFileCache(dir)
+            logger.debug('File cache cleared')
+            
+            // 3. Clear all partials
+            clearAllPartials()
+            
+            // 4. Clear all registered prompts/tools
+            clearAllPrompts()
+            
+            // 5. Reload Handlebars partials
+            const partialsCount = await loadPartials(storageDir)
+            logger.info({ count: partialsCount }, 'Partials reloaded')
+            
+            // 6. Reload all prompts
+            const result = await loadPrompts(server, storageDir)
+            
+            logger.info(
+                { loaded: result.loaded, errors: result.errors.length },
+                'Prompts reload completed'
+            )
+            
+            return result
+        } catch (error) {
+            const reloadError =
+                error instanceof Error ? error : new Error(String(error))
+            logger.error({ error: reloadError }, 'Failed to reload prompts')
+            throw reloadError
+        } finally {
+            // 清除重入保護鎖，確保即使發生錯誤也能清除
+            reloadingPromise = null
+        }
+    })()
+    
+    return reloadingPromise
 }
