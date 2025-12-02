@@ -2,9 +2,9 @@ import { simpleGit, type SimpleGitOptions } from 'simple-git'
 import fs from 'fs/promises'
 import path from 'path'
 import {
-    REPO_URL,
+    getRepoUrl,
+    getGitBranch,
     STORAGE_DIR,
-    GIT_BRANCH,
     GIT_MAX_RETRIES,
 } from '../config/env.js'
 import { logger } from '../utils/logger.js'
@@ -19,11 +19,14 @@ import { ensureDirectoryAccess, clearFileCache } from '../utils/fileSystem.js'
 export async function syncRepo(
     maxRetries: number = GIT_MAX_RETRIES
 ): Promise<void> {
-    if (!REPO_URL) {
+    const repoUrl = getRepoUrl()
+    const gitBranch = getGitBranch()
+    
+    if (!repoUrl) {
         throw new Error('❌ Error: PROMPT_REPO_URL is missing.')
     }
 
-    logger.info({ repoUrl: REPO_URL }, 'Git syncing from repository')
+    logger.info({ repoUrl, branch: gitBranch }, 'Git syncing from repository')
 
     const exists = await fs.stat(STORAGE_DIR).catch(() => null)
     const gitOptions: Partial<SimpleGitOptions> = {
@@ -51,7 +54,7 @@ export async function syncRepo(
                     
                     // Check current branch
                     const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD'])
-                    const branchName = currentBranch.trim() || GIT_BRANCH
+                    const branchName = currentBranch.trim() || gitBranch
                     
                     // Try pull with rebase (preferred strategy)
                     try {
@@ -79,7 +82,7 @@ export async function syncRepo(
                     )
                     await fs.rm(STORAGE_DIR, { recursive: true, force: true })
                     await fs.mkdir(STORAGE_DIR, { recursive: true })
-                    await cloneRepository(REPO_URL, STORAGE_DIR, GIT_BRANCH)
+                    await cloneRepository(repoUrl, STORAGE_DIR, gitBranch)
                     // Clear cache to ensure data consistency
                     clearFileCache(STORAGE_DIR)
                     logger.info('Git re-cloned successful')
@@ -88,7 +91,7 @@ export async function syncRepo(
             } else {
                 // Directory doesn't exist, first-time clone
                 await fs.mkdir(STORAGE_DIR, { recursive: true })
-                await cloneRepository(REPO_URL, STORAGE_DIR, GIT_BRANCH)
+                await cloneRepository(repoUrl, STORAGE_DIR, gitBranch)
                 // Clear cache to ensure data consistency
                 clearFileCache(STORAGE_DIR)
                 logger.info('Git first clone successful')

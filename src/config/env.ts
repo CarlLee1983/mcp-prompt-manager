@@ -131,7 +131,68 @@ function loadConfig() {
 // Export configuration
 export const config = loadConfig()
 
+// 動態 Repo 設定（記憶體變數）
+let ACTIVE_REPO_URL: string | null = null
+let ACTIVE_REPO_BRANCH: string | null = null
+
+/**
+ * 設定動態 Repo URL 和 Branch
+ * @param url - Repository URL
+ * @param branch - Branch name (optional)
+ */
+export function setActiveRepo(url: string, branch?: string): void {
+    // 驗證 URL 格式
+    if (url.includes('..') || url.includes('\0')) {
+        throw new Error('Invalid REPO_URL: path traversal detected')
+    }
+    
+    // 驗證 URL 格式或絕對路徑
+    const isValidUrl =
+        url.startsWith('http://') ||
+        url.startsWith('https://') ||
+        url.startsWith('git@') ||
+        path.isAbsolute(url)
+    
+    if (!isValidUrl) {
+        throw new Error(
+            'Invalid REPO_URL: must be a valid URL or absolute path'
+        )
+    }
+    
+    ACTIVE_REPO_URL = url
+    ACTIVE_REPO_BRANCH = branch ?? null
+}
+
+/**
+ * 取得當前活躍的 Repo 設定
+ * @returns 包含 url 和 branch 的物件，如果未設定則返回 null
+ */
+export function getActiveRepo(): { url: string; branch: string } | null {
+    if (ACTIVE_REPO_URL === null) {
+        return null
+    }
+    
+    return {
+        url: ACTIVE_REPO_URL,
+        branch: ACTIVE_REPO_BRANCH || config.GIT_BRANCH || 'main',
+    }
+}
+
 // Export computed configuration values
+// REPO_URL 和 GIT_BRANCH 現在會優先使用動態設定
+export function getRepoUrl(): string {
+    const activeRepo = getActiveRepo()
+    return activeRepo?.url ?? config.PROMPT_REPO_URL
+}
+
+export function getGitBranch(): string {
+    const activeRepo = getActiveRepo()
+    return activeRepo?.branch ?? config.GIT_BRANCH ?? 'main'
+}
+
+// 為了向後相容，保留 REPO_URL 和 GIT_BRANCH 作為 getter
+// 注意：這些值在模組載入時計算，不會動態更新
+// 請使用 getRepoUrl() 和 getGitBranch() 來取得最新值
 export const REPO_URL = config.PROMPT_REPO_URL
 export const STORAGE_DIR = config.STORAGE_DIR
     ? path.resolve(process.cwd(), config.STORAGE_DIR)

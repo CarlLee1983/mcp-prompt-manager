@@ -18,6 +18,12 @@ import {
 } from './services/loaders.js'
 import { startCacheCleanup, stopCacheCleanup } from './utils/fileSystem.js'
 import { getHealthStatus } from './services/health.js'
+import {
+    handleReload,
+    handlePromptStats,
+    handlePromptList,
+    handleRepoSwitch,
+} from './services/control.js'
 import { z } from 'zod'
 
 // Initialize MCP Server
@@ -363,7 +369,7 @@ async function main() {
                                 text: JSON.stringify(runtime, null, 2),
                             },
                         ],
-                        structuredContent: runtime,
+                        structuredContent: runtime as unknown as Record<string, unknown>,
                     }
                 } catch (error) {
                     const inspectError =
@@ -469,12 +475,76 @@ async function main() {
         )
         logger.info('Prompts list resource registered')
 
-        // 10. Start MCP Server
+        // 10. Register MCP Control Tools
+        // 10.1. mcp.reload_prompts
+        server.registerTool(
+            'mcp.reload_prompts',
+            {
+                title: 'Reload Prompts',
+                description:
+                    'Reload all prompts from Git repository without restarting the server (hot-reload).',
+                inputSchema: z.object({}),
+            },
+            async () => {
+                return await handleReload(server)
+            }
+        )
+        logger.info('mcp.reload_prompts tool registered')
+
+        // 10.2. mcp.prompt.stats
+        server.registerTool(
+            'mcp.prompt.stats',
+            {
+                title: 'Get Prompt Statistics',
+                description:
+                    'Get statistics about all prompts including counts by runtime state.',
+                inputSchema: z.object({}),
+            },
+            async () => {
+                return await handlePromptStats()
+            }
+        )
+        logger.info('mcp.prompt.stats tool registered')
+
+        // 10.3. mcp.prompt.list
+        server.registerTool(
+            'mcp.prompt.list',
+            {
+                title: 'List All Prompts',
+                description:
+                    'List all prompt runtimes with complete metadata information.',
+                inputSchema: z.object({}),
+            },
+            async () => {
+                return await handlePromptList()
+            }
+        )
+        logger.info('mcp.prompt.list tool registered')
+
+        // 10.4. mcp.repo.switch
+        server.registerTool(
+            'mcp.repo.switch',
+            {
+                title: 'Switch Prompt Repository',
+                description:
+                    'Switch to a different prompt repository and reload prompts (zero-downtime).',
+                inputSchema: z.object({
+                    repo_url: z.string().describe('Repository URL'),
+                    branch: z.string().optional().describe('Branch name'),
+                }),
+            },
+            async (args) => {
+                return await handleRepoSwitch(server, args)
+            }
+        )
+        logger.info('mcp.repo.switch tool registered')
+
+        // 11. Start MCP Server
         const transport = new StdioServerTransport()
         await server.connect(transport)
         logger.info('MCP Server is running!')
 
-        // 11. Initialize cache cleanup mechanism
+        // 12. Initialize cache cleanup mechanism
         const cleanupInterval = CACHE_CLEANUP_INTERVAL ?? 10000 // Default: 10 seconds (CACHE_TTL * 2)
         startCacheCleanup(cleanupInterval, (cleaned) => {
             if (cleaned > 0) {
@@ -486,7 +556,7 @@ async function main() {
             'Cache cleanup mechanism started'
         )
 
-        // Register graceful shutdown handlers
+        // 13. Register graceful shutdown handlers
         const shutdown = () => {
             logger.info('Shutting down gracefully...')
             stopCacheCleanup()
