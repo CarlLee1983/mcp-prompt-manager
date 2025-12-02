@@ -2,7 +2,7 @@
  * Prompt Runtime State
  * 表示 prompt 在執行時期的狀態
  */
-export type PromptRuntimeState = 'active' | 'legacy' | 'invalid' | 'disabled'
+export type PromptRuntimeState = 'active' | 'legacy' | 'invalid' | 'disabled' | 'warning'
 
 /**
  * Prompt Source

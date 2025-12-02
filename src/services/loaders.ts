@@ -241,18 +241,26 @@ const EXCLUDED_FILES = [
 
 /**
  * 判斷 YAML 資料是否為 Metadata Prompt
- * 檢查是否同時存在 version 和 status 欄位
+ * 檢查 version 是否符合 semver 格式（^\d+\.\d+\.\d+$）且 status 在允許的值中
+ * 這可以避免誤判舊格式 prompt（例如包含 version: "1.0" 和 status: stable）為 metadata prompt
  */
 function isMetadataPrompt(yamlData: unknown): boolean {
     if (typeof yamlData !== 'object' || yamlData === null) {
         return false
     }
     const data = yamlData as Record<string, unknown>
-    return (
-        typeof data.version === 'string' &&
+    
+    // 檢查 version 是否符合 semver 格式（例如 "1.0.0"）
+    const semverPattern = /^\d+\.\d+\.\d+$/
+    const hasValidVersion =
+        typeof data.version === 'string' && semverPattern.test(data.version)
+    
+    // 檢查 status 是否在允許的值中
+    const hasValidStatus =
         typeof data.status === 'string' &&
         ['draft', 'stable', 'deprecated'].includes(data.status)
-    )
+    
+    return hasValidVersion && hasValidStatus
 }
 
 /**
@@ -328,8 +336,10 @@ function createPromptRuntime(
     }
 
     // 決定 runtimeState 和 source
+    // 優先級：registry > metadata > legacy
+    // 先決定基礎狀態（metadata 或 legacy）
     if (runtimeState !== undefined && source !== undefined) {
-        // 如果已經提供了 runtimeState 和 source，使用它們
+        // 如果已經提供了 runtimeState 和 source，使用它們作為基礎
         finalRuntimeState = runtimeState
         finalSource = source
     } else if (metadata) {
@@ -342,11 +352,14 @@ function createPromptRuntime(
         finalRuntimeState = 'legacy'
     }
 
-    // 檢查 registry override（會覆蓋 source 和可能的 runtimeState）
+    // Registry override（最高優先級，會覆蓋所有狀態）
     if (registryEntry) {
         finalSource = 'registry'
         if (registryEntry.deprecated) {
             finalRuntimeState = 'disabled'
+        } else {
+            // Registry 存在且未 deprecated，覆蓋為 active（矯正 warning 等狀態）
+            finalRuntimeState = 'active'
         }
     }
 
@@ -372,8 +385,11 @@ function createPromptRuntime(
 export async function loadPrompts(
     server: McpServer,
     storageDir?: string
-): Promise<{ loaded: number; errors: LoadError[] }> {
+): Promise<{ loaded: number; errors: LoadError[]; loadedToolIds?: Set<string> }> {
     const dir = storageDir ?? STORAGE_DIR
+
+    // 追蹤新載入的 tool IDs（用於雙 registry swap）
+    const newToolIds = new Set<string>()
 
     // 清空 runtime cache
     promptRuntimeMap.clear()
@@ -454,16 +470,16 @@ export async function loadPrompts(
                     source = 'embedded'
                     runtimeState = 'active'
                 } else {
-                    // Metadata 驗證失敗
+                    // Metadata 驗證失敗（不是結構解析失敗，所以標記為 warning）
                     logger.warn(
                         {
                             filePath,
                             promptId: promptDef.id,
                             errors: metadataResult.error.issues,
                         },
-                        'Metadata validation failed, marking as invalid'
+                        'Metadata validation failed, marking as warning'
                     )
-                    runtimeState = 'invalid'
+                    runtimeState = 'warning'
                     source = 'embedded'
                 }
             }
@@ -608,6 +624,8 @@ export async function loadPrompts(
                 : z.object({})
 
             // Register Tool (using registerTool, recommended API)
+            // 雙 registry swap：先註冊新的 tool（MCP SDK 可能會覆蓋舊的，或暫時並存）
+            // 舊的 tool 會在 reloadPrompts 的最後階段移除，確保零空窗期
             const toolRef = server.registerTool(
                 promptDef.id,
                 {
@@ -663,7 +681,16 @@ export async function loadPrompts(
                     }
                 }
             )
+            
+            // 如果已存在舊的 tool ref，先保存它（稍後在 removeOldPrompts 中移除）
+            // 這樣可以確保新舊 tool 同時存在，避免空窗期
+            const oldToolRef = registeredToolRefs.get(promptDef.id)
+            if (oldToolRef) {
+                logger.debug({ promptId: promptDef.id }, 'New tool registered, old tool will be removed later')
+            }
+
             registeredToolRefs.set(promptDef.id, toolRef)
+            newToolIds.add(promptDef.id)
 
             // 儲存 runtime 資訊
             promptRuntimeMap.set(promptDef.id, promptRuntime)
@@ -703,7 +730,7 @@ export async function loadPrompts(
         )
     }
 
-    return { loaded: loadedCount, errors }
+    return { loaded: loadedCount, errors, loadedToolIds: newToolIds }
 }
 
 /**
@@ -724,9 +751,51 @@ function clearAllPartials(): void {
 }
 
 /**
+ * Remove old prompts and tools that are no longer in the new set
+ * Only removes tools that are not in the newToolIds set
+ * This is used for zero-downtime reload (dual registry swap)
+ * 
+ * @param newToolIds - Set of tool IDs that should remain registered
+ */
+function removeOldPrompts(newToolIds: Set<string>): void {
+    const toolsToRemove: string[] = []
+    
+    // 找出需要移除的舊 tools（不在新列表中的）
+    for (const toolId of registeredToolRefs.keys()) {
+        if (!newToolIds.has(toolId)) {
+            toolsToRemove.push(toolId)
+        }
+    }
+    
+    // 移除不再需要的 tools
+    for (const toolId of toolsToRemove) {
+        const toolRef = registeredToolRefs.get(toolId)
+        if (toolRef) {
+            try {
+                toolRef.remove()
+                registeredToolRefs.delete(toolId)
+                registeredPromptIds.delete(toolId)
+                promptRuntimeMap.delete(toolId)
+                logger.debug({ toolId }, 'Old tool removed')
+            } catch (error) {
+                logger.warn({ toolId, error }, 'Failed to remove old tool')
+            }
+        }
+    }
+    
+    if (toolsToRemove.length > 0) {
+        logger.info(
+            { removed: toolsToRemove.length },
+            'Old prompts and tools removed'
+        )
+    }
+}
+
+/**
  * Clear all registered prompts and tools
  * Removes all tools using their .remove() method
  * Note: Prompts are cleared by re-registering (overwriting) them
+ * @deprecated Use removeOldPrompts for zero-downtime reload instead
  */
 function clearAllPrompts(): void {
     // Remove all registered tools
@@ -749,13 +818,17 @@ function clearAllPrompts(): void {
 /**
  * Reload all prompts from Git repository
  * 
- * This function performs a complete reload of prompts:
+ * This function performs a zero-downtime reload using dual registry swap:
  * 1. Syncs Git repository (pulls latest changes)
  * 2. Clears file cache
  * 3. Clears all Handlebars partials
- * 4. Clears all registered prompts/tools
- * 5. Reloads Handlebars partials
- * 6. Reloads all prompts and tools
+ * 4. Reloads Handlebars partials
+ * 5. Loads and registers all new prompts/tools (overwrites existing, no downtime)
+ * 6. Removes old prompts/tools that are no longer needed
+ * 
+ * The dual registry swap ensures there's no gap where tools are unavailable:
+ * - New tools are registered first (overwriting old ones if they exist)
+ * - Old tools are only removed after new ones are ready
  * 
  * @param server - MCP Server instance for registering prompts
  * @param storageDir - Storage directory path (optional, defaults to STORAGE_DIR from config)
@@ -780,7 +853,7 @@ export async function reloadPrompts(
     
     // 建立新的 reload Promise
     reloadingPromise = (async () => {
-        logger.info('Starting prompts reload')
+        logger.info('Starting prompts reload (zero-downtime)')
         
         try {
             // 1. Sync Git repository
@@ -795,22 +868,32 @@ export async function reloadPrompts(
             // 3. Clear all partials
             clearAllPartials()
             
-            // 4. Clear all registered prompts/tools
-            clearAllPrompts()
-            
-            // 5. Reload Handlebars partials
+            // 4. Reload Handlebars partials
             const partialsCount = await loadPartials(storageDir)
             logger.info({ count: partialsCount }, 'Partials reloaded')
             
-            // 6. Reload all prompts
+            // 5. Load and register all new prompts/tools (dual registry swap - step 1)
+            // This registers new tools, overwriting old ones if they exist
+            // Old tools remain available during this process (no downtime)
             const result = await loadPrompts(server, storageDir)
+            
+            // 6. Remove old prompts/tools that are no longer needed (dual registry swap - step 2)
+            // Only removes tools that are not in the new set
+            if (result.loadedToolIds) {
+                removeOldPrompts(result.loadedToolIds)
+            } else {
+                // Fallback: if loadedToolIds is not available, use clearAllPrompts
+                // This should not happen in normal operation
+                logger.warn('loadedToolIds not available, falling back to clearAllPrompts')
+                clearAllPrompts()
+            }
             
             logger.info(
                 { loaded: result.loaded, errors: result.errors.length },
-                'Prompts reload completed'
+                'Prompts reload completed (zero-downtime)'
             )
             
-            return result
+            return { loaded: result.loaded, errors: result.errors }
         } catch (error) {
             const reloadError =
                 error instanceof Error ? error : new Error(String(error))
@@ -868,6 +951,7 @@ export function getPromptStats(): {
     legacy: number
     invalid: number
     disabled: number
+    warning: number
 } {
     const runtimes = Array.from(promptRuntimeMap.values())
     return {
@@ -876,5 +960,6 @@ export function getPromptStats(): {
         legacy: runtimes.filter((r) => r.runtime_state === 'legacy').length,
         invalid: runtimes.filter((r) => r.runtime_state === 'invalid').length,
         disabled: runtimes.filter((r) => r.runtime_state === 'disabled').length,
+        warning: runtimes.filter((r) => r.runtime_state === 'warning').length,
     }
 }

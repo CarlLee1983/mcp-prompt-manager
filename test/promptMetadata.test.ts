@@ -69,8 +69,8 @@ template: '請審查 {{code}}'
         })
     })
 
-    describe('Metadata 缺欄 → invalid', () => {
-        it('應該標記為 invalid 當 version 格式錯誤', async () => {
+    describe('Metadata 驗證失敗 → warning', () => {
+        it('應該標記為 warning 當 version 格式錯誤', async () => {
             const yamlContent = `
 id: 'test-prompt'
 title: '測試 Prompt'
@@ -91,7 +91,7 @@ template: '請審查 {{code}}'
 
             const runtime = getPromptRuntime('test-prompt')
             expect(runtime).toBeDefined()
-            expect(runtime?.runtime_state).toBe('invalid')
+            expect(runtime?.runtime_state).toBe('warning')
         })
     })
 
@@ -284,11 +284,11 @@ args:
 template: '{{code}}'
 `
 
-            const invalidPrompt = `
-id: 'invalid-prompt'
-title: 'Invalid Prompt'
-version: '1.0'
-status: 'stable'
+            const warningPrompt = `
+id: 'warning-prompt'
+title: 'Warning Prompt'
+version: '1.0.0'
+status: 'invalid-status'
 args:
   code:
     type: 'string'
@@ -304,8 +304,8 @@ template: '{{code}}'
                 legacyPrompt
             )
             await fs.writeFile(
-                path.join(testDir, 'invalid-prompt.yaml'),
-                invalidPrompt
+                path.join(testDir, 'warning-prompt.yaml'),
+                warningPrompt
             )
 
             await loadPrompts(server, testDir)
@@ -315,7 +315,8 @@ template: '{{code}}'
             expect(stats.total).toBe(3)
             expect(stats.active).toBe(1)
             expect(stats.legacy).toBe(1)
-            expect(stats.invalid).toBe(1)
+            expect(stats.warning).toBe(1)
+            expect(stats.invalid).toBe(0)
             expect(stats.disabled).toBe(0)
         })
 
