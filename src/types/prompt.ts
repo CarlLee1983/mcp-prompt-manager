@@ -15,7 +15,6 @@ export type PromptArgType = 'string' | 'number' | 'boolean'
  * const arg: PromptArgDefinition = {
  *   type: 'string',
  *   description: 'Code to review',
- *   required: true
  * }
  * ```
  * 
@@ -25,7 +24,6 @@ export type PromptArgType = 'string' | 'number' | 'boolean'
  *   type: 'boolean',
  *   description: 'Enable strict mode',
  *   default: false,
- *   required: false
  * }
  * ```
  */

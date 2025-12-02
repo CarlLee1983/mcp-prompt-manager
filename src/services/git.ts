@@ -16,6 +16,40 @@ import { ensureDirectoryAccess, clearFileCache } from '../utils/fileSystem.js'
  * @param maxRetries - Maximum number of retries (defaults to value from environment variable)
  * @throws {Error} When Git operation fails
  */
+/**
+ * 從本地目錄複製檔案到目標目錄（排除 .git 目錄）
+ * @param sourceDir - 來源目錄
+ * @param targetDir - 目標目錄
+ */
+async function copyLocalRepository(
+    sourceDir: string,
+    targetDir: string
+): Promise<void> {
+    // 確保目標目錄存在
+    await fs.mkdir(targetDir, { recursive: true })
+
+    // 讀取來源目錄的所有項目
+    const entries = await fs.readdir(sourceDir, { withFileTypes: true })
+
+    for (const entry of entries) {
+        const sourcePath = path.join(sourceDir, entry.name)
+        const targetPath = path.join(targetDir, entry.name)
+
+        // 跳過 .git 目錄
+        if (entry.name === '.git') {
+            continue
+        }
+
+        if (entry.isDirectory()) {
+            // 遞迴複製子目錄
+            await copyLocalRepository(sourcePath, targetPath)
+        } else {
+            // 複製檔案
+            await fs.copyFile(sourcePath, targetPath)
+        }
+    }
+}
+
 export async function syncRepo(
     maxRetries: number = GIT_MAX_RETRIES
 ): Promise<void> {
@@ -28,6 +62,47 @@ export async function syncRepo(
 
     logger.info({ repoUrl, branch: gitBranch }, 'Git syncing from repository')
 
+    // 檢查是否為本地路徑
+    const isLocalPath =
+        path.isAbsolute(repoUrl) &&
+        !repoUrl.startsWith('http://') &&
+        !repoUrl.startsWith('https://') &&
+        !repoUrl.startsWith('git@')
+
+    if (isLocalPath) {
+        // 本地路徑：直接從源目錄複製檔案（支援未提交的變更）
+        try {
+            const sourceStat = await fs.stat(repoUrl).catch(() => null)
+            if (!sourceStat) {
+                throw new Error(`Source directory does not exist: ${repoUrl}`)
+            }
+
+            logger.info(
+                { source: repoUrl, target: STORAGE_DIR },
+                'Copying from local repository (includes uncommitted changes)'
+            )
+
+            // 確保目標目錄存在
+            await fs.mkdir(STORAGE_DIR, { recursive: true })
+
+            // 複製所有檔案（排除 .git）
+            await copyLocalRepository(repoUrl, STORAGE_DIR)
+
+            // Clear cache to ensure data consistency
+            clearFileCache(STORAGE_DIR)
+            logger.info('Local repository sync successful')
+            return
+        } catch (error) {
+            const syncError =
+                error instanceof Error ? error : new Error(String(error))
+            logger.error({ error: syncError }, 'Failed to sync local repository')
+            throw new Error(
+                `Local repository sync failed: ${syncError.message}`
+            )
+        }
+    }
+
+    // 遠端 repository：使用 Git 操作
     const exists = await fs.stat(STORAGE_DIR).catch(() => null)
     const gitOptions: Partial<SimpleGitOptions> = {
         baseDir: STORAGE_DIR,
