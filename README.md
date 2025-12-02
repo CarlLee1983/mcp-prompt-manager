@@ -1,146 +1,168 @@
 # MCP Prompt Manager (Git-Driven)
 
-這是一個基於 Git 的 Model Context Protocol (MCP) Server，專門用於管理和提供 Prompt 模板。它允許你將 Prompts 存儲在一個獨立的 Git Repository 中，並透過 MCP 協議讓 Cursor、Claude Desktop 等 AI 編輯器直接使用。
+<div align="center">
 
-## ✨ 特色
+**Git-driven Model Context Protocol (MCP) Server for managing and providing Prompt templates**
 
-- **Git 同步**: Prompts 直接從指定的 Git Repository 同步，確保團隊使用統一的 Prompt 版本。
-- **Handlebars 模板**: 支援強大的 Handlebars 語法，可以建立動態、可重用的 Prompt 模板。
-- **Partials 支援**: 支援 Handlebars Partials，方便拆分和重用 Prompt 片段（例如角色設定、輸出格式）。
-- **本地緩存**: 自動將 Git Repo 內容緩存到本地 `.prompts_cache` 目錄，提高讀取速度。
-- **快取失效策略**: 自動定期清理過期快取項目，避免記憶體洩漏，確保資料一致性。
-- **群組過濾**: 支援按群組過濾載入 prompts，只載入需要的部分。
-- **錯誤處理**: 完整的錯誤統計和報告，確保問題可追蹤。
-- **重試機制**: Git 操作自動重試，提高可靠性。
-- **類型安全**: 使用 Zod 驗證配置和 prompt 定義，確保類型安全。
-- **專業日誌**: 使用 pino 日誌系統，支援結構化日誌和多種日誌級別。
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/CarlLee1983/mcp-prompt-manager)
+[![License](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-blue.svg)](https://www.typescriptlang.org/)
+[![Node](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 
-## 🚀 快速開始
+[English](README.md) | [繁體中文](README.zh-TW.md)
 
-### 1. 安裝
+</div>
 
-首先，Clone 本專案並安裝依賴：
+## 📋 Introduction
+
+This is a Git-driven Model Context Protocol (MCP) Server designed for managing and providing Prompt templates. It allows you to store Prompts in a separate Git Repository and use them directly in AI editors like Cursor, Claude Desktop, etc., through the MCP protocol.
+
+**Key Benefits:**
+- 🔄 Team Collaboration: Ensure unified Prompt versions across teams through Git version control
+- 🎯 Dynamic Templates: Support Handlebars syntax to create reusable dynamic Prompts
+- 🚀 Zero-Downtime Reload: Hot-reload support to update Prompts without restarting
+- 🔍 Smart Management: Built-in Prompt version management, state tracking, and group filtering
+- 📊 Complete Monitoring: System health status and Prompt statistics
+
+## ✨ Features
+
+- **Git Sync**: Prompts are synced directly from the specified Git Repository, ensuring teams use unified Prompt versions.
+- **Handlebars Templates**: Support powerful Handlebars syntax to create dynamic, reusable Prompt templates.
+- **Partials Support**: Support Handlebars Partials for splitting and reusing Prompt fragments (e.g., role settings, output formats).
+- **Local Cache**: Automatically cache Git Repo content to local `.prompts_cache` directory for faster reads.
+- **Cache Expiration Strategy**: Automatically clean up expired cache items periodically to prevent memory leaks and ensure data consistency.
+- **Group Filtering**: Support filtering prompts by group, loading only what you need.
+- **Error Handling**: Complete error statistics and reporting for issue tracking.
+- **Retry Mechanism**: Automatic retry for Git operations to improve reliability.
+- **Type Safety**: Use Zod to validate configuration and prompt definitions for type safety.
+- **Professional Logging**: Use pino logging system with structured logs and multiple log levels.
+
+## 🚀 Quick Start
+
+### 1. Installation
+
+First, clone this project and install dependencies:
 
 ```bash
-git clone <本專案的 URL>
+git clone <project URL>
 cd mcp-prompt-manager
-npm installLICENSE
-# 或使用 pnpm (推薦)
+npm install
+# or use pnpm (recommended)
 pnpm install
 ```
 
-### 2. 設定環境變數
+### 2. Configure Environment Variables
 
-複製範例設定檔並建立 `.env`：
+Copy the example configuration file and create `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-編輯 `.env` 檔案，設定你的 Prompt Git Repository 路徑或 URL：
+Edit the `.env` file to set your Prompt Git Repository path or URL:
 
 ```bash
-# Git Repository 來源（必填）
-# 本地路徑範例
+# Git Repository source (required)
+# Local path example
 PROMPT_REPO_URL=/Users/yourname/Desktop/my-local-prompts
 
-# 或遠端 Git URL 範例
+# Or remote Git URL examples
 # PROMPT_REPO_URL=https://github.com/yourusername/my-prompts.git
 # PROMPT_REPO_URL=git@github.com:yourusername/my-prompts.git
 
-# 輸出語言設定（可選，預設 en）
-MCP_LANGUAGE=en  # 或 zh
+# Output language setting (optional, default: en)
+MCP_LANGUAGE=en  # or zh
 
-# 群組過濾設定（可選，未設定時預設只載入 common 群組）
-# 設定範例: MCP_GROUPS="laravel,vue,react"
-# 注意：未設定時，系統會在日誌中明確提示使用預設群組
+# Group filter setting (optional, defaults to loading only common group when not set)
+# Example: MCP_GROUPS="laravel,vue,react"
+# Note: When not set, the system will explicitly prompt in logs about using default groups
 MCP_GROUPS=laravel,vue
 
-# 自訂儲存目錄（可選，預設 .prompts_cache）
+# Custom storage directory (optional, default: .prompts_cache)
 STORAGE_DIR=/custom/path
 
-# Git 分支（可選，預設 main）
+# Git branch (optional, default: main)
 GIT_BRANCH=main
 
-# Git 重試次數（可選，預設 3）
+# Git retry count (optional, default: 3)
 GIT_MAX_RETRIES=3
 
-# 快取清理間隔（可選，預設 10000 毫秒）
-# 設定定期清理過期快取項目的間隔時間（毫秒）
-# 預設值為 10 秒（CACHE_TTL * 2），確保過期項目能被及時清理
-# 建議值：5000-30000 毫秒，根據使用頻率調整
+# Cache cleanup interval (optional, default: 10000 milliseconds)
+# Set the interval time (in milliseconds) for periodic cleanup of expired cache items
+# Default is 10 seconds (CACHE_TTL * 2) to ensure expired items are cleaned up promptly
+# Recommended values: 5000-30000 milliseconds, adjust based on usage frequency
 CACHE_CLEANUP_INTERVAL=10000
 
-# 日誌級別（可選）
-# 可選值: fatal, error, warn, info, debug, trace, silent
-# 注意：
-# - stderr 只輸出 warn/error/fatal 級別的日誌（避免被標記為 error）
-# - info/debug/trace 級別的日誌只輸出到檔案（如果設定了 LOG_FILE）
-# - 如果沒有設定 LOG_FILE，info 級別的日誌完全不輸出（避免誤會）
-# - 生產環境預設為 warn（只輸出警告和錯誤），開發環境預設為 info
-# - 設定 silent 可完全禁用日誌輸出
+# Log level (optional)
+# Options: fatal, error, warn, info, debug, trace, silent
+# Notes:
+# - stderr only outputs warn/error/fatal level logs (to avoid being marked as error)
+# - info/debug/trace level logs only output to file (if LOG_FILE is set)
+# - If LOG_FILE is not set, info level logs are completely suppressed (to avoid confusion)
+# - Production environment defaults to warn (only warnings and errors), development defaults to info
+# - Setting silent completely disables log output
 LOG_LEVEL=info
 
-# 日誌檔案路徑（可選，強烈建議設定）
-# 設定此變數後，所有級別的日誌都會寫入檔案（JSON 格式）
-# stderr 仍然只輸出 warn/error/fatal（避免被標記為 error）
-# 可以是絕對路徑或相對路徑（相對於專案根目錄）
-# 範例：
+# Log file path (optional, strongly recommended)
+# After setting this variable, all level logs will be written to file (JSON format)
+# stderr still only outputs warn/error/fatal (to avoid being marked as error)
+# Can be absolute or relative path (relative to project root)
+# Examples:
 # LOG_FILE=/tmp/mcp-prompt-manager.log
 # LOG_FILE=logs/mcp.log
-# 注意：檔案會以 append 模式寫入，不會覆蓋現有內容
-# 建議：設定此變數以便查看完整的日誌（包括 info 級別）
+# Note: File is written in append mode, will not overwrite existing content
+# Recommendation: Set this variable to view complete logs (including info level)
 LOG_FILE=logs/mcp.log
 ```
 
-### 3. 編譯
+### 3. Build
 
 ```bash
 npm run build
-# 或
+# or
 pnpm run build
 ```
 
-## 🛠️ 使用方法
+## 🛠️ Usage
 
-### 使用 Inspector 測試
+### Testing with Inspector
 
-我們提供了一個方便的指令來啟動 MCP Inspector 進行測試：
+We provide a convenient command to start the MCP Inspector for testing:
 
-#### 基本使用
+#### Basic Usage
 
-**重要**: Inspector 執行的是編譯後的 `dist/index.js`，所以如果修改了源碼，需要先編譯：
+**Important**: Inspector runs the compiled `dist/index.js`, so if you've modified the source code, you need to compile first:
 
 ```bash
-# 1. 先編譯（如果修改了源碼）
+# 1. Compile first (if source code was modified)
 pnpm run build
 
-# 2. 啟動 Inspector
+# 2. Start Inspector
 pnpm run inspector
 ```
 
-#### 快速開發模式
+#### Quick Development Mode
 
-如果你在開發中，可以使用組合指令，它會自動先編譯再啟動 Inspector：
+If you're developing, you can use a combined command that automatically compiles before starting Inspector:
 
 ```bash
 pnpm run inspector:dev
 ```
 
-這會自動執行 `build` 然後啟動 Inspector，確保你測試的是最新編譯的程式碼。
+This automatically runs `build` and then starts Inspector, ensuring you're testing the latest compiled code.
 
-#### Inspector 功能
+#### Inspector Features
 
-Inspector 會啟動一個網頁介面，你可以在其中：
+Inspector launches a web interface where you can:
 
-- 查看所有已載入的 prompts
-- 測試 prompt 的輸出
-- 檢查錯誤訊息
-- 驗證環境變數設定
+- View all loaded prompts
+- Test prompt output
+- Check error messages
+- Verify environment variable settings
 
-### 在 Cursor 中使用
+### Using in Cursor
 
-#### 設定檔位置
+#### Configuration File Location
 
 **macOS:**
 
@@ -160,13 +182,13 @@ Inspector 會啟動一個網頁介面，你可以在其中：
 ~/.config/Cursor/User/globalStorage/cursor.mcp/mcp.json
 ```
 
-#### 設定步驟
+#### Configuration Steps
 
-1. **找到設定檔**：
-    - 方法一：在 Cursor 中按 `Cmd/Ctrl + Shift + P`，搜尋 "MCP: Add server"
-    - 方法二：直接編輯上述路徑的 `mcp.json` 檔案
+1. **Find the configuration file**:
+    - Method 1: In Cursor, press `Cmd/Ctrl + Shift + P`, search for "MCP: Add server"
+    - Method 2: Directly edit the `mcp.json` file at the path above
 
-2. **編輯設定檔**：
+2. **Edit the configuration file**:
 
 ```json
 {
@@ -184,25 +206,25 @@ Inspector 會啟動一個網頁介面，你可以在其中：
 }
 ```
 
-3. **重要設定說明**：
-    - `command`: 使用 `node` 執行編譯後的 JavaScript 檔案
-    - `args`: 必須是**絕對路徑**指向 `dist/index.js`
-    - `env`: 環境變數（可選，如果已在 `.env` 中設定）
+3. **Important Configuration Notes**:
+    - `command`: Use `node` to execute the compiled JavaScript file
+    - `args`: Must be an **absolute path** pointing to `dist/index.js`
+    - `env`: Environment variables (optional, if already set in `.env`)
 
-4. **驗證設定**：
-    - 重啟 Cursor
-    - 在 Cursor 中按 `Cmd/Ctrl + Shift + P`，搜尋 "MCP: Show servers"
-    - 確認 `mcp-prompt-manager` 顯示為已連接狀態
+4. **Verify Configuration**:
+    - Restart Cursor
+    - In Cursor, press `Cmd/Ctrl + Shift + P`, search for "MCP: Show servers"
+    - Confirm that `mcp-prompt-manager` shows as connected
 
-> **注意**:
+> **Note**:
 >
-> - 請將 `/path/to/mcp-prompt-manager` 替換為本專案的實際絕對路徑
-> - 如果在 `.env` 中已經設定了環境變數，則 `env` 區塊可以省略，但直接在 JSON 中指定通常更穩健
-> - 如果設定檔不存在，需要先建立 `mcp.json` 檔案
+> - Replace `/path/to/mcp-prompt-manager` with the actual absolute path of this project
+> - If environment variables are already set in `.env`, the `env` block can be omitted, but specifying directly in JSON is usually more robust
+> - If the configuration file doesn't exist, you need to create the `mcp.json` file first
 
-### 在 Claude Desktop 中使用
+### Using in Claude Desktop
 
-#### 設定檔位置
+#### Configuration File Location
 
 **macOS:**
 
@@ -222,11 +244,11 @@ Inspector 會啟動一個網頁介面，你可以在其中：
 ~/.config/Claude/claude_desktop_config.json
 ```
 
-#### 設定步驟
+#### Configuration Steps
 
-1. **建立或編輯設定檔**：
+1. **Create or edit the configuration file**:
 
-如果檔案不存在，需要先建立：
+If the file doesn't exist, create it first:
 
 ```bash
 # macOS/Linux
@@ -234,7 +256,7 @@ mkdir -p ~/Library/Application\ Support/Claude
 touch ~/Library/Application\ Support/Claude/claude_desktop_config.json
 ```
 
-2. **編輯設定檔**：
+2. **Edit the configuration file**:
 
 ```json
 {
@@ -252,31 +274,31 @@ touch ~/Library/Application\ Support/Claude/claude_desktop_config.json
 }
 ```
 
-3. **驗證設定**：
-    - 完全關閉 Claude Desktop（確保所有視窗都關閉）
-    - 重新啟動 Claude Desktop
-    - 在對話中，Claude 應該能夠使用你定義的 prompts
+3. **Verify Configuration**:
+    - Completely close Claude Desktop (ensure all windows are closed)
+    - Restart Claude Desktop
+    - In conversations, Claude should be able to use your defined prompts
 
-> **注意**:
+> **Note**:
 >
-> - 設定檔必須是有效的 JSON 格式
-> - 路徑必須使用絕對路徑
-> - 修改設定檔後必須完全重啟 Claude Desktop
+> - Configuration file must be valid JSON format
+> - Paths must use absolute paths
+> - After modifying the configuration file, you must completely restart Claude Desktop
 
-### 在 VS Code 中使用（透過擴充功能）
+### Using in VS Code (via Extension)
 
-VS Code 可以透過 MCP 擴充功能來使用 MCP Server。
+VS Code can use MCP Server through MCP extensions.
 
-#### 設定步驟
+#### Configuration Steps
 
-1. **安裝 MCP 擴充功能**：
-    - 在 VS Code 擴充功能市場搜尋 "MCP" 或 "Model Context Protocol"
-    - 安裝對應的擴充功能
+1. **Install MCP Extension**:
+    - Search for "MCP" or "Model Context Protocol" in VS Code Extension Marketplace
+    - Install the corresponding extension
 
-2. **設定 MCP Server**：
-    - 開啟 VS Code 設定（`Cmd/Ctrl + ,`）
-    - 搜尋 "MCP" 相關設定
-    - 或編輯 `settings.json`：
+2. **Configure MCP Server**:
+    - Open VS Code settings (`Cmd/Ctrl + ,`)
+    - Search for "MCP" related settings
+    - Or edit `settings.json`:
 
 ```json
 {
@@ -294,11 +316,11 @@ VS Code 可以透過 MCP 擴充功能來使用 MCP Server。
 }
 ```
 
-### 在 Continue 中使用
+### Using in Continue
 
-Continue 是一個開源的 AI 程式碼助手，支援 MCP。
+Continue is an open-source AI code assistant that supports MCP.
 
-#### 設定檔位置
+#### Configuration File Location
 
 **macOS:**
 
@@ -318,9 +340,9 @@ Continue 是一個開源的 AI 程式碼助手，支援 MCP。
 ~/.config/Continue/config.json
 ```
 
-#### 設定步驟
+#### Configuration Steps
 
-編輯 `config.json`：
+Edit `config.json`:
 
 ```json
 {
@@ -338,13 +360,13 @@ Continue 是一個開源的 AI 程式碼助手，支援 MCP。
 }
 ```
 
-### 在 Aider 中使用
+### Using in Aider
 
-Aider 是一個 AI 程式碼編輯器，支援 MCP。
+Aider is an AI code editor that supports MCP.
 
-#### 設定方式
+#### Configuration Method
 
-在 Aider 的設定檔中（通常是 `~/.aider/config.json` 或透過環境變數）：
+In Aider's configuration file (usually `~/.aider/config.json` or via environment variables):
 
 ```json
 {
@@ -360,18 +382,18 @@ Aider 是一個 AI 程式碼編輯器，支援 MCP。
 }
 ```
 
-### 在自訂應用程式中使用（程式化）
+### Using in Custom Applications (Programmatic)
 
-如果你正在開發自己的應用程式並想要整合 MCP Server，可以使用 MCP SDK：
+If you're developing your own application and want to integrate the MCP Server, you can use the MCP SDK:
 
-#### TypeScript/JavaScript 範例
+#### TypeScript/JavaScript Example
 
 ```typescript
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { spawn } from "child_process"
 
-// 建立 MCP Client
+// Create MCP Client
 const client = new Client(
     {
         name: "my-app",
@@ -382,24 +404,24 @@ const client = new Client(
     }
 )
 
-// 建立 transport（使用 stdio）
+// Create transport (using stdio)
 const transport = new StdioClientTransport({
     command: "node",
     args: ["/path/to/mcp-prompt-manager/dist/index.js"],
     env: {
         PROMPT_REPO_URL: "/path/to/repo",
-        MCP_LANGUAGE: "zh",
+        MCP_LANGUAGE: "en",
     },
 })
 
-// 連接
+// Connect
 await client.connect(transport)
 
-// 列出可用的 prompts
+// List available prompts
 const prompts = await client.listPrompts()
 console.log("Available prompts:", prompts)
 
-// 取得特定 prompt
+// Get specific prompt
 const prompt = await client.getPrompt({
     name: "code-review",
     arguments: {
@@ -409,34 +431,34 @@ const prompt = await client.getPrompt({
 })
 ```
 
-#### Python 範例
+#### Python Example
 
 ```python
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 async def main():
-    # 設定 server 參數
+    # Configure server parameters
     server_params = StdioServerParameters(
         command="node",
         args=["/path/to/mcp-prompt-manager/dist/index.js"],
         env={
             "PROMPT_REPO_URL": "/path/to/repo",
-            "MCP_LANGUAGE": "zh"
+            "MCP_LANGUAGE": "en"
         }
     )
 
-    # 建立 session
+    # Create session
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
-            # 初始化
+            # Initialize
             await session.initialize()
 
-            # 列出 prompts
+            # List prompts
             prompts = await session.list_prompts()
             print(f"Available prompts: {prompts}")
 
-            # 取得 prompt
+            # Get prompt
             prompt = await session.get_prompt(
                 name="code-review",
                 arguments={
@@ -447,24 +469,24 @@ async def main():
             print(f"Prompt result: {prompt}")
 ```
 
-### MCP Client 快速參考
+### MCP Client Quick Reference
 
-| Client             | 設定檔位置                                                                            | 設定檔格式    | 備註                |
-| ------------------ | ------------------------------------------------------------------------------------- | ------------- | ------------------- |
-| **Cursor**         | `~/Library/Application Support/Cursor/User/globalStorage/cursor.mcp/mcp.json` (macOS) | `mcpServers`  | 支援 UI 設定        |
-| **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)             | `mcpServers`  | 需完全重啟          |
-| **VS Code**        | `settings.json`                                                                       | `mcp.servers` | 需安裝 MCP 擴充功能 |
-| **Continue**       | `~/.continue/config.json`                                                             | `mcpServers`  | 開源 AI 助手        |
-| **Aider**          | `~/.aider/config.json`                                                                | `mcp_servers` | AI 程式碼編輯器     |
+| Client             | Configuration File Location                                                                           | Config Format | Notes                |
+| ------------------ | ----------------------------------------------------------------------------------------------------- | ------------- | --------------------- |
+| **Cursor**         | `~/Library/Application Support/Cursor/User/globalStorage/cursor.mcp/mcp.json` (macOS)                | `mcpServers`  | Supports UI config    |
+| **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)                            | `mcpServers`  | Requires full restart |
+| **VS Code**        | `settings.json`                                                                                       | `mcp.servers` | Requires MCP extension |
+| **Continue**       | `~/.continue/config.json`                                                                             | `mcpServers`  | Open-source AI assistant |
+| **Aider**          | `~/.aider/config.json`                                                                                 | `mcp_servers` | AI code editor        |
 
-> **注意**: 路徑中的 `~` 代表使用者主目錄，在不同作業系統中會自動展開為：
+> **Note**: The `~` in paths represents the user home directory, which expands to:
 >
-> - macOS/Linux: `/Users/username` 或 `/home/username`
+> - macOS/Linux: `/Users/username` or `/home/username`
 > - Windows: `C:\Users\username`
 
-### 通用設定格式
+### Universal Configuration Format
 
-所有支援 MCP 的客戶端都遵循相同的設定格式：
+All MCP-compatible clients follow the same configuration format:
 
 ```json
 {
@@ -483,54 +505,54 @@ async def main():
 }
 ```
 
-#### 設定欄位說明
+#### Configuration Field Descriptions
 
-- **`command`**: 執行命令（通常是 `node`）
-- **`args`**: 命令參數陣列，必須包含編譯後的 `dist/index.js` 的絕對路徑
-- **`env`**: 環境變數物件（可選）
-    - `PROMPT_REPO_URL`: Git 倉庫 URL 或本地路徑（必填）
-    - `MCP_LANGUAGE`: 輸出語言，`en` 或 `zh`（可選，預設 `en`）
-    - `MCP_GROUPS`: 要載入的群組，逗號分隔（可選，未設定時預設只載入 `common` 群組，系統會在日誌中提示）
-    - `STORAGE_DIR`: 本地緩存目錄（可選）
-    - `GIT_BRANCH`: Git 分支（可選，預設 `main`）
-    - `GIT_MAX_RETRIES`: Git 重試次數（可選，預設 `3`）
-    - `CACHE_CLEANUP_INTERVAL`: 快取清理間隔，毫秒（可選，預設 `10000`）
-    - `LOG_LEVEL`: 日誌級別（可選，預設 `info`）
+- **`command`**: Execution command (usually `node`)
+- **`args`**: Command argument array, must include the absolute path to the compiled `dist/index.js`
+- **`env`**: Environment variable object (optional)
+    - `PROMPT_REPO_URL`: Git repository URL or local path (required)
+    - `MCP_LANGUAGE`: Output language, `en` or `zh` (optional, default `en`)
+    - `MCP_GROUPS`: Groups to load, comma-separated (optional, defaults to loading only `common` group when not set, system will prompt in logs)
+    - `STORAGE_DIR`: Local cache directory (optional)
+    - `GIT_BRANCH`: Git branch (optional, default `main`)
+    - `GIT_MAX_RETRIES`: Git retry count (optional, default `3`)
+    - `CACHE_CLEANUP_INTERVAL`: Cache cleanup interval in milliseconds (optional, default `10000`)
+    - `LOG_LEVEL`: Log level (optional, default `info`)
 
-#### 重要注意事項
+#### Important Notes
 
-1. **絕對路徑**：`args` 中的路徑必須是絕對路徑，不能使用相對路徑
-2. **JSON 格式**：確保 JSON 格式正確，最後一個項目後不能有逗號
-3. **環境變數優先級**：JSON 中的 `env` 會覆蓋 `.env` 檔案中的設定
-4. **重啟應用**：修改設定後需要完全重啟應用程式才能生效
+1. **Absolute Paths**: Paths in `args` must be absolute paths, cannot use relative paths
+2. **JSON Format**: Ensure JSON format is correct, no comma after the last item
+3. **Environment Variable Priority**: `env` in JSON overrides settings in `.env` file
+4. **Restart Application**: After modifying configuration, you must completely restart the application for changes to take effect
 
-### 驗證 MCP Server 是否正常運作
+### Verifying MCP Server is Running Properly
 
-#### 方法一：使用 MCP Inspector
+#### Method 1: Using MCP Inspector
 
 ```bash
 cd /path/to/mcp-prompt-manager
 
-# 如果修改了源碼，先編譯
+# If source code was modified, compile first
 pnpm run build
 
-# 啟動 Inspector（或使用 inspector:dev 自動編譯）
+# Start Inspector (or use inspector:dev for auto-compile)
 pnpm run inspector
-# 或
+# or
 pnpm run inspector:dev
 ```
 
-這會啟動一個網頁介面，你可以在其中：
+This launches a web interface where you can:
 
-- 查看所有已載入的 prompts
-- 測試 prompt 的輸出
-- 檢查錯誤訊息
+- View all loaded prompts
+- Test prompt output
+- Check error messages
 
-> **注意**: Inspector 執行的是 `dist/index.js`，修改源碼後必須先執行 `build` 才能看到最新變更。
+> **Note**: Inspector runs `dist/index.js`, so after modifying source code, you must run `build` first to see the latest changes.
 
-#### 方法二：檢查日誌
+#### Method 2: Check Logs
 
-在設定檔中添加環境變數來查看詳細日誌：
+Add environment variables in the configuration file to view detailed logs:
 
 ```json
 {
@@ -547,115 +569,115 @@ pnpm run inspector:dev
 }
 ```
 
-然後查看客戶端的日誌輸出（Cursor 的輸出面板或 Claude Desktop 的日誌）。
+Then check the client's log output (Cursor's output panel or Claude Desktop's logs).
 
-#### 方法三：檢查檔案系統
+#### Method 3: Check File System
 
-確認 Git 倉庫已成功同步：
+Verify Git repository has been synced successfully:
 
 ```bash
 ls -la /path/to/mcp-prompt-manager/.prompts_cache
 ```
 
-應該能看到從 Git 倉庫 clone 下來的檔案。
+You should see files cloned from the Git repository.
 
-### 常見設定問題
+### Common Configuration Issues
 
-#### 問題 1: 找不到設定檔
+#### Issue 1: Configuration File Not Found
 
-**解決方案**:
+**Solution**:
 
-- 確認應用程式已經啟動過至少一次（會自動建立設定目錄）
-- 手動建立設定檔和目錄
-- 檢查路徑是否正確（注意大小寫和空格）
+- Confirm the application has been started at least once (will automatically create configuration directory)
+- Manually create the configuration file and directory
+- Check if the path is correct (note case sensitivity and spaces)
 
-#### 問題 2: JSON 格式錯誤
+#### Issue 2: JSON Format Error
 
-**解決方案**:
+**Solution**:
 
-- 使用 JSON 驗證工具檢查格式（如 [JSONLint](https://jsonlint.com/)）
-- 確保所有字串都用雙引號
-- 確保最後一個項目後沒有逗號
+- Use JSON validation tools to check format (e.g., [JSONLint](https://jsonlint.com/))
+- Ensure all strings use double quotes
+- Ensure no comma after the last item
 
-#### 問題 3: Server 無法啟動
+#### Issue 3: Server Cannot Start
 
-**解決方案**:
+**Solution**:
 
-1. 確認 `dist/index.js` 檔案存在
-2. 確認路徑是絕對路徑
-3. 確認 Node.js 已安裝且版本 >= 18
-4. 檢查環境變數是否正確
-5. 查看客戶端的錯誤日誌
+1. Confirm `dist/index.js` file exists
+2. Confirm path is absolute
+3. Confirm Node.js is installed and version >= 18
+4. Check if environment variables are correct
+5. Check client error logs
 
-#### 問題 4: 找不到 Prompts
+#### Issue 4: No Prompts Found
 
-**解決方案**:
+**Solution**:
 
-1. 確認 `PROMPT_REPO_URL` 正確
-2. 檢查 `MCP_GROUPS` 設定是否包含你想要的群組
-   - **注意**：如果 `MCP_GROUPS` 未設定，系統預設只載入 `common` 群組
-   - 查看日誌中的提示訊息，確認是否使用了預設群組
-   - 設定 `MCP_GROUPS=laravel,vue` 等來載入其他群組
-3. 確認 Git 倉庫中有 `.yaml` 或 `.yml` 檔案
-4. 使用 `LOG_LEVEL=debug` 查看詳細日誌，確認哪些群組被載入
+1. Confirm `PROMPT_REPO_URL` is correct
+2. Check if `MCP_GROUPS` setting includes the groups you want
+   - **Note**: If `MCP_GROUPS` is not set, the system defaults to loading only the `common` group
+   - Check log messages to confirm if default groups are being used
+   - Set `MCP_GROUPS=laravel,vue` etc. to load other groups
+3. Confirm Git repository contains `.yaml` or `.yml` files
+4. Use `LOG_LEVEL=debug` to view detailed logs and confirm which groups are loaded
 
-## 📂 Prompt Repository 結構
+## 📂 Prompt Repository Structure
 
-你的 Prompt Repository (即 `PROMPT_REPO_URL` 指向的地方) 應該具有以下結構：
+Your Prompt Repository (where `PROMPT_REPO_URL` points to) should have the following structure:
 
 ```text
 my-prompts/
-├── partials/              # 存放 Handlebars partials (.hbs)
+├── partials/              # Store Handlebars partials (.hbs)
 │   ├── role-expert.hbs
 │   └── output-format.hbs
-├── common/                # common 群組（永遠載入）
+├── common/                # common group (always loaded)
 │   ├── common-prompt.yaml
 │   └── partials/
 │       └── common-partial.hbs
-├── laravel/               # laravel 群組（需在 MCP_GROUPS 中指定）
+├── laravel/               # laravel group (must be specified in MCP_GROUPS)
 │   └── laravel-prompt.yaml
-├── vue/                   # vue 群組（需在 MCP_GROUPS 中指定）
+├── vue/                   # vue group (must be specified in MCP_GROUPS)
 │   └── vue-prompt.yaml
-├── root-prompt.yaml       # 根目錄（永遠載入）
+├── root-prompt.yaml       # Root directory (always loaded)
 └── another-prompt.yml
 ```
 
-### 群組過濾規則
+### Group Filtering Rules
 
-- **根目錄** (`/`): 永遠載入
-- **common 群組** (`common/`): 永遠載入
-- **其他群組**: 只有在 `MCP_GROUPS` 環境變數中指定時才載入
+- **Root directory** (`/`): Always loaded
+- **common group** (`common/`): Always loaded
+- **Other groups**: Only loaded when specified in `MCP_GROUPS` environment variable
 
-#### 預設行為
+#### Default Behavior
 
-當 `MCP_GROUPS` **未設定**時：
-- 系統會自動載入 `common` 群組（以及根目錄的 prompts）
-- 啟動時會在日誌中明確提示使用預設群組
-- 日誌會包含提示訊息，建議設定 `MCP_GROUPS` 以載入更多群組
+When `MCP_GROUPS` is **not set**:
+- System automatically loads the `common` group (and root directory prompts)
+- Startup logs will explicitly prompt about using default groups
+- Logs will include messages suggesting to set `MCP_GROUPS` to load more groups
 
-#### 範例
+#### Examples
 
-- `MCP_GROUPS=laravel,vue` → 載入根目錄、common、laravel、vue
-- `MCP_GROUPS=` 或未設定 → 只載入根目錄和 common（系統會提示使用預設值）
+- `MCP_GROUPS=laravel,vue` → Load root, common, laravel, vue
+- `MCP_GROUPS=` or not set → Only load root and common (system will prompt about using default)
 
-### Prompt 定義檔範例 (`.yaml`)
+### Prompt Definition File Example (`.yaml`)
 
 ```yaml
 id: "code-review"
-title: "代碼審查"
-description: "幫我進行代碼審查"
+title: "Code Review"
+description: "Help me review code"
 args:
     code:
         type: "string"
-        description: "要審查的代碼"
+        description: "Code to review"
     language:
         type: "string"
-        description: "程式語言"
+        description: "Programming language"
 template: |
     {{> role-expert }}
 
-    你是一位資深的 {{language}} 工程師。
-    請幫我審查以下代碼：
+    You are a senior {{language}} engineer.
+    Please review the following code:
 ```
 
 {{ code }}
@@ -664,251 +686,462 @@ template: |
 
 ```
 
-### 參數類型
+### Parameter Types
 
-Prompt 支援三種參數類型：
+Prompts support three parameter types:
 
-- `string`: 字串類型（預設）
-- `number`: 數字類型
-- `boolean`: 布林類型
+- `string`: String type (default)
+- `number`: Number type
+- `boolean`: Boolean type
 
-## 💻 開發指南
+### Registry Feature (Optional)
 
-### 專案結構
+You can create a `registry.yaml` file in the root directory of your Prompt Repository to centrally manage prompt visibility and deprecation status.
+
+#### Registry File Format
+
+```yaml
+prompts:
+  - id: "code-review"
+    group: "common"
+    visibility: "public"  # public, private, internal
+    deprecated: false
+  - id: "old-prompt"
+    visibility: "private"
+    deprecated: true
+```
+
+#### Registry Field Descriptions
+
+- **`id`**: Prompt ID (required)
+- **`group`**: Group name (optional)
+- **`visibility`**: Visibility setting
+  - `public`: Public (default)
+  - `private`: Private
+  - `internal`: Internal use
+- **`deprecated`**: Whether deprecated (default `false`)
+
+#### Registry Purpose
+
+- **Centralized Management**: Manage all prompts' visibility and deprecation status in a single file
+- **Override Defaults**: Can override default settings in prompt definition files
+- **Version Control**: Track prompt lifecycle through Git
+
+> **Note**: `registry.yaml` is optional. If it doesn't exist, the system will use default values from prompt definition files.
+
+### Prompt Runtime State
+
+Each prompt has a runtime state (`runtime_state`) indicating the prompt's current availability:
+
+- **`active`**: Active state, prompt works normally and can be used as an MCP Tool
+- **`legacy`**: Legacy state, prompt is still available but marked as old version, recommend using new version
+- **`invalid`**: Invalid state, prompt definition has issues (e.g., missing required fields, template errors, etc.), cannot be used
+- **`disabled`**: Disabled, prompt is explicitly disabled (e.g., marked as deprecated in registry)
+- **`warning`**: Warning state, prompt can work but has some warnings (e.g., version too old)
+
+### Prompt Source
+
+Each prompt has a source (`source`) tag indicating where the metadata comes from:
+
+- **`embedded`**: Metadata embedded in prompt definition file (using `metadata:` block)
+- **`registry`**: Settings from `registry.yaml`
+- **`legacy`**: Legacy mode, no metadata, uses default values
+
+### Prompt Status
+
+Each prompt has a status (`status`) indicating the prompt's development stage:
+
+- **`draft`**: Draft, under development
+- **`stable`**: Stable version, can be used normally
+- **`deprecated`**: Deprecated, not recommended for use
+- **`legacy`**: Legacy version, still available but recommend upgrading
+
+## 🔧 MCP Tools and Resources
+
+This project provides multiple MCP tools and resources for managing and querying Prompts.
+
+### MCP Tools
+
+#### 1. `mcp.reload` / `mcp.reload_prompts`
+
+Reload all Prompts without restarting the server (hot-reload).
+
+- **Function**: Pull latest changes from Git repository, clear cache, reload all Handlebars partials and prompts
+- **Parameters**: None
+- **Usage Example**:
+  ```json
+  {
+    "tool": "mcp.reload",
+    "arguments": {}
+  }
+  ```
+
+#### 2. `mcp.stats` / `mcp.prompt.stats`
+
+Get Prompts statistics.
+
+- **Function**: Returns statistics for all prompts, including counts by runtime state (active, legacy, invalid, disabled, warning)
+- **Parameters**: None
+- **Return Content**:
+  - `total`: Total count
+  - `active`: Active state count
+  - `legacy`: Legacy state count
+  - `invalid`: Invalid state count
+  - `disabled`: Disabled count
+  - `warning`: Warning state count
+
+#### 3. `mcp.list` / `mcp.prompt.list`
+
+List all Prompts with multiple filter options.
+
+- **Function**: Lists all prompt runtimes with complete metadata information
+- **Parameters** (optional):
+  - `status`: Filter by status (`draft`, `stable`, `deprecated`, `legacy`)
+  - `group`: Filter by group name
+  - `tag`: Filter by tag (prompts must contain this tag)
+  - `runtime_state`: Filter by runtime state (`active`, `legacy`, `invalid`, `disabled`, `warning`)
+- **Usage Example**:
+  ```json
+  {
+    "tool": "mcp.list",
+    "arguments": {
+      "group": "laravel",
+      "runtime_state": "active"
+    }
+  }
+  ```
+
+#### 4. `mcp.inspect`
+
+Inspect detailed runtime information for a specific Prompt.
+
+- **Function**: Get complete runtime metadata by Prompt ID, including state, source, version, tags, and use cases
+- **Parameters**:
+  - `id`: Prompt ID (required)
+- **Usage Example**:
+  ```json
+  {
+    "tool": "mcp.inspect",
+    "arguments": {
+      "id": "code-review"
+    }
+  }
+  ```
+
+#### 5. `mcp.repo.switch`
+
+Switch to a different Prompt repository and reload (zero-downtime).
+
+- **Function**: Switch to a new Git repository and reload all prompts
+- **Parameters**:
+  - `repo_url`: Repository URL (required)
+  - `branch`: Branch name (optional)
+- **Usage Example**:
+  ```json
+  {
+    "tool": "mcp.repo.switch",
+    "arguments": {
+      "repo_url": "/path/to/new/repo",
+      "branch": "main"
+    }
+  }
+  ```
+
+### MCP Resources
+
+#### 1. `system://health`
+
+System health status resource.
+
+- **URI**: `system://health`
+- **MIME Type**: `application/json`
+- **Content**: Includes the following information:
+  - `git`: Git repository information (URL, path, HEAD commit)
+  - `prompts`: Prompts statistics (total, counts by state, loaded count, group list)
+  - `registry`: Registry status (enabled, source)
+  - `cache`: Cache information (size, cleanup interval)
+  - `system`: System information (uptime, memory usage)
+
+#### 2. `prompts://list`
+
+Prompts list resource.
+
+- **URI**: `prompts://list`
+- **MIME Type**: `application/json`
+- **Content**: Complete metadata list of all prompts, including:
+  - `id`: Prompt ID
+  - `title`: Title
+  - `version`: Version
+  - `status`: Status
+  - `runtime_state`: Runtime state
+  - `source`: Source
+  - `tags`: Tags array
+  - `use_cases`: Use cases array
+  - `group`: Group name
+  - `visibility`: Visibility
+
+### Tool Usage Recommendations
+
+- **During Development**: Use `mcp.reload` to quickly reload prompts without restarting the server
+- **During Debugging**: Use `mcp.inspect` to check detailed information for specific prompts
+- **During Monitoring**: Use `mcp.stats` and `system://health` resource to monitor system status
+- **During Querying**: Use `mcp.list` with filter conditions to find specific prompts
+
+## 💻 Development Guide
+
+### Project Structure
 
 ```
 mcp-prompt-manager/
 ├── src/
-│   ├── index.ts              # 主程式入口
+│   ├── index.ts              # Main entry point
 │   ├── config/
-│   │   └── env.ts            # 環境變數配置和驗證
+│   │   └── env.ts            # Environment variable configuration and validation
 │   ├── services/
-│   │   ├── git.ts            # Git 同步服務
-│   │   └── loaders.ts        # Prompt 和 Partials 載入器
+│   │   ├── control.ts        # MCP control tool handlers
+│   │   ├── git.ts            # Git sync service
+│   │   ├── health.ts         # Health status service
+│   │   └── loaders.ts        # Prompt and Partials loader
 │   ├── types/
-│   │   └── prompt.ts         # 類型定義
+│   │   ├── prompt.ts         # Prompt type definitions
+│   │   ├── promptMetadata.ts # Prompt metadata types
+│   │   ├── promptRuntime.ts  # Prompt runtime types
+│   │   └── registry.ts       # Registry type definitions
 │   └── utils/
-│       ├── fileSystem.ts     # 檔案系統工具（含緩存）
-│       └── logger.ts         # 日誌工具
-├── test/                      # 測試文件
+│       ├── fileSystem.ts     # File system utilities (with cache)
+│       └── logger.ts         # Logging utilities
+├── test/                      # Test files
 │   ├── config.test.ts
 │   ├── loaders.test.ts
+│   ├── promptMetadata.test.ts
 │   ├── utils.test.ts
-│   └── integration.test.ts  # 整合測試
-├── dist/                      # 編譯輸出
+│   └── integration.test.ts  # Integration tests
+├── dist/                      # Compiled output
 ├── package.json
 ├── tsconfig.json
 └── vitest.config.ts
 ```
 
-### 常用指令
+### Common Commands
 
 ```bash
-# 編譯 TypeScript
+# Compile TypeScript
 npm run build
-# 或
+# or
 pnpm run build
 
-# 啟動 MCP Inspector 進行除錯
-# 注意：需先執行 build，或使用 inspector:dev 自動編譯
+# Start MCP Inspector for debugging
+# Note: Need to run build first, or use inspector:dev for auto-compile
 pnpm run build && pnpm run inspector
-# 或使用開發模式（自動編譯）
+# or use development mode (auto-compile)
 pnpm run inspector:dev
 
-# 運行測試
+# Run tests
 npm run test
-# 或
+# or
 pnpm test
 
-# 運行測試（單次）
+# Run tests (once)
 npm run test:run
-# 或
+# or
 pnpm test:run
 
-# 開啟測試 UI
+# Open test UI
 npm run test:ui
-# 或
+# or
 pnpm test:ui
 
-# 格式化代碼
+# Format code
 npm run format
-# 或
+# or
 pnpm format
 
-# 檢查代碼格式
+# Check code format
 npm run format:check
-# 或
+# or
 pnpm format:check
 ```
 
-### 開發流程
+### Development Workflow
 
-1. 修改 `src/` 目錄中的代碼。
-2. 執行 `pnpm run build` 重新編譯（或使用 `pnpm run inspector:dev` 自動編譯並測試）。
-3. 執行 `pnpm run test` 運行測試。
-4. 使用 `pnpm run inspector:dev` 驗證變更（會自動編譯並啟動 Inspector）。
-5. 在 Cursor 或 Claude Desktop 中重啟 MCP Server 以套用變更。
+1. Modify code in the `src/` directory.
+2. Run `pnpm run build` to recompile (or use `pnpm run inspector:dev` to auto-compile and test).
+3. Run `pnpm run test` to run tests.
+4. Use `pnpm run inspector:dev` to verify changes (will auto-compile and start Inspector).
+5. Restart MCP Server in Cursor or Claude Desktop to apply changes.
 
-> **重要提示**:
+> **Important Notes**:
 >
-> - `inspector` 指令執行的是 `dist/index.js`（編譯後的檔案）
-> - 修改源碼後必須先執行 `build` 才能看到最新變更
-> - 使用 `inspector:dev` 可以自動編譯並啟動，適合開發時使用
+> - The `inspector` command runs `dist/index.js` (compiled file)
+> - After modifying source code, you must run `build` first to see the latest changes
+> - Using `inspector:dev` can auto-compile and start, suitable for development
 
-## 🧪 測試
+## 🧪 Testing
 
-專案包含完整的測試套件：
+The project includes a complete test suite:
 
-- **單元測試**: 53 個測試案例
-- **整合測試**: 9 個測試案例
-- **總計**: 62 個測試，全部通過
+- **Unit Tests**: 53 test cases
+- **Integration Tests**: 9 test cases
+- **Total**: 62 tests, all passing
 
-運行測試：
+Run tests:
 
 ```bash
-# 監聽模式
+# Watch mode
 pnpm test
 
-# 單次運行
+# Run once
 pnpm test:run
 
-# 開啟 UI
+# Open UI
 pnpm test:ui
 ```
 
-## 🔧 配置說明
+## 🔧 Configuration
 
-### 環境變數
+### Environment Variables
 
-| 變數名                  | 必填 | 預設值           | 說明                     |
-| ----------------------- | ---- | ---------------- | ------------------------ |
-| `PROMPT_REPO_URL`       | ✅   | -                | Git 倉庫 URL 或本地路徑  |
-| `MCP_LANGUAGE`          | ❌   | `en`             | 輸出語言 (`en` 或 `zh`)  |
-| `MCP_GROUPS`            | ❌   | `common`         | 要載入的群組（逗號分隔），未設定時會在日誌中提示預設行為 |
-| `STORAGE_DIR`           | ❌   | `.prompts_cache` | 本地緩存目錄             |
-| `GIT_BRANCH`            | ❌   | `main`           | Git 分支名稱             |
-| `GIT_MAX_RETRIES`       | ❌   | `3`              | Git 操作最大重試次數     |
-| `CACHE_CLEANUP_INTERVAL` | ❌   | `10000`          | 快取清理間隔（毫秒），定期清理過期快取項目 |
-| `LOG_LEVEL`             | ❌   | `warn` (生產) / `info` (開發) | 日誌級別，生產環境預設只輸出警告和錯誤 |
+| Variable Name            | Required | Default Value    | Description                                    |
+| ------------------------ | -------- | ---------------- | ---------------------------------------------- |
+| `PROMPT_REPO_URL`       | ✅       | -                | Git repository URL or local path               |
+| `MCP_LANGUAGE`          | ❌       | `en`             | Output language (`en` or `zh`)                 |
+| `MCP_GROUPS`            | ❌       | `common`         | Groups to load (comma-separated), system will prompt about default behavior when not set |
+| `STORAGE_DIR`           | ❌       | `.prompts_cache` | Local cache directory                          |
+| `GIT_BRANCH`            | ❌       | `main`           | Git branch name                                |
+| `GIT_MAX_RETRIES`       | ❌       | `3`              | Maximum retry count for Git operations        |
+| `CACHE_CLEANUP_INTERVAL` | ❌       | `10000`          | Cache cleanup interval (milliseconds), periodic cleanup of expired cache items |
+| `LOG_LEVEL`             | ❌       | `warn` (prod) / `info` (dev) | Log level, production defaults to warnings and errors only |
 
-### 快取失效策略
+### Cache Expiration Strategy
 
-系統使用 TTL-based 定期清理機制來管理檔案列表快取，確保記憶體使用效率。
+The system uses a TTL-based periodic cleanup mechanism to manage file list cache, ensuring memory efficiency.
 
-#### 快取機制
+#### Cache Mechanism
 
-- **快取 TTL**: 5 秒（硬編碼）
-- **清理間隔**: 預設 10 秒（`CACHE_TTL * 2`），可透過 `CACHE_CLEANUP_INTERVAL` 環境變數調整
-- **自動清理**: 應用程式啟動時自動啟動清理機制
-- **優雅關閉**: 應用程式關閉時自動停止清理定時器
+- **Cache TTL**: 5 seconds (hardcoded)
+- **Cleanup Interval**: Default 10 seconds (`CACHE_TTL * 2`), adjustable via `CACHE_CLEANUP_INTERVAL` environment variable
+- **Auto Cleanup**: Cleanup mechanism starts automatically when application starts
+- **Graceful Shutdown**: Cleanup timer stops automatically when application closes
 
-#### 工作原理
+#### How It Works
 
-1. **快取建立**: 當 `getFilesRecursively()` 被調用時，會將掃描結果快取 5 秒
-2. **定期清理**: 每 10 秒（或設定的間隔）自動掃描並移除過期的快取項目
-3. **記憶體管理**: 防止快取無限增長，避免記憶體洩漏
+1. **Cache Creation**: When `getFilesRecursively()` is called, scan results are cached for 5 seconds
+2. **Periodic Cleanup**: Every 10 seconds (or configured interval), automatically scans and removes expired cache items
+3. **Memory Management**: Prevents cache from growing indefinitely, avoiding memory leaks
 
-#### 配置範例
+#### Configuration Examples
 
 ```bash
-# 設定較短的清理間隔（用於測試）
-CACHE_CLEANUP_INTERVAL=2000  # 2 秒清理一次
+# Set shorter cleanup interval (for testing)
+CACHE_CLEANUP_INTERVAL=2000  # Cleanup every 2 seconds
 
-# 設定較長的清理間隔（用於生產環境，減少清理頻率）
-CACHE_CLEANUP_INTERVAL=30000  # 30 秒清理一次
+# Set longer cleanup interval (for production, reduce cleanup frequency)
+CACHE_CLEANUP_INTERVAL=30000  # Cleanup every 30 seconds
 ```
 
-#### 監控快取狀態
+#### Monitor Cache Status
 
-可以透過日誌查看快取清理狀態（需要設定 `LOG_LEVEL=debug`）：
+You can view cache cleanup status through logs (requires setting `LOG_LEVEL=debug`):
 
 ```
 [DEBUG] Cache cleanup mechanism started { interval: 10000 }
 [DEBUG] Cache cleanup completed { cleaned: 2 }
 ```
 
-#### 驗證快取機制
+#### Verify Cache Mechanism
 
-詳見 [CACHE_VERIFICATION.md](./CACHE_VERIFICATION.md) 文件，包含完整的驗證方法和測試指南。
+See [CACHE_VERIFICATION.md](./CACHE_VERIFICATION.md) for complete verification methods and testing guide.
 
-### 安全性
+### Security
 
-- ✅ 輸入驗證：所有環境變數都經過 Zod 驗證
-- ✅ 路徑安全：防止路徑遍歷攻擊
-- ✅ 群組驗證：群組名稱格式驗證（只允許字母、數字、下劃線、破折號）
+- ✅ Input Validation: All environment variables are validated with Zod
+- ✅ Path Security: Prevents path traversal attacks
+- ✅ Group Validation: Group name format validation (only letters, numbers, underscores, dashes allowed)
 
-## 📝 日誌
+## 📝 Logging
 
-專案使用 [pino](https://github.com/pinojs/pino) 作為日誌系統，支援結構化日誌。
+The project uses [pino](https://github.com/pinojs/pino) as the logging system, supporting structured logging.
 
-### 日誌級別
+### Log Levels
 
-- `fatal`: 致命錯誤，導致程序退出
-- `error`: 錯誤訊息
-- `warn`: 警告訊息
-- `info`: 一般資訊
-- `debug`: 除錯訊息
-- `trace`: 追蹤訊息
-- `silent`: 完全禁用日誌輸出
+- `fatal`: Fatal errors that cause program exit
+- `error`: Error messages
+- `warn`: Warning messages
+- `info`: General information
+- `debug`: Debug messages
+- `trace`: Trace messages
+- `silent`: Completely disable log output
 
-**預設行為**：
-- **生產環境**（`NODE_ENV` 未設定或不是 `development`）：預設為 `warn`，只輸出警告和錯誤
-- **開發環境**（`NODE_ENV=development`）：預設為 `info`，輸出所有資訊級別以上的日誌
-- 可通過 `LOG_LEVEL` 環境變數覆蓋預設值
+**Default Behavior**:
+- **Production Environment** (`NODE_ENV` not set or not `development`): Defaults to `warn`, only outputs warnings and errors
+- **Development Environment** (`NODE_ENV=development`): Defaults to `info`, outputs all info level and above logs
+- Can override default value via `LOG_LEVEL` environment variable
 
-### 設定日誌級別
+### Setting Log Level
 
 ```bash
-# 在 .env 中設定
+# Set in .env
 LOG_LEVEL=debug
 
-# 或在環境變數中設定
+# Or set in environment variables
 export LOG_LEVEL=debug
 ```
 
-## 🐛 故障排除
+## 🐛 Troubleshooting
 
-### 問題：Git 同步失敗
+### Issue: Git Sync Failed
 
-**解決方案**:
+**Solution**:
 
-1. 檢查 `PROMPT_REPO_URL` 是否正確
-2. 確認網路連線正常
-3. 檢查 Git 憑證是否正確
-4. 查看日誌了解詳細錯誤訊息
+1. Check if `PROMPT_REPO_URL` is correct
+2. Confirm network connection is normal
+3. Check if Git credentials are correct
+4. Check logs for detailed error messages
 
-### 問題：沒有載入任何 prompts
+### Issue: No Prompts Loaded
 
-**解決方案**:
+**Solution**:
 
-1. 檢查 `MCP_GROUPS` 設定是否正確
-2. 確認 prompts 檔案在正確的目錄結構中
-3. 檢查 YAML 檔案格式是否正確
-4. 查看日誌中的錯誤訊息
+1. Check if `MCP_GROUPS` setting is correct
+2. Confirm prompt files are in the correct directory structure
+3. Check if YAML file format is correct
+4. Check error messages in logs
 
-### 問題：Partials 無法使用
+### Issue: Partials Cannot Be Used
 
-**解決方案**:
+**Solution**:
 
-1. 確認 partial 檔案副檔名為 `.hbs`
-2. 檢查 partial 檔案內容是否正確
-3. 確認在模板中使用 `{{> partial-name }}` 語法
+1. Confirm partial file extension is `.hbs`
+2. Check if partial file content is correct
+3. Confirm using `{{> partial-name }}` syntax in templates
 
-## 📚 相關資源
+## 📦 Key Dependencies
 
-- [Model Context Protocol 官方文檔](https://modelcontextprotocol.io/)
-- [Handlebars 文檔](https://handlebarsjs.com/)
-- [Zod 文檔](https://zod.dev/)
+- **@modelcontextprotocol/sdk**: MCP SDK, provides MCP Server core functionality
+- **handlebars**: Handlebars template engine, supports dynamic Prompt generation
+- **simple-git**: Git operations library for syncing Git repositories
+- **js-yaml**: YAML parser for parsing Prompt definition files
+- **zod**: TypeScript-first schema validation library for configuration and type validation
+- **pino**: High-performance structured logging library
+- **dotenv**: Environment variable loading utility
 
-## 📄 授權
+## 📚 Related Resources
+
+- [Model Context Protocol Official Documentation](https://modelcontextprotocol.io/)
+- [Handlebars Documentation](https://handlebarsjs.com/)
+- [Zod Documentation](https://zod.dev/)
+- [Simple Git Documentation](https://github.com/steveukx/git-js)
+- [Pino Documentation](https://getpino.io/)
+
+## 📄 License
 
 ISC
 
-## 🤝 貢獻
+## 🤝 Contributing
 
-歡迎提交 Issue 和 Pull Request！
+Welcome to submit Issues and Pull Requests!
 
 ---
 
-**版本**: 1.0.0  
-**最後更新**: 2024-11-30
+**Version**: 1.0.0  
+**Last Updated**: 2024-11-30
