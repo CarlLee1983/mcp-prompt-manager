@@ -8,7 +8,12 @@ import {
 } from './config/env.js'
 import { logger } from './utils/logger.js'
 import { syncRepo } from './services/git.js'
-import { loadPartials, loadPrompts, reloadPrompts } from './services/loaders.js'
+import {
+    loadPartials,
+    loadPrompts,
+    reloadPrompts,
+    getAllPromptRuntimes,
+} from './services/loaders.js'
 import { startCacheCleanup, stopCacheCleanup } from './utils/fileSystem.js'
 import { getHealthStatus } from './services/health.js'
 import { z } from 'zod'
@@ -174,12 +179,57 @@ async function main() {
         )
         logger.info('System health resource registered')
 
-        // 6. Start MCP Server
+        // 6. Register prompts list resource (提供完整的 prompt metadata 資訊)
+        server.registerResource(
+            'prompts-list',
+            'prompts://list',
+            {
+                title: 'Prompts List',
+                description:
+                    'Complete list of all prompts with metadata including runtime state, version, status, tags, and use cases',
+                mimeType: 'application/json',
+            },
+            async () => {
+                try {
+                    const runtimes = getAllPromptRuntimes()
+                    // 轉換為 listPrompts 格式
+                    const prompts = runtimes.map((runtime) => ({
+                        id: runtime.id,
+                        title: runtime.title,
+                        version: runtime.version,
+                        status: runtime.status,
+                        runtime_state: runtime.runtime_state,
+                        source: runtime.source,
+                        tags: runtime.tags,
+                        use_cases: runtime.use_cases,
+                        group: runtime.group,
+                        visibility: runtime.visibility,
+                    }))
+                    return {
+                        contents: [
+                            {
+                                uri: 'prompts://list',
+                                mimeType: 'application/json',
+                                text: JSON.stringify(prompts, null, 2),
+                            },
+                        ],
+                    }
+                } catch (error) {
+                    const listError =
+                        error instanceof Error ? error : new Error(String(error))
+                    logger.error({ error: listError }, 'Failed to get prompts list')
+                    throw listError
+                }
+            }
+        )
+        logger.info('Prompts list resource registered')
+
+        // 7. Start MCP Server
         const transport = new StdioServerTransport()
         await server.connect(transport)
         logger.info('MCP Server is running!')
 
-        // 7. Initialize cache cleanup mechanism
+        // 8. Initialize cache cleanup mechanism
         const cleanupInterval = CACHE_CLEANUP_INTERVAL ?? 10000 // Default: 10 seconds (CACHE_TTL * 2)
         startCacheCleanup(cleanupInterval, (cleaned) => {
             if (cleaned > 0) {

@@ -15,11 +15,24 @@ import { logger } from '../utils/logger.js'
 import { getFilesRecursively, clearFileCache } from '../utils/fileSystem.js'
 import { syncRepo } from './git.js'
 import type { PromptDefinition, PromptArgDefinition } from '../types/prompt.js'
+import {
+    PromptMetadataSchema,
+    type PromptMetadata,
+} from '../types/promptMetadata.js'
+import { RegistrySchema, type Registry } from '../types/registry.js'
+import type {
+    PromptRuntime,
+    PromptRuntimeState,
+    PromptSource,
+} from '../types/promptRuntime.js'
 
 // Track registered prompts, tools, and partials for reload functionality
 const registeredPromptIds = new Set<string>()
 const registeredToolRefs = new Map<string, { remove: () => void }>()
 const registeredPartials = new Set<string>()
+
+// Track prompt runtime states
+const promptRuntimeMap = new Map<string, PromptRuntime>()
 
 // 重入保護鎖：追蹤當前正在執行的 reload Promise
 let reloadingPromise: Promise<{ loaded: number; errors: LoadError[] }> | null = null
@@ -223,25 +236,162 @@ const EXCLUDED_FILES = [
     'poetry.lock',
     'pom.xml',
     'build.gradle',
+    'registry.yaml',
 ]
+
+/**
+ * 判斷 YAML 資料是否為 Metadata Prompt
+ * 檢查是否同時存在 version 和 status 欄位
+ */
+function isMetadataPrompt(yamlData: unknown): boolean {
+    if (typeof yamlData !== 'object' || yamlData === null) {
+        return false
+    }
+    const data = yamlData as Record<string, unknown>
+    return (
+        typeof data.version === 'string' &&
+        typeof data.status === 'string' &&
+        ['draft', 'stable', 'deprecated'].includes(data.status)
+    )
+}
+
+/**
+ * 載入 registry.yaml 檔案
+ * @param storageDir - Storage directory
+ * @returns Registry 物件或 null（如果檔案不存在或載入失敗）
+ */
+async function loadRegistry(
+    storageDir: string
+): Promise<Registry | null> {
+    const registryPath = path.join(storageDir, 'registry.yaml')
+    try {
+        const content = await fs.readFile(registryPath, 'utf-8')
+        const yamlData = yaml.load(content)
+        const parseResult = RegistrySchema.safeParse(yamlData)
+        if (!parseResult.success) {
+            logger.warn(
+                { error: parseResult.error },
+                'Failed to parse registry.yaml, ignoring'
+            )
+            return null
+        }
+        logger.debug('Registry loaded successfully')
+        return parseResult.data
+    } catch (error) {
+        // 檔案不存在是正常情況，不記錄錯誤
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            logger.debug('registry.yaml not found, skipping')
+            return null
+        }
+        logger.warn({ error }, 'Failed to load registry.yaml, ignoring')
+        return null
+    }
+}
+
+/**
+ * 建立 PromptRuntime 物件
+ * @param promptDef - Prompt definition
+ * @param metadata - Metadata（如果有的話）
+ * @param groupName - Group name
+ * @param registry - Registry override（如果有的話）
+ * @param runtimeState - Runtime state（如果已經確定）
+ * @param source - Source（如果已經確定）
+ * @returns PromptRuntime 物件
+ */
+function createPromptRuntime(
+    promptDef: PromptDefinition,
+    metadata: PromptMetadata | null,
+    groupName: string,
+    registry: Registry | null,
+    runtimeState?: PromptRuntimeState,
+    source?: PromptSource
+): PromptRuntime {
+    const registryEntry = registry?.prompts.find((p) => p.id === promptDef.id)
+    let finalRuntimeState: PromptRuntimeState
+    let finalSource: PromptSource
+    let version: string
+    let status: 'draft' | 'stable' | 'deprecated' | 'legacy'
+    let tags: string[]
+    let useCases: string[]
+
+    // 決定 version、status、tags、useCases
+    if (metadata) {
+        version = metadata.version
+        status = metadata.status
+        tags = metadata.tags ?? []
+        useCases = metadata.use_cases ?? []
+    } else {
+        version = '0.0.0'
+        status = 'legacy'
+        tags = []
+        useCases = []
+    }
+
+    // 決定 runtimeState 和 source
+    if (runtimeState !== undefined && source !== undefined) {
+        // 如果已經提供了 runtimeState 和 source，使用它們
+        finalRuntimeState = runtimeState
+        finalSource = source
+    } else if (metadata) {
+        // Metadata Prompt
+        finalSource = 'embedded'
+        finalRuntimeState = 'active'
+    } else {
+        // Legacy Prompt
+        finalSource = 'legacy'
+        finalRuntimeState = 'legacy'
+    }
+
+    // 檢查 registry override（會覆蓋 source 和可能的 runtimeState）
+    if (registryEntry) {
+        finalSource = 'registry'
+        if (registryEntry.deprecated) {
+            finalRuntimeState = 'disabled'
+        }
+    }
+
+    const runtime: PromptRuntime = {
+        id: promptDef.id,
+        title: promptDef.title,
+        version,
+        status,
+        tags,
+        use_cases: useCases,
+        runtime_state: finalRuntimeState,
+        source: finalSource,
+        group: registryEntry?.group ?? groupName,
+    }
+
+    if (registryEntry?.visibility !== undefined) {
+        runtime.visibility = registryEntry.visibility
+    }
+
+    return runtime
+}
 
 export async function loadPrompts(
     server: McpServer,
     storageDir?: string
 ): Promise<{ loaded: number; errors: LoadError[] }> {
     const dir = storageDir ?? STORAGE_DIR
-    
+
+    // 清空 runtime cache
+    promptRuntimeMap.clear()
+
     // Explicitly log loaded groups and whether using default values
     const logContext: Record<string, unknown> = {
         activeGroups: ACTIVE_GROUPS,
     }
-    
+
     if (IS_DEFAULT_GROUPS) {
         logContext.isDefault = true
         logContext.hint = 'Set MCP_GROUPS to load additional groups'
     }
-    
+
     logger.info(logContext, 'Loading prompts')
+
+    // 載入 registry.yaml（如果存在）
+    const registry = await loadRegistry(dir)
 
     const allFiles = await getFilesRecursively(dir)
     let loadedCount = 0
@@ -275,7 +425,7 @@ export async function loadPrompts(
             const content = await fs.readFile(filePath, 'utf-8')
             const yamlData = yaml.load(content)
 
-            // Validate structure using Zod
+            // 先驗證基本 Prompt 結構
             const parseResult = PromptDefinitionSchema.safeParse(yamlData)
             if (!parseResult.success) {
                 const error = new Error(
@@ -290,6 +440,69 @@ export async function loadPrompts(
             }
 
             const promptDef = parseResult.data
+
+            // 判斷是否為 Metadata Prompt
+            let metadata: PromptMetadata | null = null
+            let runtimeState: PromptRuntimeState = 'legacy'
+            let source: PromptSource = 'legacy'
+
+            if (isMetadataPrompt(yamlData)) {
+                // 嘗試解析 Metadata
+                const metadataResult = PromptMetadataSchema.safeParse(yamlData)
+                if (metadataResult.success) {
+                    metadata = metadataResult.data
+                    source = 'embedded'
+                    runtimeState = 'active'
+                } else {
+                    // Metadata 驗證失敗
+                    logger.warn(
+                        {
+                            filePath,
+                            promptId: promptDef.id,
+                            errors: metadataResult.error.issues,
+                        },
+                        'Metadata validation failed, marking as invalid'
+                    )
+                    runtimeState = 'invalid'
+                    source = 'embedded'
+                }
+            }
+
+            // 建立 PromptRuntime
+            // 使用型別斷言，因為 parseResult.data 已經通過 Zod 驗證，符合 PromptDefinition
+            const promptRuntime = createPromptRuntime(
+                promptDef as PromptDefinition,
+                metadata,
+                groupName,
+                registry,
+                runtimeState,
+                source
+            )
+
+            // 如果 runtime_state 是 invalid 或 disabled，仍然記錄但不註冊到 MCP
+            if (promptRuntime.runtime_state === 'invalid') {
+                promptRuntimeMap.set(promptDef.id, promptRuntime)
+                logger.warn(
+                    {
+                        promptId: promptDef.id,
+                        filePath,
+                    },
+                    'Prompt marked as invalid, skipping registration'
+                )
+                continue
+            }
+
+            if (promptRuntime.runtime_state === 'disabled') {
+                promptRuntimeMap.set(promptDef.id, promptRuntime)
+                logger.debug(
+                    {
+                        promptId: promptDef.id,
+                        filePath,
+                    },
+                    'Prompt disabled by registry, skipping registration'
+                )
+                continue
+            }
 
             // Build Zod Schema
             const zodShape: z.ZodRawShape = promptDef.args
@@ -452,8 +665,19 @@ export async function loadPrompts(
             )
             registeredToolRefs.set(promptDef.id, toolRef)
 
+            // 儲存 runtime 資訊
+            promptRuntimeMap.set(promptDef.id, promptRuntime)
+
             loadedCount++
-            logger.debug({ groupName, promptId: promptDef.id }, 'Prompt loaded')
+            logger.debug(
+                {
+                    groupName,
+                    promptId: promptDef.id,
+                    runtimeState: promptRuntime.runtime_state,
+                    source: promptRuntime.source,
+                },
+                'Prompt loaded'
+            )
         } catch (error) {
             const loadError =
                 error instanceof Error ? error : new Error(String(error))
@@ -514,10 +738,11 @@ function clearAllPrompts(): void {
             logger.warn({ toolId, error }, 'Failed to remove tool')
         }
     }
-    
+
     // Clear tracking sets
     registeredToolRefs.clear()
     registeredPromptIds.clear()
+    promptRuntimeMap.clear()
     logger.info('All prompts and tools cleared')
 }
 
@@ -614,4 +839,42 @@ export function getLoadedPromptCount(): number {
  */
 export function getRegisteredPromptIds(): string[] {
     return Array.from(registeredPromptIds)
+}
+
+/**
+ * 取得所有 PromptRuntime 物件
+ * @returns PromptRuntime 陣列
+ */
+export function getAllPromptRuntimes(): PromptRuntime[] {
+    return Array.from(promptRuntimeMap.values())
+}
+
+/**
+ * 取得指定 ID 的 PromptRuntime
+ * @param id - Prompt ID
+ * @returns PromptRuntime 或 undefined
+ */
+export function getPromptRuntime(id: string): PromptRuntime | undefined {
+    return promptRuntimeMap.get(id)
+}
+
+/**
+ * 取得 Prompt 統計資訊
+ * @returns 統計物件
+ */
+export function getPromptStats(): {
+    total: number
+    active: number
+    legacy: number
+    invalid: number
+    disabled: number
+} {
+    const runtimes = Array.from(promptRuntimeMap.values())
+    return {
+        total: runtimes.length,
+        active: runtimes.filter((r) => r.runtime_state === 'active').length,
+        legacy: runtimes.filter((r) => r.runtime_state === 'legacy').length,
+        invalid: runtimes.filter((r) => r.runtime_state === 'invalid').length,
+        disabled: runtimes.filter((r) => r.runtime_state === 'disabled').length,
+    }
 }

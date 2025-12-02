@@ -8,7 +8,9 @@ import {
 } from '../config/env.js'
 import { logger } from '../utils/logger.js'
 import { getCacheStats } from '../utils/fileSystem.js'
-import { getLoadedPromptCount } from './loaders.js'
+import { getLoadedPromptCount, getPromptStats } from './loaders.js'
+import fs from 'fs/promises'
+import path from 'path'
 
 /**
  * 健康狀態資料結構
@@ -20,8 +22,17 @@ export interface HealthStatus {
         headCommit: string | null
     }
     prompts: {
+        total: number
+        active: number
+        legacy: number
+        invalid: number
+        disabled: number
         loadedCount: number
         groups: string[]
+    }
+    registry: {
+        enabled: boolean
+        source: 'registry.yaml' | 'none'
     }
     cache: {
         size: number
@@ -77,35 +88,67 @@ async function getGitHeadCommit(
 }
 
 /**
+ * 檢查 registry.yaml 是否存在
+ * @param storageDir - Storage directory
+ * @returns 是否存在
+ */
+async function checkRegistryExists(storageDir: string): Promise<boolean> {
+    try {
+        const registryPath = path.join(storageDir, 'registry.yaml')
+        await fs.access(registryPath)
+        return true
+    } catch {
+        return false
+    }
+}
+
+/**
  * 取得系統健康狀態
  * @param startTime - 應用程式啟動時間（毫秒）
+ * @param storageDir - Storage directory（可選，預設為 STORAGE_DIR）
  * @returns 健康狀態物件
  */
 export async function getHealthStatus(
-    startTime: number
+    startTime: number,
+    storageDir?: string
 ): Promise<HealthStatus> {
+    const dir = storageDir ?? STORAGE_DIR
+
     // 取得 Git 資訊
-    const headCommit = await getGitHeadCommit(STORAGE_DIR)
-    
+    const headCommit = await getGitHeadCommit(dir)
+
     // 取得 Prompt 統計
     const loadedCount = getLoadedPromptCount()
-    
+    const promptStats = getPromptStats()
+
+    // 檢查 registry 是否存在
+    const registryExists = await checkRegistryExists(dir)
+
     // 取得 Cache 統計
     const cacheStats = getCacheStats()
-    
+
     // 取得系統資訊
     const uptime = Date.now() - startTime
     const memoryUsage = process.memoryUsage()
-    
+
     return {
         git: {
             repoUrl: REPO_URL || '',
-            repoPath: STORAGE_DIR,
+            repoPath: dir,
             headCommit,
         },
         prompts: {
+            total: promptStats.total,
+            active: promptStats.active,
+            legacy: promptStats.legacy,
+            invalid: promptStats.invalid,
+            disabled: promptStats.disabled,
             loadedCount,
             groups: [...ACTIVE_GROUPS],
+        },
+        registry: {
+            enabled: registryExists,
+            source: registryExists ? 'registry.yaml' : 'none',
         },
         cache: {
             size: cacheStats.size,
