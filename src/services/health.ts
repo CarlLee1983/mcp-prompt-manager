@@ -1,10 +1,10 @@
 import { execSync } from 'child_process'
 import { simpleGit, type SimpleGitOptions } from 'simple-git'
 import {
-    REPO_URL,
     STORAGE_DIR,
     ACTIVE_GROUPS,
     CACHE_CLEANUP_INTERVAL,
+    getRepoUrl,
 } from '../config/env.js'
 import { logger } from '../utils/logger.js'
 import { getCacheStats } from '../utils/fileSystem.js'
@@ -133,7 +133,7 @@ export async function getHealthStatus(
 
     return {
         git: {
-            repoUrl: REPO_URL || '',
+            repoUrl: getRepoUrl() || '',
             repoPath: dir,
             headCommit,
         },

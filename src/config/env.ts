@@ -33,7 +33,8 @@ const ConfigSchema = z.object({
                     if (
                         url.startsWith('http://') ||
                         url.startsWith('https://') ||
-                        url.startsWith('git@')
+                        url.startsWith('git@') ||
+                        url.startsWith('s3://')
                     ) {
                         return true
                     }
@@ -151,6 +152,7 @@ export function setActiveRepo(url: string, branch?: string): void {
         url.startsWith('http://') ||
         url.startsWith('https://') ||
         url.startsWith('git@') ||
+        url.startsWith('s3://') ||
         path.isAbsolute(url)
     
     if (!isValidUrl) {
@@ -182,7 +184,16 @@ export function getActiveRepo(): { url: string; branch: string } | null {
 // REPO_URL 和 GIT_BRANCH 現在會優先使用動態設定
 export function getRepoUrl(): string {
     const activeRepo = getActiveRepo()
-    return activeRepo?.url ?? config.PROMPT_REPO_URL
+    if (activeRepo?.url) {
+        return activeRepo.url
+    }
+
+    // 如果環境變數在啟動後被修改（例如測試環境），優先使用環境變數
+    if (process.env.PROMPT_REPO_URL && process.env.PROMPT_REPO_URL !== config.PROMPT_REPO_URL) {
+        return process.env.PROMPT_REPO_URL
+    }
+
+    return config.PROMPT_REPO_URL
 }
 
 export function getGitBranch(): string {
@@ -205,6 +216,22 @@ export const LANG_SETTING = config.MCP_LANGUAGE
  * Configuration: MCP_GROUPS=laravel,vue,react
  */
 export const ACTIVE_GROUPS = config.MCP_GROUPS || ['common']
+
+/**
+ * Get active groups dynamically
+ * If env var MCP_GROUPS is set at runtime (e.g. tests), prioritize it
+ */
+export function getActiveGroups(): string[] {
+    if (process.env.MCP_GROUPS && process.env.MCP_GROUPS !== (config.MCP_GROUPS ? config.MCP_GROUPS.join(',') : undefined)) {
+        const groups = process.env.MCP_GROUPS.split(',').map(g => g.trim()).filter(Boolean)
+        // Basic validation for runtime groups
+        const groupNamePattern = /^[a-zA-Z0-9_-]+$/
+        if (groups.every(g => groupNamePattern.test(g))) {
+            return groups
+        }
+    }
+    return ACTIVE_GROUPS
+}
 
 /**
  * Whether using default groups (when MCP_GROUPS is not set)

@@ -7,6 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import {
     STORAGE_DIR,
     ACTIVE_GROUPS,
+    getActiveGroups,
     IS_DEFAULT_GROUPS,
     LANG_INSTRUCTION,
     LANG_SETTING,
@@ -471,8 +472,9 @@ export async function loadPrompts(
     promptRuntimeMap.clear()
 
     // Explicitly log loaded groups and whether using default values
+    const activeGroups = getActiveGroups()
     const logContext: Record<string, unknown> = {
-        activeGroups: ACTIVE_GROUPS,
+        activeGroups,
     }
 
     if (IS_DEFAULT_GROUPS) {
@@ -505,7 +507,7 @@ export async function loadPrompts(
         const relativePath = path.relative(dir, filePath)
         const { shouldLoad, groupName } = shouldLoadPrompt(
             relativePath,
-            ACTIVE_GROUPS
+            activeGroups
         )
 
         if (!shouldLoad) {
@@ -577,14 +579,12 @@ export async function loadPrompts(
             // 儲存 runtime 資訊（無論狀態如何）
             promptRuntimeMap.set(promptDef.id, promptRuntime)
 
-            // 只註冊 runtime_state === 'active' 的 prompts 作為 tools
-            // 其他狀態（invalid, disabled, legacy, warning）不註冊為 tools，但仍記錄在 runtime map 中
-            if (promptRuntime.runtime_state !== 'active') {
+            // 只跳過明確禁用或無效的 prompt
+            // legacy 和 warning 狀態的 prompt 仍然應該被載入和註冊，以維持向後相容性
+            if (promptRuntime.runtime_state === 'disabled' || promptRuntime.runtime_state === 'invalid') {
                 const stateReason = {
                     invalid: 'Prompt marked as invalid',
                     disabled: 'Prompt disabled by registry',
-                    legacy: 'Legacy prompt (not registered as tool)',
-                    warning: 'Prompt has metadata validation warnings',
                 }[promptRuntime.runtime_state] || 'Unknown state'
 
                 logger.debug(
@@ -593,7 +593,7 @@ export async function loadPrompts(
                         filePath,
                         runtime_state: promptRuntime.runtime_state,
                     },
-                    `${stateReason}, skipping tool registration`
+                    `${stateReason}, skipping registration`
                 )
                 continue
             }
