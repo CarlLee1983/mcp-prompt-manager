@@ -577,13 +577,13 @@ export async function loadPrompts(
             // 儲存 runtime 資訊（無論狀態如何）
             promptRuntimeMap.set(promptDef.id, promptRuntime)
 
-            // 只註冊 runtime_state === 'active' 的 prompts 作為 tools
-            // 其他狀態（invalid, disabled, legacy, warning）不註冊為 tools，但仍記錄在 runtime map 中
-            if (promptRuntime.runtime_state !== 'active') {
+            // 註冊 runtime_state === 'active' 或 'legacy' 的 prompts 作為 tools
+            // 其他狀態（invalid, disabled, warning）不註冊為 tools，但仍記錄在 runtime map 中
+            // Legacy prompts 仍然可以註冊以保持向後相容性
+            if (promptRuntime.runtime_state !== 'active' && promptRuntime.runtime_state !== 'legacy') {
                 const stateReason = {
                     invalid: 'Prompt marked as invalid',
                     disabled: 'Prompt disabled by registry',
-                    legacy: 'Legacy prompt (not registered as tool)',
                     warning: 'Prompt has metadata validation warnings',
                 }[promptRuntime.runtime_state] || 'Unknown state'
 
