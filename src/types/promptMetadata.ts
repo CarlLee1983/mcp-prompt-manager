@@ -12,6 +12,11 @@ export const PromptMetadataSchema = z.object({
     status: z.enum(['draft', 'stable', 'deprecated']),
     tags: z.array(z.string()).default([]),
     use_cases: z.array(z.string()).default([]),
+    dependencies: z
+        .object({
+            partials: z.array(z.string()).default([]),
+        })
+        .optional(),
 })
 
 /**

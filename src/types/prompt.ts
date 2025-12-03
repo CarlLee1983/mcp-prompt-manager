@@ -39,6 +39,16 @@ export interface PromptArgDefinition {
 }
 
 /**
+ * Prompt triggers definition
+ * 
+ * Defines trigger patterns for when the prompt should be used.
+ */
+export interface PromptTriggers {
+    /** List of trigger patterns that should activate this prompt */
+    readonly patterns: readonly string[]
+}
+
+/**
  * Prompt definition interface
  * 
  * Defines a complete Prompt template structure, including ID, title, description, arguments, and Handlebars template.
@@ -49,6 +59,13 @@ export interface PromptArgDefinition {
  *   id: 'code-review',
  *   title: 'Code Review',
  *   description: 'Authority tool for comprehensive code review.',
+ *   triggers: {
+ *     patterns: ['review', 'check code']
+ *   },
+ *   rules: [
+ *     'MUST use this tool when code review is requested',
+ *     'Analyze code quality and security issues'
+ *   ],
  *   args: {
  *     code: {
  *       type: 'string',
@@ -69,8 +86,12 @@ export interface PromptDefinition {
     readonly id: string
     /** Title of the Prompt */
     readonly title: string
-    /** Description of the Prompt, may contain TRIGGER and RULES information */
+    /** Description of the Prompt */
     readonly description?: string
+    /** Trigger patterns for when this prompt should be used */
+    readonly triggers?: PromptTriggers
+    /** Rules that must be followed when using this prompt */
+    readonly rules?: readonly string[]
     /** Prompt argument definitions, key is argument name, value is argument definition */
     readonly args?: Readonly<Record<string, PromptArgDefinition>>
     /** Handlebars template string for generating the final Prompt content */

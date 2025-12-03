@@ -123,6 +123,12 @@ const PromptDefinitionSchema = z.object({
     id: z.string().min(1),
     title: z.string().min(1),
     description: z.string().optional(),
+    triggers: z
+        .object({
+            patterns: z.array(z.string()).min(1),
+        })
+        .optional(),
+    rules: z.array(z.string()).optional(),
     args: z
         .record(
             z.string(),
@@ -172,6 +178,69 @@ export async function loadPartials(storageDir?: string): Promise<number> {
 
     logger.info({ count }, 'Partials loaded')
     return count
+}
+
+/**
+ * 從 Handlebars template 中提取 partial 引用
+ * @param template - Handlebars template 字串
+ * @returns 提取出的 partial 名稱陣列（去重）
+ */
+function extractPartialsFromTemplate(template: string): string[] {
+    const regex = /{{>\s*([a-zA-Z0-9/_-]+)\s*}}/g
+    const results = new Set<string>()
+    let match: RegExpExecArray | null
+    while ((match = regex.exec(template)) !== null) {
+        const partialName = match[1]
+        if (partialName) {
+            results.add(partialName)
+        }
+    }
+    return Array.from(results)
+}
+
+/**
+ * 驗證 partial 依賴一致性
+ * @param template - Handlebars template 字串
+ * @param declaredPartials - 在 dependencies.partials 中聲明的 partials
+ * @returns 驗證結果，包含是否有問題和警告訊息
+ */
+function validatePartialDependencies(
+    template: string,
+    declaredPartials: string[]
+): {
+    hasIssues: boolean
+    warnings: string[]
+    undeclaredPartials: string[]
+    unusedPartials: string[]
+} {
+    const usedPartials = extractPartialsFromTemplate(template)
+    const declaredSet = new Set(declaredPartials)
+    const usedSet = new Set(usedPartials)
+
+    const undeclaredPartials = usedPartials.filter((p) => !declaredSet.has(p))
+    const unusedPartials = declaredPartials.filter((p) => !usedSet.has(p))
+
+    const warnings: string[] = []
+    const hasIssues = undeclaredPartials.length > 0 || unusedPartials.length > 0
+
+    if (undeclaredPartials.length > 0) {
+        warnings.push(
+            `Template 中使用了 ${undeclaredPartials.length} 個未聲明的 partials: ${undeclaredPartials.join(', ')}。建議在 dependencies.partials 中聲明這些 partials。`
+        )
+    }
+
+    if (unusedPartials.length > 0) {
+        warnings.push(
+            `dependencies.partials 中聲明了 ${unusedPartials.length} 個未使用的 partials: ${unusedPartials.join(', ')}。建議清理這些未使用的依賴。`
+        )
+    }
+
+    return {
+        hasIssues,
+        warnings,
+        undeclaredPartials,
+        unusedPartials,
+    }
 }
 
 /**
@@ -337,6 +406,49 @@ function isMetadataPrompt(yamlData: unknown): boolean {
     const hasStatus = typeof data.status === 'string' && data.status.length > 0
     
     return hasVersion && hasStatus
+}
+
+/**
+ * 從 description 中解析 RULES（向後相容性）
+ * @param description - Description 文字
+ * @returns 解析出的 rules 陣列
+ */
+function parseRulesFromDescription(description: string): string[] {
+    const rulesMatch = description.match(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is)
+    if (!rulesMatch || !rulesMatch[1]) {
+        return []
+    }
+
+    const rulesText = rulesMatch[1].trim()
+    // 解析編號格式的規則：1. Rule text. 2. Another rule.
+    const rules: string[] = []
+    const rulePattern = /(\d+)\.\s*([^0-9]+?)(?=\s*\d+\.|$)/g
+    let match: RegExpExecArray | null
+
+    while ((match = rulePattern.exec(rulesText)) !== null) {
+        const ruleText = match[2]?.trim()
+        if (ruleText) {
+            rules.push(ruleText)
+        }
+    }
+
+    // 如果沒有找到編號格式，嘗試按行分割
+    if (rules.length === 0) {
+        const lines = rulesText.split(/\n/).map((line) => line.trim()).filter((line) => line.length > 0)
+        rules.push(...lines)
+    }
+
+    return rules
+}
+
+/**
+ * 從 description 中解析 TRIGGER（向後相容性）
+ * @param description - Description 文字
+ * @returns 解析出的 trigger 文字
+ */
+function parseTriggerFromDescription(description: string): string | null {
+    const triggerMatch = description.match(/TRIGGER:\s*(.+?)(?:\n|$)/i)
+    return triggerMatch && triggerMatch[1] ? triggerMatch[1].trim() : null
 }
 
 /**
@@ -563,6 +675,36 @@ export async function loadPrompts(
                 }
             }
 
+            // 驗證 partial 依賴一致性
+            const declaredPartials =
+                metadata?.dependencies?.partials ?? []
+            const validationResult = validatePartialDependencies(
+                promptDef.template,
+                declaredPartials
+            )
+
+            if (validationResult.hasIssues) {
+                // 記錄警告
+                logger.warn(
+                    {
+                        filePath,
+                        promptId: promptDef.id,
+                        undeclaredPartials: validationResult.undeclaredPartials,
+                        unusedPartials: validationResult.unusedPartials,
+                    },
+                    `Partial dependencies validation issues: ${validationResult.warnings.join(' ')}`
+                )
+
+                // 如果原本是 active 狀態，且有未聲明的 partials，標記為 warning
+                // 如果原本已經是 warning 或其他狀態，保持原狀
+                if (
+                    runtimeState === 'active' &&
+                    validationResult.undeclaredPartials.length > 0
+                ) {
+                    runtimeState = 'warning'
+                }
+            }
+
             // 建立 PromptRuntime
             // 使用型別斷言，因為 parseResult.data 已經通過 Zod 驗證，符合 PromptDefinition
             const promptRuntime = createPromptRuntime(
@@ -723,17 +865,44 @@ export async function loadPrompts(
             registeredPromptIds.add(promptDef.id)
 
             // Also register as Tool so AI can automatically invoke it
-            // Extract TRIGGER information from description for tool description
+            // 優先使用結構化的 triggers 和 rules，如果沒有則從 description 中解析（向後相容）
             const description = promptDef.description || ''
-            const triggerMatch = description.match(/TRIGGER:\s*(.+?)(?:\n|$)/i)
-            const triggerText = triggerMatch && triggerMatch[1]
-                ? triggerMatch[1].trim()
-                : `When user needs ${promptDef.title.toLowerCase()}`
+            
+            // 提取 triggers：優先使用結構化資料
+            let triggerText: string
+            if (promptDef.triggers && promptDef.triggers.patterns.length > 0) {
+                triggerText = `When user mentions "${promptDef.triggers.patterns.join('", "')}"`
+            } else {
+                // 向後相容：從 description 中解析
+                const parsedTrigger = parseTriggerFromDescription(description)
+                triggerText = parsedTrigger || `When user needs ${promptDef.title.toLowerCase()}`
+            }
+
+            // 提取 rules：優先使用結構化資料
+            let rules: string[] = []
+            if (promptDef.rules && promptDef.rules.length > 0) {
+                rules = [...promptDef.rules]
+            } else {
+                // 向後相容：從 description 中解析
+                rules = parseRulesFromDescription(description)
+            }
 
             // 構建增強的工具描述，包含 tags 和 use_cases 供 Agent 判斷
             let enhancedDescription = description
+            // 移除 description 中的 RULES: 和 TRIGGER: 文字（如果存在），因為我們已經有結構化資料
+            if (promptDef.rules || promptDef.triggers) {
+                enhancedDescription = enhancedDescription
+                    .replace(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is, '')
+                    .replace(/TRIGGER:\s*(.+?)(?:\n|$)/i, '')
+                    .trim()
+            }
+            
+            // 加入結構化的 triggers 和 rules 資訊
             if (triggerText) {
                 enhancedDescription += `\n\nTRIGGER: ${triggerText}`
+            }
+            if (rules.length > 0) {
+                enhancedDescription += `\n\nRULES:\n${rules.map((rule, index) => `  ${index + 1}. ${rule}`).join('\n')}`
             }
 
             // 加入 tags 資訊（如果有的話）
