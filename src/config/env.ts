@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import dotenv from 'dotenv'
 import path from 'path'
+import {
+    type RepoConfig,
+    parseRepoUrls,
+    parseSingleRepoUrl,
+    sortReposByPriority,
+} from './repoConfig.js'
 
 /**
  * Load environment variables
@@ -47,7 +53,43 @@ const ConfigSchema = z.object({
                 message:
                     'Invalid REPO_URL: must be a valid URL or absolute path',
             }
+        )
+        .optional(), // Made optional because PROMPT_REPO_URLS can be used
+    PROMPT_REPO_URLS: z
+        .string()
+        .optional()
+        .describe('Multiple repo URLs separated by commas'),
+    SYSTEM_REPO_URL: z
+        .string()
+        .optional()
+        .refine(
+            (url) => {
+                if (!url) return true // Optional
+                if (url.includes('..') || url.includes('\0')) {
+                    return false
+                }
+                try {
+                    if (
+                        url.startsWith('http://') ||
+                        url.startsWith('https://') ||
+                        url.startsWith('git@')
+                    ) {
+                        return true
+                    }
+                    return path.isAbsolute(url)
+                } catch {
+                    return false
+                }
+            },
+            {
+                message:
+                    'Invalid SYSTEM_REPO_URL: must be a valid URL or absolute path',
+            }
         ),
+    TRANSPORT_TYPE: z
+        .enum(['stdio', 'http', 'sse'])
+        .default('stdio')
+        .describe('Transport type: stdio, http, or sse'),
     MCP_LANGUAGE: z.enum(['en', 'zh']).default('en'),
     MCP_GROUPS: z
         .string()
@@ -107,6 +149,9 @@ function loadConfig() {
     try {
         const rawConfig = {
             PROMPT_REPO_URL: process.env.PROMPT_REPO_URL,
+            PROMPT_REPO_URLS: process.env.PROMPT_REPO_URLS,
+            SYSTEM_REPO_URL: process.env.SYSTEM_REPO_URL,
+            TRANSPORT_TYPE: process.env.TRANSPORT_TYPE,
             MCP_LANGUAGE: process.env.MCP_LANGUAGE,
             MCP_GROUPS: process.env.MCP_GROUPS,
             STORAGE_DIR: process.env.STORAGE_DIR,
@@ -116,7 +161,16 @@ function loadConfig() {
             CACHE_CLEANUP_INTERVAL: process.env.CACHE_CLEANUP_INTERVAL,
         }
 
-        return ConfigSchema.parse(rawConfig)
+        const parsed = ConfigSchema.parse(rawConfig)
+
+        // Validation: at least one of PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided
+        if (!parsed.PROMPT_REPO_URL && !parsed.PROMPT_REPO_URLS) {
+            throw new Error(
+                'Either PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided'
+            )
+        }
+
+        return parsed
     } catch (error) {
         if (error instanceof z.ZodError) {
             const messages = error.issues
@@ -131,22 +185,22 @@ function loadConfig() {
 // Export configuration
 export const config = loadConfig()
 
-// 動態 Repo 設定（記憶體變數）
+// Dynamic Repo settings (in-memory variables)
 let ACTIVE_REPO_URL: string | null = null
 let ACTIVE_REPO_BRANCH: string | null = null
 
 /**
- * 設定動態 Repo URL 和 Branch
+ * Set dynamic Repo URL and Branch
  * @param url - Repository URL
  * @param branch - Branch name (optional)
  */
 export function setActiveRepo(url: string, branch?: string): void {
-    // 驗證 URL 格式
+    // Validate URL format
     if (url.includes('..') || url.includes('\0')) {
         throw new Error('Invalid REPO_URL: path traversal detected')
     }
     
-    // 驗證 URL 格式或絕對路徑
+    // Validate URL format or absolute path
     const isValidUrl =
         url.startsWith('http://') ||
         url.startsWith('https://') ||
@@ -164,8 +218,8 @@ export function setActiveRepo(url: string, branch?: string): void {
 }
 
 /**
- * 取得當前活躍的 Repo 設定
- * @returns 包含 url 和 branch 的物件，如果未設定則返回 null
+ * Get current active Repo settings
+ * @returns Object containing url and branch, or null if not set
  */
 export function getActiveRepo(): { url: string; branch: string } | null {
     if (ACTIVE_REPO_URL === null) {
@@ -179,10 +233,10 @@ export function getActiveRepo(): { url: string; branch: string } | null {
 }
 
 // Export computed configuration values
-// REPO_URL 和 GIT_BRANCH 現在會優先使用動態設定
+// REPO_URL and GIT_BRANCH now prioritize dynamic settings
 export function getRepoUrl(): string {
     const activeRepo = getActiveRepo()
-    return activeRepo?.url ?? config.PROMPT_REPO_URL
+    return activeRepo?.url ?? config.PROMPT_REPO_URL ?? ''
 }
 
 export function getGitBranch(): string {
@@ -190,9 +244,9 @@ export function getGitBranch(): string {
     return activeRepo?.branch ?? config.GIT_BRANCH ?? 'main'
 }
 
-// 為了向後相容，保留 REPO_URL 和 GIT_BRANCH 作為 getter
-// 注意：這些值在模組載入時計算，不會動態更新
-// 請使用 getRepoUrl() 和 getGitBranch() 來取得最新值
+// For backward compatibility, keep REPO_URL and GIT_BRANCH as getters
+// Note: These values are calculated at module load time and won't update dynamically
+// Please use getRepoUrl() and getGitBranch() to get the latest values
 export const REPO_URL = config.PROMPT_REPO_URL
 export const STORAGE_DIR = config.STORAGE_DIR
     ? path.resolve(process.cwd(), config.STORAGE_DIR)
@@ -201,10 +255,11 @@ export const LANG_SETTING = config.MCP_LANGUAGE
 
 /**
  * Active prompt groups list
- * When MCP_GROUPS is not set, only the 'common' group is loaded by default
+ * When MCP_GROUPS is not set, no groups are loaded by default (common is now optional)
  * Configuration: MCP_GROUPS=laravel,vue,react
+ * Note: common group is no longer automatically loaded. Use SYSTEM_REPO_URL to provide common group.
  */
-export const ACTIVE_GROUPS = config.MCP_GROUPS || ['common']
+export const ACTIVE_GROUPS = config.MCP_GROUPS || []
 
 /**
  * Whether using default groups (when MCP_GROUPS is not set)
@@ -216,6 +271,9 @@ export const LOG_LEVEL = config.LOG_LEVEL
 export const LOG_FILE = config.LOG_FILE
 export const GIT_BRANCH = config.GIT_BRANCH || 'main'
 export const GIT_MAX_RETRIES = config.GIT_MAX_RETRIES
+export const TRANSPORT_TYPE: 'stdio' | 'http' | 'sse' = config.TRANSPORT_TYPE
+export const SYSTEM_REPO_URL = config.SYSTEM_REPO_URL || undefined
+export const PROMPT_REPO_URLS = config.PROMPT_REPO_URLS || undefined
 
 /**
  * Cache cleanup interval in milliseconds
@@ -229,3 +287,36 @@ export const LANG_INSTRUCTION =
     LANG_SETTING === 'zh'
         ? 'Please reply in Traditional Chinese (繁體中文). Keep technical terms in English.'
         : 'Please reply in English.'
+
+/**
+ * Get all configured repo URLs (including backward compatibility)
+ * @returns Array of Repo configurations, sorted by priority
+ */
+export function getRepoConfigs(): RepoConfig[] {
+    const configs: RepoConfig[] = []
+
+    // Prefer PROMPT_REPO_URLS (multiple repos)
+    if (PROMPT_REPO_URLS) {
+        const parsed = parseRepoUrls(PROMPT_REPO_URLS)
+        configs.push(...parsed)
+    }
+
+    // Backward compatibility: if no PROMPT_REPO_URLS, use PROMPT_REPO_URL
+    if (configs.length === 0 && config.PROMPT_REPO_URL) {
+        configs.push(parseSingleRepoUrl(config.PROMPT_REPO_URL, GIT_BRANCH))
+    }
+
+    return sortReposByPriority(configs)
+}
+
+/**
+ * Get System Repo configuration (if available)
+ * @returns System Repo configuration or null
+ */
+export function getSystemRepoConfig(): RepoConfig | null {
+    if (!SYSTEM_REPO_URL) {
+        return null
+    }
+
+    return parseSingleRepoUrl(SYSTEM_REPO_URL, GIT_BRANCH)
+}

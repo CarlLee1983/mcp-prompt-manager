@@ -58,7 +58,7 @@ async function getGitHeadCommit(
     storageDir: string
 ): Promise<string | null> {
     try {
-        // 優先使用 simple-git
+        // Prefer simple-git
         const gitOptions: Partial<SimpleGitOptions> = {
             baseDir: storageDir,
             binary: 'git',
@@ -71,7 +71,7 @@ async function getGitHeadCommit(
         logger.debug({ error }, 'Failed to get HEAD commit using simple-git, trying exec')
         
         try {
-            // Fallback 到 exec
+            // Fallback to exec
             const commit = execSync('git rev-parse HEAD', {
                 cwd: storageDir,
                 encoding: 'utf-8',
@@ -88,9 +88,9 @@ async function getGitHeadCommit(
 }
 
 /**
- * 檢查 registry.yaml 是否存在
+ * Check if registry.yaml exists
  * @param storageDir - Storage directory
- * @returns 是否存在
+ * @returns Whether it exists
  */
 async function checkRegistryExists(storageDir: string): Promise<boolean> {
     try {
@@ -103,10 +103,10 @@ async function checkRegistryExists(storageDir: string): Promise<boolean> {
 }
 
 /**
- * 取得系統健康狀態
- * @param startTime - 應用程式啟動時間（毫秒）
- * @param storageDir - Storage directory（可選，預設為 STORAGE_DIR）
- * @returns 健康狀態物件
+ * Get system health status
+ * @param startTime - Application startup time (milliseconds)
+ * @param storageDir - Storage directory (optional, defaults to STORAGE_DIR)
+ * @returns Health status object
  */
 export async function getHealthStatus(
     startTime: number,
@@ -114,20 +114,20 @@ export async function getHealthStatus(
 ): Promise<HealthStatus> {
     const dir = storageDir ?? STORAGE_DIR
 
-    // 取得 Git 資訊
+    // Get Git information
     const headCommit = await getGitHeadCommit(dir)
 
-    // 取得 Prompt 統計
+    // Get Prompt statistics
     const loadedCount = getLoadedPromptCount()
     const promptStats = getPromptStats()
 
-    // 檢查 registry 是否存在
+    // Check if registry exists
     const registryExists = await checkRegistryExists(dir)
 
-    // 取得 Cache 統計
+    // Get Cache statistics
     const cacheStats = getCacheStats()
 
-    // 取得系統資訊
+    // Get system information
     const uptime = Date.now() - startTime
     const memoryUsage = process.memoryUsage()
 

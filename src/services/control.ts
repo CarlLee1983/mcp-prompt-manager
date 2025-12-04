@@ -134,18 +134,18 @@ export async function handleRepoSwitch(
             'mcp.repo.switch tool invoked'
         )
 
-        // 驗證 repo_url 為 string
+        // Validate repo_url is string
         if (typeof args.repo_url !== 'string' || args.repo_url.length === 0) {
             throw new Error('repo_url must be a non-empty string')
         }
 
-        // 設定動態 repo
+        // Set dynamic repo
         setActiveRepo(args.repo_url, args.branch)
 
-        // 同步 repo
+        // Sync repo
         await syncRepo()
 
-        // 重新載入 prompts
+        // Reload prompts
         const result = await reloadPrompts(server, STORAGE_DIR)
 
         const message = `Repo switched and reloaded successfully. Loaded: ${result.loaded}`

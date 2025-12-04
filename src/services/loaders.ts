@@ -13,7 +13,7 @@ import {
 } from '../config/env.js'
 import { logger } from '../utils/logger.js'
 import { getFilesRecursively, clearFileCache } from '../utils/fileSystem.js'
-import { syncRepo } from './git.js'
+// syncRepo is dynamically imported in reloadPrompts to support new RepoManager architecture
 import type { PromptDefinition, PromptArgDefinition } from '../types/prompt.js'
 import {
     PromptMetadataSchema,
@@ -34,10 +34,10 @@ const registeredPartials = new Set<string>()
 // Track prompt runtime states
 const promptRuntimeMap = new Map<string, PromptRuntime>()
 
-// 重入保護鎖：追蹤當前正在執行的 reload Promise
+// Reentrancy protection lock: track currently executing reload Promise
 let reloadingPromise: Promise<{ loaded: number; errors: LoadError[] }> | null = null
 
-// 待註冊的 prompt 資訊（用於排序）
+// Pending prompt registration information (for sorting)
 interface PendingPromptRegistration {
     promptDef: PromptDefinition
     promptRuntime: PromptRuntime
@@ -48,10 +48,10 @@ interface PendingPromptRegistration {
 }
 
 /**
- * 比較版本號（semver）
- * @param version1 - 版本號 1
- * @param version2 - 版本號 2
- * @returns 比較結果：-1 (v1 < v2), 0 (v1 === v2), 1 (v1 > v2)
+ * Compare version numbers (semver)
+ * @param version1 - Version number 1
+ * @param version2 - Version number 2
+ * @returns Comparison result: -1 (v1 < v2), 0 (v1 === v2), 1 (v1 > v2)
  */
 function compareVersions(version1: string, version2: string): number {
     const v1Parts = version1.split('.').map(Number)
@@ -61,21 +61,21 @@ function compareVersions(version1: string, version2: string): number {
     for (let i = 0; i < maxLength; i++) {
         const v1Part = v1Parts[i] ?? 0
         const v2Part = v2Parts[i] ?? 0
-        if (v1Part < v2Part) return 1 // 較新版本優先，所以返回 1
+        if (v1Part < v2Part) return 1 // Newer version has priority, so return 1
         if (v1Part > v2Part) return -1
     }
     return 0
 }
 
 /**
- * 對 prompts 進行優先權排序
- * 排序規則：
- * 1. status 優先級：stable > draft > deprecated > legacy
- * 2. version（較新版本優先）
- * 3. source 優先級：registry > embedded > legacy
+ * Sort prompts by priority
+ * Sorting rules:
+ * 1. status priority: stable > draft > deprecated > legacy
+ * 2. version (newer version has priority)
+ * 3. source priority: registry > embedded > legacy
  * 
- * @param prompts - 待排序的 prompts
- * @returns 排序後的 prompts
+ * @param prompts - Prompts to sort
+ * @returns Sorted prompts
  */
 function sortPromptsByPriority(
     prompts: PendingPromptRegistration[]
@@ -97,23 +97,23 @@ function sortPromptsByPriority(
         const runtimeA = a.promptRuntime
         const runtimeB = b.promptRuntime
 
-        // 1. status 優先級（較高優先）
+        // 1. status priority (higher priority first)
         const statusA = statusPriority[runtimeA.status] ?? 0
         const statusB = statusPriority[runtimeB.status] ?? 0
         const statusDiff = statusB - statusA
         if (statusDiff !== 0) return statusDiff
 
-        // 2. version（較新版本優先）
+        // 2. version (newer version has priority)
         const versionDiff = compareVersions(runtimeA.version, runtimeB.version)
         if (versionDiff !== 0) return versionDiff
 
-        // 3. source 優先級（較高優先）
+        // 3. source priority (higher priority first)
         const sourceA = sourcePriority[runtimeA.source] ?? 0
         const sourceB = sourcePriority[runtimeB.source] ?? 0
         const sourceDiff = sourceB - sourceA
         if (sourceDiff !== 0) return sourceDiff
 
-        // 4. 最後按 ID 字母順序（確保穩定性）
+        // 4. Finally by ID alphabetical order (ensure stability)
         return a.promptDef.id.localeCompare(b.promptDef.id)
     })
 }
@@ -327,26 +327,46 @@ function buildZodSchema(
  * Based on file path and active groups list
  * @param relativePath - Path relative to storage directory
  * @param activeGroups - Active groups list
+ * @param includeCommon - Whether to include common group (from system repo)
  * @returns Object containing whether to load and group name
  * @remarks
  * - Files in root directory are always loaded
- * - Files in 'common' group are always loaded
+ * - Files in 'common' group are only loaded if includeCommon is true or explicitly in activeGroups
  * - Other groups are only loaded when in activeGroups
  */
 function shouldLoadPrompt(
     relativePath: string,
-    activeGroups: string[]
+    activeGroups: string[],
+    includeCommon: boolean = false
 ): {
     shouldLoad: boolean
     groupName: string
 } {
     const pathParts = relativePath.split(path.sep)
     const groupName = pathParts.length > 1 ? (pathParts[0] ?? 'root') : 'root'
-    const isAlwaysActive = groupName === 'root' || groupName === 'common'
+    const isRoot = groupName === 'root'
+    const isCommon = groupName === 'common'
     const isSelected = activeGroups.includes(groupName)
 
+    // Root directory always loads
+    if (isRoot) {
+        return {
+            shouldLoad: true,
+            groupName,
+        }
+    }
+
+    // Common group: only loads if includeCommon is true or explicitly in activeGroups
+    if (isCommon) {
+        return {
+            shouldLoad: includeCommon || isSelected,
+            groupName,
+        }
+    }
+
+    // Other groups: only loads when in activeGroups
     return {
-        shouldLoad: isAlwaysActive || isSelected,
+        shouldLoad: isSelected,
         groupName,
     }
 }
@@ -390,9 +410,9 @@ const EXCLUDED_FILES = [
 ]
 
 /**
- * 判斷 YAML 資料是否為 Metadata Prompt
- * 只要檢查是否有 version 和 status 欄位即可，格式驗證由 PromptMetadataSchema 負責
- * 這可以讓格式錯誤的 metadata 被標記為 warning，而不是 legacy
+ * Determine if YAML data is a Metadata Prompt
+ * Only check if version and status fields exist, format validation is handled by PromptMetadataSchema
+ * This allows incorrectly formatted metadata to be marked as warning instead of legacy
  */
 function isMetadataPrompt(yamlData: unknown): boolean {
     if (typeof yamlData !== 'object' || yamlData === null) {
@@ -400,8 +420,8 @@ function isMetadataPrompt(yamlData: unknown): boolean {
     }
     const data = yamlData as Record<string, unknown>
     
-    // 只要檢查是否有 version 和 status 欄位即可
-    // 格式驗證由 PromptMetadataSchema 負責
+    // Only check if version and status fields exist
+    // Format validation is handled by PromptMetadataSchema
     const hasVersion = typeof data.version === 'string' && data.version.length > 0
     const hasStatus = typeof data.status === 'string' && data.status.length > 0
     
@@ -409,9 +429,9 @@ function isMetadataPrompt(yamlData: unknown): boolean {
 }
 
 /**
- * 從 description 中解析 RULES（向後相容性）
- * @param description - Description 文字
- * @returns 解析出的 rules 陣列
+ * Parse RULES from description (backward compatibility)
+ * @param description - Description text
+ * @returns Parsed rules array
  */
 function parseRulesFromDescription(description: string): string[] {
     const rulesMatch = description.match(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is)
@@ -420,7 +440,7 @@ function parseRulesFromDescription(description: string): string[] {
     }
 
     const rulesText = rulesMatch[1].trim()
-    // 解析編號格式的規則：1. Rule text. 2. Another rule.
+    // Parse numbered format rules: 1. Rule text. 2. Another rule.
     const rules: string[] = []
     const rulePattern = /(\d+)\.\s*([^0-9]+?)(?=\s*\d+\.|$)/g
     let match: RegExpExecArray | null
@@ -432,7 +452,7 @@ function parseRulesFromDescription(description: string): string[] {
         }
     }
 
-    // 如果沒有找到編號格式，嘗試按行分割
+    // If numbered format not found, try splitting by lines
     if (rules.length === 0) {
         const lines = rulesText.split(/\n/).map((line) => line.trim()).filter((line) => line.length > 0)
         rules.push(...lines)
@@ -442,9 +462,9 @@ function parseRulesFromDescription(description: string): string[] {
 }
 
 /**
- * 從 description 中解析 TRIGGER（向後相容性）
- * @param description - Description 文字
- * @returns 解析出的 trigger 文字
+ * Parse TRIGGER from description (backward compatibility)
+ * @param description - Description text
+ * @returns Parsed trigger text
  */
 function parseTriggerFromDescription(description: string): string | null {
     const triggerMatch = description.match(/TRIGGER:\s*(.+?)(?:\n|$)/i)
@@ -452,9 +472,9 @@ function parseTriggerFromDescription(description: string): string | null {
 }
 
 /**
- * 載入 registry.yaml 檔案
+ * Load registry.yaml file
  * @param storageDir - Storage directory
- * @returns Registry 物件或 null（如果檔案不存在或載入失敗）
+ * @returns Registry object or null (if file doesn't exist or load fails)
  */
 async function loadRegistry(
     storageDir: string
@@ -474,7 +494,7 @@ async function loadRegistry(
         logger.debug('Registry loaded successfully')
         return parseResult.data
     } catch (error) {
-        // 檔案不存在是正常情況，不記錄錯誤
+        // File not existing is normal, don't log error
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
             logger.debug('registry.yaml not found, skipping')
             return null
@@ -485,14 +505,14 @@ async function loadRegistry(
 }
 
 /**
- * 建立 PromptRuntime 物件
+ * Create PromptRuntime object
  * @param promptDef - Prompt definition
- * @param metadata - Metadata（如果有的話）
+ * @param metadata - Metadata (if available)
  * @param groupName - Group name
- * @param registry - Registry override（如果有的話）
- * @param runtimeState - Runtime state（如果已經確定）
- * @param source - Source（如果已經確定）
- * @returns PromptRuntime 物件
+ * @param registry - Registry override (if available)
+ * @param runtimeState - Runtime state (if already determined)
+ * @param source - Source (if already determined)
+ * @returns PromptRuntime object
  */
 function createPromptRuntime(
     promptDef: PromptDefinition,
@@ -510,7 +530,7 @@ function createPromptRuntime(
     let tags: string[]
     let useCases: string[]
 
-    // 決定 version、status、tags、useCases
+    // Determine version, status, tags, useCases
     if (metadata) {
         version = metadata.version
         status = metadata.status
@@ -523,11 +543,11 @@ function createPromptRuntime(
         useCases = []
     }
 
-    // 決定 runtimeState 和 source
-    // 優先級：registry > metadata > legacy
-    // 先決定基礎狀態（metadata 或 legacy）
+    // Determine runtimeState and source
+    // Priority: registry > metadata > legacy
+    // First determine base state (metadata or legacy)
     if (runtimeState !== undefined && source !== undefined) {
-        // 如果已經提供了 runtimeState 和 source，使用它們作為基礎
+        // If runtimeState and source are already provided, use them as base
         finalRuntimeState = runtimeState
         finalSource = source
     } else if (metadata) {
@@ -540,13 +560,13 @@ function createPromptRuntime(
         finalRuntimeState = 'legacy'
     }
 
-    // Registry override（最高優先級，會覆蓋所有狀態）
+    // Registry override (highest priority, overrides all states)
     if (registryEntry) {
         finalSource = 'registry'
         if (registryEntry.deprecated) {
             finalRuntimeState = 'disabled'
         } else {
-            // Registry 存在且未 deprecated，覆蓋為 active（矯正 warning 等狀態）
+            // Registry exists and not deprecated, override to active (corrects warning states, etc.)
             finalRuntimeState = 'active'
         }
     }
@@ -572,19 +592,25 @@ function createPromptRuntime(
 
 export async function loadPrompts(
     server: McpServer,
-    storageDir?: string
+    storageDir?: string,
+    systemStorageDir?: string
 ): Promise<{ loaded: number; errors: LoadError[]; loadedToolIds?: Set<string> }> {
     const dir = storageDir ?? STORAGE_DIR
+    const systemDir = systemStorageDir
 
-    // 追蹤新載入的 tool IDs（用於雙 registry swap）
+    // Track newly loaded tool IDs (for dual registry swap)
     const newToolIds = new Set<string>()
 
-    // 清空 runtime cache
+    // Clear runtime cache
     promptRuntimeMap.clear()
+
+    // Check if system repo exists
+    const hasSystemRepo = systemDir !== undefined
 
     // Explicitly log loaded groups and whether using default values
     const logContext: Record<string, unknown> = {
         activeGroups: ACTIVE_GROUPS,
+        hasSystemRepo,
     }
 
     if (IS_DEFAULT_GROUPS) {
@@ -594,14 +620,14 @@ export async function loadPrompts(
 
     logger.info(logContext, 'Loading prompts')
 
-    // 載入 registry.yaml（如果存在）
+    // Load registry.yaml (if exists)
     const registry = await loadRegistry(dir)
 
     const allFiles = await getFilesRecursively(dir)
     let loadedCount = 0
     const errors: LoadError[] = []
     
-    // 收集所有待註冊的 prompts（用於排序）
+    // Collect all pending prompt registrations (for sorting)
     const pendingRegistrations: PendingPromptRegistration[] = []
 
     for (const filePath of allFiles) {
@@ -617,7 +643,8 @@ export async function loadPrompts(
         const relativePath = path.relative(dir, filePath)
         const { shouldLoad, groupName } = shouldLoadPrompt(
             relativePath,
-            ACTIVE_GROUPS
+            ACTIVE_GROUPS,
+            hasSystemRepo
         )
 
         if (!shouldLoad) {
@@ -632,7 +659,7 @@ export async function loadPrompts(
             const content = await fs.readFile(filePath, 'utf-8')
             const yamlData = yaml.load(content)
 
-            // 先驗證基本 Prompt 結構
+            // First validate basic Prompt structure
             const parseResult = PromptDefinitionSchema.safeParse(yamlData)
             if (!parseResult.success) {
                 const error = new Error(
@@ -648,20 +675,20 @@ export async function loadPrompts(
 
             const promptDef = parseResult.data
 
-            // 判斷是否為 Metadata Prompt
+            // Determine if it's a Metadata Prompt
             let metadata: PromptMetadata | null = null
             let runtimeState: PromptRuntimeState = 'legacy'
             let source: PromptSource = 'legacy'
 
             if (isMetadataPrompt(yamlData)) {
-                // 嘗試解析 Metadata
+                // Try to parse Metadata
                 const metadataResult = PromptMetadataSchema.safeParse(yamlData)
                 if (metadataResult.success) {
                     metadata = metadataResult.data
                     source = 'embedded'
                     runtimeState = 'active'
                 } else {
-                    // Metadata 驗證失敗（不是結構解析失敗，所以標記為 warning）
+                    // Metadata validation failed (not structure parsing failure, so mark as warning)
                     logger.warn(
                         {
                             filePath,
@@ -675,7 +702,7 @@ export async function loadPrompts(
                 }
             }
 
-            // 驗證 partial 依賴一致性
+            // Validate partial dependency consistency
             const declaredPartials =
                 metadata?.dependencies?.partials ?? []
             const validationResult = validatePartialDependencies(
@@ -684,7 +711,7 @@ export async function loadPrompts(
             )
 
             if (validationResult.hasIssues) {
-                // 記錄警告
+                // Log warning
                 logger.warn(
                     {
                         filePath,
@@ -695,8 +722,8 @@ export async function loadPrompts(
                     `Partial dependencies validation issues: ${validationResult.warnings.join(' ')}`
                 )
 
-                // 如果原本是 active 狀態，且有未聲明的 partials，標記為 warning
-                // 如果原本已經是 warning 或其他狀態，保持原狀
+                // If originally active state and has undeclared partials, mark as warning
+                // If already warning or other state, keep as is
                 if (
                     runtimeState === 'active' &&
                     validationResult.undeclaredPartials.length > 0
@@ -705,8 +732,8 @@ export async function loadPrompts(
                 }
             }
 
-            // 建立 PromptRuntime
-            // 使用型別斷言，因為 parseResult.data 已經通過 Zod 驗證，符合 PromptDefinition
+            // Create PromptRuntime
+            // Use type assertion because parseResult.data has passed Zod validation and matches PromptDefinition
             const promptRuntime = createPromptRuntime(
                 promptDef as PromptDefinition,
                 metadata,
@@ -716,12 +743,12 @@ export async function loadPrompts(
                 source
             )
 
-            // 儲存 runtime 資訊（無論狀態如何）
+            // Store runtime information (regardless of state)
             promptRuntimeMap.set(promptDef.id, promptRuntime)
 
-            // 註冊 runtime_state === 'active' 或 'legacy' 的 prompts 作為 tools
-            // 其他狀態（invalid, disabled, warning）不註冊為 tools，但仍記錄在 runtime map 中
-            // Legacy prompts 仍然可以註冊以保持向後相容性
+            // Register prompts with runtime_state === 'active' or 'legacy' as tools
+            // Other states (invalid, disabled, warning) are not registered as tools but still recorded in runtime map
+            // Legacy prompts can still be registered for backward compatibility
             if (promptRuntime.runtime_state !== 'active' && promptRuntime.runtime_state !== 'legacy') {
                 const stateReason = {
                     invalid: 'Prompt marked as invalid',
@@ -775,7 +802,7 @@ export async function loadPrompts(
                 continue
             }
 
-            // 收集待註冊的 prompt（稍後排序並註冊）
+            // Collect pending prompt registration (to be sorted and registered later)
             pendingRegistrations.push({
                 promptDef: promptDef as PromptDefinition,
                 promptRuntime,
@@ -792,14 +819,14 @@ export async function loadPrompts(
         }
     }
 
-    // 對待註冊的 prompts 進行優先權排序
+    // Sort pending prompts by priority
     const sortedRegistrations = sortPromptsByPriority(pendingRegistrations)
     logger.debug(
         { total: sortedRegistrations.length },
         'Prompts sorted by priority (status > version > source)'
     )
 
-    // 按照排序後的順序註冊 prompts 和 tools
+    // Register prompts and tools in sorted order
     for (const {
         promptDef,
         promptRuntime,
@@ -865,31 +892,31 @@ export async function loadPrompts(
             registeredPromptIds.add(promptDef.id)
 
             // Also register as Tool so AI can automatically invoke it
-            // 優先使用結構化的 triggers 和 rules，如果沒有則從 description 中解析（向後相容）
+            // Prefer structured triggers and rules, if not available parse from description (backward compatibility)
             const description = promptDef.description || ''
             
-            // 提取 triggers：優先使用結構化資料
+            // Extract triggers: prefer structured data
             let triggerText: string
             if (promptDef.triggers && promptDef.triggers.patterns.length > 0) {
                 triggerText = `When user mentions "${promptDef.triggers.patterns.join('", "')}"`
             } else {
-                // 向後相容：從 description 中解析
+                // Backward compatibility: parse from description
                 const parsedTrigger = parseTriggerFromDescription(description)
                 triggerText = parsedTrigger || `When user needs ${promptDef.title.toLowerCase()}`
             }
 
-            // 提取 rules：優先使用結構化資料
+            // Extract rules: prefer structured data
             let rules: string[] = []
             if (promptDef.rules && promptDef.rules.length > 0) {
                 rules = [...promptDef.rules]
             } else {
-                // 向後相容：從 description 中解析
+                // Backward compatibility: parse from description
                 rules = parseRulesFromDescription(description)
             }
 
-            // 構建增強的工具描述，包含 tags 和 use_cases 供 Agent 判斷
+            // Build enhanced tool description, including tags and use_cases for Agent judgment
             let enhancedDescription = description
-            // 移除 description 中的 RULES: 和 TRIGGER: 文字（如果存在），因為我們已經有結構化資料
+            // Remove RULES: and TRIGGER: text from description (if exists) since we already have structured data
             if (promptDef.rules || promptDef.triggers) {
                 enhancedDescription = enhancedDescription
                     .replace(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is, '')
@@ -897,7 +924,7 @@ export async function loadPrompts(
                     .trim()
             }
             
-            // 加入結構化的 triggers 和 rules 資訊
+            // Add structured triggers and rules information
             if (triggerText) {
                 enhancedDescription += `\n\nTRIGGER: ${triggerText}`
             }
@@ -905,12 +932,12 @@ export async function loadPrompts(
                 enhancedDescription += `\n\nRULES:\n${rules.map((rule, index) => `  ${index + 1}. ${rule}`).join('\n')}`
             }
 
-            // 加入 tags 資訊（如果有的話）
+            // Add tags information (if available)
             if (promptRuntime.tags && promptRuntime.tags.length > 0) {
                 enhancedDescription += `\n\nTags: ${promptRuntime.tags.join(', ')}`
             }
 
-            // 加入 use_cases 資訊（如果有的話）
+            // Add use_cases information (if available)
             if (promptRuntime.use_cases && promptRuntime.use_cases.length > 0) {
                 enhancedDescription += `\n\nUse Cases: ${promptRuntime.use_cases.join(', ')}`
             }
@@ -921,10 +948,10 @@ export async function loadPrompts(
                 : z.object({})
 
             // Register Tool (using registerTool, recommended API)
-            // 雙 registry swap：先註冊新的 tool（MCP SDK 可能會覆蓋舊的，或暫時並存）
-            // 舊的 tool 會在 reloadPrompts 的最後階段移除，確保零空窗期
-            // 只註冊 runtime_state === 'active' 的 prompts 作為 tools
-            // 按照優先權排序後的順序註冊，讓 Agent 能夠優先選擇高優先權的 tools
+            // Dual registry swap: register new tool first (MCP SDK may overwrite old one or temporarily coexist)
+            // Old tool will be removed in final stage of reloadPrompts, ensuring zero downtime
+            // Only register prompts with runtime_state === 'active' as tools
+            // Register in priority-sorted order so Agent can prioritize high-priority tools
             const toolRef = server.registerTool(
                 promptDef.id,
                 {
@@ -981,8 +1008,8 @@ export async function loadPrompts(
                 }
             )
             
-            // 如果已存在舊的 tool ref，先保存它（稍後在 removeOldPrompts 中移除）
-            // 這樣可以確保新舊 tool 同時存在，避免空窗期
+            // If old tool ref already exists, save it first (to be removed later in removeOldPrompts)
+            // This ensures new and old tools coexist, avoiding downtime
             const oldToolRef = registeredToolRefs.get(promptDef.id)
             if (oldToolRef) {
                 logger.debug({ promptId: promptDef.id }, 'New tool registered, old tool will be removed later')
@@ -1009,6 +1036,18 @@ export async function loadPrompts(
         }
     }
 
+    // If system repo exists, load common group from system repo
+    if (hasSystemRepo && systemDir) {
+        logger.info({ systemDir }, 'Loading prompts from system repository')
+        const systemResult = await loadPromptsFromSystemRepo(
+            server,
+            systemDir,
+            newToolIds
+        )
+        loadedCount += systemResult.loaded
+        errors.push(...systemResult.errors)
+    }
+
     logger.info(
         { loaded: loadedCount, errors: errors.length },
         'Prompts loading completed'
@@ -1027,6 +1066,381 @@ export async function loadPrompts(
     }
 
     return { loaded: loadedCount, errors, loadedToolIds: newToolIds }
+}
+
+/**
+ * Load common group prompts from system repo
+ * @param server - MCP Server instance
+ * @param systemDir - System repository storage directory
+ * @param existingToolIds - Existing tool IDs (to avoid duplicate registration)
+ * @returns Load result
+ */
+async function loadPromptsFromSystemRepo(
+    server: McpServer,
+    systemDir: string,
+    existingToolIds: Set<string>
+): Promise<{ loaded: number; errors: LoadError[] }> {
+    let loadedCount = 0
+    const errors: LoadError[] = []
+
+    // Load system repo's registry.yaml (if exists)
+    const registry = await loadRegistry(systemDir)
+
+    const allFiles = await getFilesRecursively(systemDir)
+    const pendingRegistrations: PendingPromptRegistration[] = []
+
+    for (const filePath of allFiles) {
+        if (!filePath.endsWith('.yaml') && !filePath.endsWith('.yml')) continue
+
+        // Exclude non-prompt files
+        const fileName = path.basename(filePath).toLowerCase()
+        if (EXCLUDED_FILES.some((excluded) => fileName === excluded.toLowerCase())) {
+            logger.debug({ filePath }, 'Skipping excluded file')
+            continue
+        }
+
+        const relativePath = path.relative(systemDir, filePath)
+        // System repo only loads common group
+        const { shouldLoad, groupName } = shouldLoadPrompt(
+            relativePath,
+            ['common'], // Only load common group
+            true // includeCommon = true
+        )
+
+        if (!shouldLoad || groupName !== 'common') {
+            logger.debug(
+                { filePath, groupName },
+                'Skipping prompt (not in common group)'
+            )
+            continue
+        }
+
+        try {
+            const content = await fs.readFile(filePath, 'utf-8')
+            const yamlData = yaml.load(content)
+
+            // Validate basic Prompt structure
+            const parseResult = PromptDefinitionSchema.safeParse(yamlData)
+            if (!parseResult.success) {
+                const error = new Error(
+                    `Invalid prompt definition: ${parseResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+                )
+                errors.push({ file: relativePath, error })
+                logger.warn(
+                    { filePath, error: parseResult.error },
+                    'Failed to validate prompt definition'
+                )
+                continue
+            }
+
+            const promptDef = parseResult.data
+
+            // Check if already exists (avoid duplicate registration)
+            if (existingToolIds.has(promptDef.id)) {
+                logger.debug(
+                    { promptId: promptDef.id },
+                    'Skipping duplicate prompt from system repo'
+                )
+                continue
+            }
+
+            // Determine if it's a Metadata Prompt
+            let metadata: PromptMetadata | null = null
+            let runtimeState: PromptRuntimeState = 'legacy'
+            let source: PromptSource = 'legacy'
+
+            if (isMetadataPrompt(yamlData)) {
+                const metadataResult = PromptMetadataSchema.safeParse(yamlData)
+                if (metadataResult.success) {
+                    metadata = metadataResult.data
+                    source = 'embedded'
+                    runtimeState = 'active'
+                } else {
+                    logger.warn(
+                        {
+                            filePath,
+                            promptId: promptDef.id,
+                            errors: metadataResult.error.issues,
+                        },
+                        'Metadata validation failed, marking as warning'
+                    )
+                    runtimeState = 'warning'
+                    source = 'embedded'
+                }
+            }
+
+            // Validate partial dependency consistency
+            const declaredPartials =
+                metadata?.dependencies?.partials ?? []
+            const validationResult = validatePartialDependencies(
+                promptDef.template,
+                declaredPartials
+            )
+
+            if (validationResult.hasIssues) {
+                logger.warn(
+                    {
+                        filePath,
+                        promptId: promptDef.id,
+                        undeclaredPartials: validationResult.undeclaredPartials,
+                        unusedPartials: validationResult.unusedPartials,
+                    },
+                    `Partial dependencies validation issues: ${validationResult.warnings.join(' ')}`
+                )
+
+                if (
+                    runtimeState === 'active' &&
+                    validationResult.undeclaredPartials.length > 0
+                ) {
+                    runtimeState = 'warning'
+                }
+            }
+
+            // Create PromptRuntime
+            const promptRuntime = createPromptRuntime(
+                promptDef as PromptDefinition,
+                metadata,
+                groupName,
+                registry,
+                runtimeState,
+                source
+            )
+
+            // Store runtime information
+            promptRuntimeMap.set(promptDef.id, promptRuntime)
+
+            // Only register prompts with active or legacy state
+            if (promptRuntime.runtime_state !== 'active' && promptRuntime.runtime_state !== 'legacy') {
+                continue
+            }
+
+            // Build Zod Schema
+            const zodShape: z.ZodRawShape = promptDef.args
+                ? buildZodSchema(promptDef.args as Record<
+                      string,
+                      {
+                          type: 'string' | 'number' | 'boolean'
+                          description?: string
+                          default?: string | number | boolean
+                          required?: boolean
+                      }
+                  >)
+                : {}
+
+            // Compile Handlebars template
+            let templateDelegate: HandlebarsTemplateDelegate
+            try {
+                templateDelegate = Handlebars.compile(promptDef.template, {
+                    noEscape: true,
+                })
+            } catch (error) {
+                const compileError =
+                    error instanceof Error ? error : new Error(String(error))
+                errors.push({
+                    file: relativePath,
+                    error: new Error(
+                        `Failed to compile template: ${compileError.message}`
+                    ),
+                })
+                logger.warn(
+                    { filePath, error: compileError },
+                    'Failed to compile Handlebars template'
+                )
+                continue
+            }
+
+            // Collect pending prompt registration
+            pendingRegistrations.push({
+                promptDef: promptDef as PromptDefinition,
+                promptRuntime,
+                zodShape,
+                templateDelegate,
+                filePath,
+                relativePath,
+            })
+        } catch (error) {
+            const loadError =
+                error instanceof Error ? error : new Error(String(error))
+            errors.push({ file: relativePath, error: loadError })
+            logger.warn({ filePath, error: loadError }, 'Failed to load prompt')
+        }
+    }
+
+    // Sort pending prompts by priority
+    const sortedRegistrations = sortPromptsByPriority(pendingRegistrations)
+
+    // Register prompts and tools in sorted order
+    for (const {
+        promptDef,
+        promptRuntime,
+        zodShape,
+        templateDelegate,
+        relativePath,
+    } of sortedRegistrations) {
+        try {
+            // Create prompt handler function
+            const promptHandler = (args: Record<string, unknown>) => {
+                try {
+                    logger.info(
+                        {
+                            promptId: promptDef.id,
+                            promptTitle: promptDef.title,
+                            args: Object.keys(args),
+                        },
+                        'Prompt invoked (from system repo)'
+                    )
+
+                    const context = {
+                        ...args,
+                        output_lang_rule: LANG_INSTRUCTION,
+                        sys_lang: LANG_SETTING,
+                    }
+                    const message = templateDelegate(context)
+
+                    logger.debug(
+                        {
+                            promptId: promptDef.id,
+                            messageLength: message.length,
+                        },
+                        'Template rendered successfully'
+                    )
+
+                    return {
+                        messages: [
+                            {
+                                role: 'user' as const,
+                                content: { type: 'text' as const, text: message },
+                            },
+                        ],
+                    }
+                } catch (error) {
+                    const execError =
+                        error instanceof Error
+                            ? error
+                            : new Error(String(error))
+                    logger.error(
+                        { promptId: promptDef.id, error: execError },
+                        'Template execution failed'
+                    )
+                    throw execError
+                }
+            }
+
+            // Register Prompt
+            server.prompt(promptDef.id, zodShape, promptHandler)
+            registeredPromptIds.add(promptDef.id)
+
+            // Register as Tool
+            const description = promptDef.description || ''
+
+            let triggerText: string
+            if (promptDef.triggers && promptDef.triggers.patterns.length > 0) {
+                triggerText = `When user mentions "${promptDef.triggers.patterns.join('", "')}"`
+            } else {
+                const parsedTrigger = parseTriggerFromDescription(description)
+                triggerText = parsedTrigger || `When user needs ${promptDef.title.toLowerCase()}`
+            }
+
+            let rules: string[] = []
+            if (promptDef.rules && promptDef.rules.length > 0) {
+                rules = [...promptDef.rules]
+            } else {
+                rules = parseRulesFromDescription(description)
+            }
+
+            let enhancedDescription = description
+            if (promptDef.rules || promptDef.triggers) {
+                enhancedDescription = enhancedDescription
+                    .replace(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is, '')
+                    .replace(/TRIGGER:\s*(.+?)(?:\n|$)/i, '')
+                    .trim()
+            }
+
+            if (triggerText) {
+                enhancedDescription += `\n\nTRIGGER: ${triggerText}`
+            }
+            if (rules.length > 0) {
+                enhancedDescription += `\n\nRULES:\n${rules.map((rule, index) => `  ${index + 1}. ${rule}`).join('\n')}`
+            }
+
+            if (promptRuntime.tags && promptRuntime.tags.length > 0) {
+                enhancedDescription += `\n\nTags: ${promptRuntime.tags.join(', ')}`
+            }
+
+            if (promptRuntime.use_cases && promptRuntime.use_cases.length > 0) {
+                enhancedDescription += `\n\nUse Cases: ${promptRuntime.use_cases.join(', ')}`
+            }
+
+            const toolInputSchema = Object.keys(zodShape).length > 0
+                ? z.object(zodShape)
+                : z.object({})
+
+            const toolRef = server.registerTool(
+                promptDef.id,
+                {
+                    title: promptDef.title,
+                    description: enhancedDescription,
+                    inputSchema: toolInputSchema,
+                },
+                async (args: Record<string, unknown>) => {
+                    logger.info(
+                        {
+                            toolId: promptDef.id,
+                            toolTitle: promptDef.title,
+                            args: Object.keys(args),
+                        },
+                        '🔧 Tool invoked (from system repo)'
+                    )
+
+                    const result = promptHandler(args)
+
+                    const firstMessage = result.messages[0]
+                    const messageText =
+                        firstMessage?.content && 'text' in firstMessage.content
+                            ? firstMessage.content.text
+                            : ''
+
+                    logger.info(
+                        {
+                            toolId: promptDef.id,
+                            messageLength: messageText.length,
+                        },
+                        '✅ Tool execution completed'
+                    )
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: messageText,
+                            },
+                        ],
+                    }
+                }
+            )
+
+            registeredToolRefs.set(promptDef.id, toolRef)
+            existingToolIds.add(promptDef.id)
+
+            loadedCount++
+            logger.debug(
+                {
+                    promptId: promptDef.id,
+                    runtimeState: promptRuntime.runtime_state,
+                    source: promptRuntime.source,
+                    status: promptRuntime.status,
+                },
+                'Prompt loaded from system repo'
+            )
+        } catch (error) {
+            const loadError =
+                error instanceof Error ? error : new Error(String(error))
+            errors.push({ file: relativePath, error: loadError })
+            logger.warn({ filePath: relativePath, error: loadError }, 'Failed to register prompt from system repo')
+        }
+    }
+
+    return { loaded: loadedCount, errors }
 }
 
 /**
@@ -1056,14 +1470,14 @@ function clearAllPartials(): void {
 function removeOldPrompts(newToolIds: Set<string>): void {
     const toolsToRemove: string[] = []
     
-    // 找出需要移除的舊 tools（不在新列表中的）
+    // Find old tools that need to be removed (not in new list)
     for (const toolId of registeredToolRefs.keys()) {
         if (!newToolIds.has(toolId)) {
             toolsToRemove.push(toolId)
         }
     }
     
-    // 移除不再需要的 tools
+    // Remove tools that are no longer needed
     for (const toolId of toolsToRemove) {
         const toolRef = registeredToolRefs.get(toolId)
         if (toolRef) {
@@ -1139,26 +1553,32 @@ function clearAllPrompts(): void {
  */
 export async function reloadPrompts(
     server: McpServer,
-    storageDir?: string
+    storageDir?: string,
+    systemStorageDir?: string
 ): Promise<{ loaded: number; errors: LoadError[] }> {
-    // 重入保護：如果已經有正在執行的 reload，直接返回該 Promise
+    // Reentrancy protection: if reload is already in progress, return existing Promise
     if (reloadingPromise !== null) {
         logger.warn('Reload already in progress, returning existing promise')
         return reloadingPromise
     }
     
-    // 建立新的 reload Promise
+    // Create new reload Promise
     reloadingPromise = (async () => {
         logger.info('Starting prompts reload (zero-downtime)')
         
         try {
-            // 1. Sync Git repository
+            // 1. Sync Git repository (using RepoManager, but still using syncRepo here for backward compatibility)
+            // TODO: Can be changed to use RepoManager in the future
+            const { syncRepo } = await import('./git.js')
             await syncRepo()
             logger.info('Git repository synced')
             
             // 2. Clear file cache
             const dir = storageDir ?? STORAGE_DIR
             clearFileCache(dir)
+            if (systemStorageDir) {
+                clearFileCache(systemStorageDir)
+            }
             logger.debug('File cache cleared')
             
             // 3. Clear all partials
@@ -1171,7 +1591,7 @@ export async function reloadPrompts(
             // 5. Load and register all new prompts/tools (dual registry swap - step 1)
             // This registers new tools, overwriting old ones if they exist
             // Old tools remain available during this process (no downtime)
-            const result = await loadPrompts(server, storageDir)
+            const result = await loadPrompts(server, storageDir, systemStorageDir)
             
             // 6. Remove old prompts/tools that are no longer needed (dual registry swap - step 2)
             // Only removes tools that are not in the new set
@@ -1196,7 +1616,7 @@ export async function reloadPrompts(
             logger.error({ error: reloadError }, 'Failed to reload prompts')
             throw reloadError
         } finally {
-            // 清除重入保護鎖，確保即使發生錯誤也能清除
+            // Clear reentrancy protection lock, ensure it's cleared even if error occurs
             reloadingPromise = null
         }
     })()
@@ -1205,41 +1625,41 @@ export async function reloadPrompts(
 }
 
 /**
- * 取得已載入的 prompt 數量
- * @returns 已載入的 prompt 數量
+ * Get count of loaded prompts
+ * @returns Count of loaded prompts
  */
 export function getLoadedPromptCount(): number {
     return registeredPromptIds.size
 }
 
 /**
- * 取得已註冊的 prompt ID 清單
- * @returns 已註冊的 prompt ID 陣列
+ * Get list of registered prompt IDs
+ * @returns Array of registered prompt IDs
  */
 export function getRegisteredPromptIds(): string[] {
     return Array.from(registeredPromptIds)
 }
 
 /**
- * 取得所有 PromptRuntime 物件
- * @returns PromptRuntime 陣列
+ * Get all PromptRuntime objects
+ * @returns Array of PromptRuntime
  */
 export function getAllPromptRuntimes(): PromptRuntime[] {
     return Array.from(promptRuntimeMap.values())
 }
 
 /**
- * 取得指定 ID 的 PromptRuntime
+ * Get PromptRuntime by ID
  * @param id - Prompt ID
- * @returns PromptRuntime 或 undefined
+ * @returns PromptRuntime or undefined
  */
 export function getPromptRuntime(id: string): PromptRuntime | undefined {
     return promptRuntimeMap.get(id)
 }
 
 /**
- * 取得 Prompt 統計資訊
- * @returns 統計物件
+ * Get Prompt statistics
+ * @returns Statistics object
  */
 export function getPromptStats(): {
     total: number

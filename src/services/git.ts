@@ -43,14 +43,14 @@ async function copyLocalRepository(
     sourceDir: string,
     targetDir: string
 ): Promise<void> {
-    // 確保目標目錄存在
+    // Ensure target directory exists
     await fs.mkdir(targetDir, { recursive: true })
 
-    // 讀取來源目錄的所有項目
+    // Read all items from source directory
     const entries = await fs.readdir(sourceDir, { withFileTypes: true })
 
     for (const entry of entries) {
-        // 跳過排除的項目
+        // Skip excluded items
         if (EXCLUDED_ITEMS.has(entry.name.toLowerCase())) {
             continue
         }
@@ -60,15 +60,15 @@ async function copyLocalRepository(
 
         try {
             if (entry.isDirectory()) {
-                // 遞迴複製子目錄
+                // Recursively copy subdirectories
                 await copyLocalRepository(sourcePath, targetPath)
             } else if (entry.isFile()) {
-                // 只複製普通檔案（跳過符號連結等特殊檔案）
+                // Only copy regular files (skip symlinks and other special files)
                 await fs.copyFile(sourcePath, targetPath)
             }
-            // 跳過符號連結、FIFO 等特殊檔案類型
+            // Skip symlinks, FIFOs, and other special file types
         } catch (error) {
-            // 如果複製失敗，記錄警告但繼續處理其他檔案
+            // If copy fails, log warning but continue processing other files
             logger.warn(
                 { sourcePath, targetPath, error },
                 'Failed to copy file, skipping'
@@ -89,7 +89,7 @@ export async function syncRepo(
 
     logger.info({ repoUrl, branch: gitBranch }, 'Git syncing from repository')
 
-    // 檢查是否為本地路徑
+    // Check if it's a local path
     const isLocalPath =
         path.isAbsolute(repoUrl) &&
         !repoUrl.startsWith('http://') &&
@@ -97,7 +97,7 @@ export async function syncRepo(
         !repoUrl.startsWith('git@')
 
     if (isLocalPath) {
-        // 本地路徑：直接從源目錄複製檔案（支援未提交的變更）
+        // Local path: directly copy files from source directory (supports uncommitted changes)
         try {
             const sourceStat = await fs.stat(repoUrl).catch(() => null)
             if (!sourceStat) {
@@ -109,10 +109,10 @@ export async function syncRepo(
                 'Copying from local repository (includes uncommitted changes)'
             )
 
-            // 確保目標目錄存在
+            // Ensure target directory exists
             await fs.mkdir(STORAGE_DIR, { recursive: true })
 
-            // 複製所有檔案（排除 .git）
+            // Copy all files (excluding .git)
             await copyLocalRepository(repoUrl, STORAGE_DIR)
 
             // Clear cache to ensure data consistency
@@ -129,7 +129,7 @@ export async function syncRepo(
         }
     }
 
-    // 遠端 repository：使用 Git 操作
+    // Remote repository: use Git operations
     const exists = await fs.stat(STORAGE_DIR).catch(() => null)
     const gitOptions: Partial<SimpleGitOptions> = {
         baseDir: STORAGE_DIR,
