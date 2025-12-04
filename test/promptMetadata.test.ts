@@ -10,6 +10,7 @@ import {
     getAllPromptRuntimes,
     getPromptStats,
     getPromptRuntime,
+    clearAllPrompts,
 } from '../src/services/loaders.js'
 import { getHealthStatus } from '../src/services/health.js'
 import { PromptMetadataSchema } from '../src/types/promptMetadata.js'
@@ -34,6 +35,7 @@ describe('Prompt Metadata 測試', () => {
     afterEach(() => {
         // 還原環境變數
         process.env = originalEnv
+        clearAllPrompts()
     })
 
     afterEach(async () => {
