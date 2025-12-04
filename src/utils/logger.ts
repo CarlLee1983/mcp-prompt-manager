@@ -12,8 +12,12 @@ import path from 'path'
  * 2. info/debug/trace level logs only output to file (if LOG_FILE is set)
  * 3. If LOG_FILE is not set, info level logs are not output at all (to avoid confusion)
  * 4. Use silent mode to completely disable logging (when LOG_LEVEL=silent)
+ * 5. Use PRETTY_LOG=true to enable formatted output (even when LOG_FILE is set)
  */
 const logLevel = LOG_LEVEL || (process.env.NODE_ENV === 'development' ? 'info' : 'warn')
+
+// Check if pretty log is enabled
+const prettyLog = process.env.PRETTY_LOG === 'true' || process.env.PRETTY_LOG === '1'
 
 // stderr log level: only output warn/error/fatal, avoid info being marked as error
 const stderrLogLevel = 'warn'
@@ -25,6 +29,19 @@ const loggerOptions: pino.LoggerOptions = {
 
 // Create logger
 let logger: pino.Logger
+
+// Pretty print options
+// Note: customPrettifiers cannot be used with pino.transport (worker thread limitation)
+// Error formatting is handled in errorFormatter.ts instead
+const prettyOptions = {
+    colorize: true,
+    translateTime: 'SYS:standard',
+    ignore: 'pid,hostname',
+    singleLine: false,
+    hideObject: false,
+    errorLikeObjectKeys: ['err', 'error'],
+    messageFormat: '{msg}',
+}
 
 // If LOG_FILE is set, use multistream to output to stderr and file separately
 if (LOG_FILE) {
@@ -39,37 +56,61 @@ if (LOG_FILE) {
     }
 
     // Create output stream array
-    const streams = [
-        // stderr output: only output warn/error/fatal (to avoid info being marked as error)
-        {
+    const streams: Array<{ level: string; stream: any }> = []
+
+    // stderr output: only output warn/error/fatal (to avoid info being marked as error)
+    if (prettyLog || process.env.NODE_ENV === 'development') {
+        // Use pretty format for stderr
+        streams.push({
+            level: stderrLogLevel,
+            stream: pino.transport({
+                target: 'pino-pretty',
+                options: {
+                    ...prettyOptions,
+                    destination: 2, // stderr
+                },
+            }),
+        })
+    } else {
+        streams.push({
             level: stderrLogLevel,
             stream: pino.destination(2),
-        },
-        // File output: output all level logs (raw JSON format, convenient for parsing and searching)
-        {
+        })
+    }
+
+    // File output: output all level logs
+    if (prettyLog) {
+        // Use pretty format for file too (if PRETTY_LOG is enabled)
+        streams.push({
+            level: logLevel,
+            stream: pino.transport({
+                target: 'pino-pretty',
+                options: {
+                    ...prettyOptions,
+                    destination: fs.createWriteStream(logFilePath, { flags: 'a' }),
+                },
+            }),
+        })
+    } else {
+        // Raw JSON format (convenient for parsing and searching)
+        streams.push({
             level: logLevel,
             stream: fs.createWriteStream(logFilePath, { flags: 'a' }),
-        },
-    ]
+        })
+    }
 
     // Use multistream to output to multiple targets simultaneously
-    // Note: When using multistream, transport option is ignored
-    // If formatted output is needed, use tools (such as pino-pretty) on the client side to view files
     logger = pino(loggerOptions, pino.multistream(streams))
 } else {
     // LOG_FILE not set, only output warn/error/fatal to stderr
     // info/debug/trace level logs are not output (to avoid being marked as error)
     loggerOptions.level = stderrLogLevel
 
-    // Only use pino-pretty for formatted output in development environment
-    if (process.env.NODE_ENV === 'development') {
+    // Use pino-pretty for formatted output in development or when PRETTY_LOG is enabled
+    if (prettyLog || process.env.NODE_ENV === 'development') {
         loggerOptions.transport = {
             target: 'pino-pretty',
-            options: {
-                colorize: true,
-                translateTime: 'SYS:standard',
-                ignore: 'pid,hostname',
-            },
+            options: prettyOptions,
         }
     }
 

@@ -13,6 +13,7 @@ import {
 } from '../config/env.js'
 import { logger } from '../utils/logger.js'
 import { getFilesRecursively, clearFileCache } from '../utils/fileSystem.js'
+import { formatErrorForLogging, formatYAMLError } from '../utils/errorFormatter.js'
 // syncRepo is dynamically imported in reloadPrompts to support new RepoManager architecture
 import type { PromptDefinition, PromptArgDefinition } from '../types/prompt.js'
 import {
@@ -33,6 +34,9 @@ const registeredPartials = new Set<string>()
 
 // Track prompt runtime states
 const promptRuntimeMap = new Map<string, PromptRuntime>()
+
+// Track file path to prompt ID mapping (for hot reload)
+const filePathToPromptIdMap = new Map<string, string>()
 
 // Reentrancy protection lock: track currently executing reload Promise
 let reloadingPromise: Promise<{ loaded: number; errors: LoadError[] }> | null = null
@@ -657,7 +661,30 @@ export async function loadPrompts(
 
         try {
             const content = await fs.readFile(filePath, 'utf-8')
-            const yamlData = yaml.load(content)
+            let yamlData: unknown
+            try {
+                yamlData = yaml.load(content)
+            } catch (yamlError) {
+                // YAML parsing error - format it nicely
+                const formattedError = formatErrorForLogging(yamlError)
+                const errorMessage = formatYAMLError(yamlError, filePath)
+                const error = new Error(errorMessage)
+                errors.push({ file: relativePath, error })
+                logger.warn(
+                    {
+                        filePath,
+                        errorMessage: formattedError.errorMessage,
+                        errorName: formattedError.errorName,
+                        ...(formattedError.yamlError && {
+                            yamlLine: formattedError.yamlError.line,
+                            yamlColumn: formattedError.yamlError.column,
+                            yamlSnippet: formattedError.yamlError.snippet,
+                        }),
+                    },
+                    `YAML parsing failed: ${formattedError.errorMessage}${formattedError.yamlError?.line ? ` (line ${formattedError.yamlError.line}, column ${formattedError.yamlError.column})` : ''}`
+                )
+                continue
+            }
 
             // First validate basic Prompt structure
             const parseResult = PromptDefinitionSchema.safeParse(yamlData)
@@ -745,6 +772,9 @@ export async function loadPrompts(
 
             // Store runtime information (regardless of state)
             promptRuntimeMap.set(promptDef.id, promptRuntime)
+            
+            // Store file path mapping for hot reload
+            filePathToPromptIdMap.set(filePath, promptDef.id)
 
             // Register prompts with runtime_state === 'active' or 'legacy' as tools
             // Other states (invalid, disabled, warning) are not registered as tools but still recorded in runtime map
@@ -814,6 +844,18 @@ export async function loadPrompts(
         } catch (error) {
             const loadError =
                 error instanceof Error ? error : new Error(String(error))
+            
+            // Filter out "already registered" errors - these are expected during reload
+            // and don't indicate a real problem
+            if (loadError.message.includes('already registered')) {
+                logger.debug(
+                    { filePath },
+                    'Prompt already registered (expected during reload), skipping error'
+                )
+                // Don't add to errors array - this is not a real error
+                continue
+            }
+            
             errors.push({ file: relativePath, error: loadError })
             logger.warn({ filePath, error: loadError }, 'Failed to load prompt')
         }
@@ -888,6 +930,21 @@ export async function loadPrompts(
             }
 
             // Register Prompt
+            // Check if prompt is already registered, remove old tool if exists
+            if (registeredPromptIds.has(promptDef.id)) {
+                const oldToolRef = registeredToolRefs.get(promptDef.id)
+                if (oldToolRef) {
+                    try {
+                        oldToolRef.remove()
+                        registeredToolRefs.delete(promptDef.id)
+                        logger.debug({ promptId: promptDef.id }, 'Old tool removed before re-registering prompt')
+                    } catch (error) {
+                        logger.warn({ promptId: promptDef.id, error }, 'Failed to remove old tool before re-registering')
+                    }
+                }
+                // Note: MCP SDK doesn't support removing prompts directly,
+                // but re-registering should overwrite the old one
+            }
             server.prompt(promptDef.id, zodShape, promptHandler)
             registeredPromptIds.add(promptDef.id)
 
@@ -1031,6 +1088,18 @@ export async function loadPrompts(
         } catch (error) {
             const loadError =
                 error instanceof Error ? error : new Error(String(error))
+            
+            // Filter out "already registered" errors - these are expected during reload
+            // and don't indicate a real problem
+            if (loadError.message.includes('already registered')) {
+                logger.debug(
+                    { filePath, promptId: promptDef.id },
+                    'Prompt already registered (expected during reload), skipping error'
+                )
+                // Don't add to errors array - this is not a real error
+                continue
+            }
+            
             errors.push({ file: relativePath, error: loadError })
             logger.warn({ filePath, error: loadError }, 'Failed to register prompt')
         }
@@ -1117,7 +1186,30 @@ async function loadPromptsFromSystemRepo(
 
         try {
             const content = await fs.readFile(filePath, 'utf-8')
-            const yamlData = yaml.load(content)
+            let yamlData: unknown
+            try {
+                yamlData = yaml.load(content)
+            } catch (yamlError) {
+                // YAML parsing error - format it nicely
+                const formattedError = formatErrorForLogging(yamlError)
+                const errorMessage = formatYAMLError(yamlError, filePath)
+                const error = new Error(errorMessage)
+                errors.push({ file: relativePath, error })
+                logger.warn(
+                    {
+                        filePath,
+                        errorMessage: formattedError.errorMessage,
+                        errorName: formattedError.errorName,
+                        ...(formattedError.yamlError && {
+                            yamlLine: formattedError.yamlError.line,
+                            yamlColumn: formattedError.yamlError.column,
+                            yamlSnippet: formattedError.yamlError.snippet,
+                        }),
+                    },
+                    `YAML parsing failed: ${formattedError.errorMessage}${formattedError.yamlError?.line ? ` (line ${formattedError.yamlError.line}, column ${formattedError.yamlError.column})` : ''}`
+                )
+                continue
+            }
 
             // Validate basic Prompt structure
             const parseResult = PromptDefinitionSchema.safeParse(yamlData)
@@ -1208,6 +1300,9 @@ async function loadPromptsFromSystemRepo(
 
             // Store runtime information
             promptRuntimeMap.set(promptDef.id, promptRuntime)
+            
+            // Store file path mapping for hot reload
+            filePathToPromptIdMap.set(filePath, promptDef.id)
 
             // Only register prompts with active or legacy state
             if (promptRuntime.runtime_state !== 'active' && promptRuntime.runtime_state !== 'legacy') {
@@ -1261,6 +1356,18 @@ async function loadPromptsFromSystemRepo(
         } catch (error) {
             const loadError =
                 error instanceof Error ? error : new Error(String(error))
+            
+            // Filter out "already registered" errors - these are expected during reload
+            // and don't indicate a real problem
+            if (loadError.message.includes('already registered')) {
+                logger.debug(
+                    { filePath },
+                    'Prompt already registered (expected during reload), skipping error'
+                )
+                // Don't add to errors array - this is not a real error
+                continue
+            }
+            
             errors.push({ file: relativePath, error: loadError })
             logger.warn({ filePath, error: loadError }, 'Failed to load prompt')
         }
@@ -1327,6 +1434,21 @@ async function loadPromptsFromSystemRepo(
             }
 
             // Register Prompt
+            // Check if prompt is already registered, remove old tool if exists
+            if (registeredPromptIds.has(promptDef.id)) {
+                const oldToolRef = registeredToolRefs.get(promptDef.id)
+                if (oldToolRef) {
+                    try {
+                        oldToolRef.remove()
+                        registeredToolRefs.delete(promptDef.id)
+                        logger.debug({ promptId: promptDef.id }, 'Old tool removed before re-registering prompt')
+                    } catch (error) {
+                        logger.warn({ promptId: promptDef.id, error }, 'Failed to remove old tool before re-registering')
+                    }
+                }
+                // Note: MCP SDK doesn't support removing prompts directly,
+                // but re-registering should overwrite the old one
+            }
             server.prompt(promptDef.id, zodShape, promptHandler)
             registeredPromptIds.add(promptDef.id)
 
@@ -1435,6 +1557,18 @@ async function loadPromptsFromSystemRepo(
         } catch (error) {
             const loadError =
                 error instanceof Error ? error : new Error(String(error))
+            
+            // Filter out "already registered" errors - these are expected during reload
+            // and don't indicate a real problem
+            if (loadError.message.includes('already registered')) {
+                logger.debug(
+                    { filePath: relativePath, promptId: promptDef.id },
+                    'Prompt already registered (expected during reload), skipping error'
+                )
+                // Don't add to errors array - this is not a real error
+                continue
+            }
+            
             errors.push({ file: relativePath, error: loadError })
             logger.warn({ filePath: relativePath, error: loadError }, 'Failed to register prompt from system repo')
         }
@@ -1526,6 +1660,484 @@ function clearAllPrompts(): void {
 }
 
 /**
+ * Reload a single prompt file
+ * Used for hot reload when a specific file changes
+ * 
+ * @param server - MCP Server instance for registering prompts
+ * @param filePath - Absolute path to the prompt file
+ * @param storageDir - Storage directory path (optional, defaults to STORAGE_DIR from config)
+ * @returns Object containing success status and error (if any)
+ */
+export async function reloadSinglePrompt(
+    server: McpServer,
+    filePath: string,
+    storageDir?: string
+): Promise<{ success: boolean; error?: Error }> {
+    const dir = storageDir ?? STORAGE_DIR
+    
+    try {
+        // Check if file exists
+        const fileExists = await fs.access(filePath).then(() => true).catch(() => false)
+        
+        if (!fileExists) {
+            // File was deleted, remove the corresponding tool
+            logger.debug({ filePath }, 'File deleted, removing prompt')
+            
+            // Find prompt ID by file path from mapping
+            const promptIdToRemove = filePathToPromptIdMap.get(filePath)
+            
+            if (promptIdToRemove) {
+                const toolRef = registeredToolRefs.get(promptIdToRemove)
+                if (toolRef) {
+                    try {
+                        toolRef.remove()
+                        registeredToolRefs.delete(promptIdToRemove)
+                        registeredPromptIds.delete(promptIdToRemove)
+                        promptRuntimeMap.delete(promptIdToRemove)
+                        filePathToPromptIdMap.delete(filePath)
+                        logger.info({ promptId: promptIdToRemove }, 'Prompt removed due to file deletion')
+                    } catch (error) {
+                        logger.warn({ promptId: promptIdToRemove, error }, 'Failed to remove prompt')
+                    }
+                }
+            } else {
+                logger.debug({ filePath }, 'No prompt found for deleted file')
+            }
+            
+            return { success: true }
+        }
+        
+        // File exists, reload it
+        if (!filePath.endsWith('.yaml') && !filePath.endsWith('.yml')) {
+            logger.debug({ filePath }, 'File is not a YAML file, skipping')
+            return { success: true }
+        }
+        
+        // Exclude non-prompt files
+        const fileName = path.basename(filePath).toLowerCase()
+        if (EXCLUDED_FILES.some((excluded) => fileName === excluded.toLowerCase())) {
+            logger.debug({ filePath }, 'Skipping excluded file')
+            return { success: true }
+        }
+        
+        const relativePath = path.relative(dir, filePath)
+        const { shouldLoad, groupName } = shouldLoadPrompt(
+            relativePath,
+            ACTIVE_GROUPS,
+            false // hasSystemRepo - not needed for single file reload
+        )
+        
+        if (!shouldLoad) {
+            logger.debug({ filePath, groupName }, 'Skipping prompt (not in active groups)')
+            return { success: true }
+        }
+        
+        // Load registry (needed for createPromptRuntime)
+        const registry = await loadRegistry(dir)
+        
+        // Read and parse file
+        let content: string
+        let yamlData: unknown
+        try {
+            content = await fs.readFile(filePath, 'utf-8')
+            yamlData = yaml.load(content)
+        } catch (error) {
+            // YAML parsing error - format it nicely
+            const formattedError = formatErrorForLogging(error)
+            const errorMessage = formatYAMLError(error, filePath)
+            const yamlError = new Error(errorMessage)
+            logger.warn(
+                {
+                    filePath,
+                    errorMessage: formattedError.errorMessage,
+                    errorName: formattedError.errorName,
+                    ...(formattedError.yamlError && {
+                        yamlLine: formattedError.yamlError.line,
+                        yamlColumn: formattedError.yamlError.column,
+                        yamlSnippet: formattedError.yamlError.snippet,
+                    }),
+                },
+                `YAML parsing failed: ${formattedError.errorMessage}${formattedError.yamlError?.line ? ` (line ${formattedError.yamlError.line}, column ${formattedError.yamlError.column})` : ''}`
+            )
+            // Fallback to full reload on YAML parsing error
+            logger.info({ filePath }, 'Falling back to full reload due to YAML parsing error')
+            try {
+                await reloadPrompts(server, storageDir)
+            } catch (reloadError) {
+                const fullReloadError = reloadError instanceof Error ? reloadError : new Error(String(reloadError))
+                logger.error(
+                    {
+                        filePath,
+                        errorMessage: fullReloadError.message,
+                    },
+                    `Full reload also failed: ${fullReloadError.message}`
+                )
+            }
+            return { success: false, error: yamlError }
+        }
+        
+        // Validate basic Prompt structure
+        const parseResult = PromptDefinitionSchema.safeParse(yamlData)
+        if (!parseResult.success) {
+            const errorMessage = parseResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')
+            const error = new Error(`Invalid prompt definition: ${errorMessage}`)
+            logger.warn(
+                { 
+                    filePath, 
+                    validationErrors: parseResult.error.issues,
+                    errorMessage
+                }, 
+                `Failed to validate prompt definition: ${errorMessage}`
+            )
+            // Fallback to full reload on validation error
+            logger.info({ filePath }, 'Falling back to full reload due to validation error')
+            try {
+                await reloadPrompts(server, storageDir)
+            } catch (reloadError) {
+                const fullReloadError = reloadError instanceof Error ? reloadError : new Error(String(reloadError))
+                logger.error(
+                    { 
+                        filePath,
+                        errorMessage: fullReloadError.message,
+                        errorStack: fullReloadError.stack
+                    },
+                    `Full reload also failed: ${fullReloadError.message}`
+                )
+            }
+            return { success: false, error }
+        }
+        
+        const promptDef = parseResult.data
+        
+        // Determine if it's a Metadata Prompt
+        let metadata: PromptMetadata | null = null
+        let runtimeState: PromptRuntimeState = 'legacy'
+        let source: PromptSource = 'legacy'
+        
+        if (isMetadataPrompt(yamlData)) {
+            const metadataResult = PromptMetadataSchema.safeParse(yamlData)
+            if (metadataResult.success) {
+                metadata = metadataResult.data
+                source = 'embedded'
+                runtimeState = 'active'
+            } else {
+                logger.warn(
+                    { filePath, promptId: promptDef.id, errors: metadataResult.error.issues },
+                    'Metadata validation failed, marking as warning'
+                )
+                runtimeState = 'warning'
+                source = 'embedded'
+            }
+        }
+        
+        // Validate partial dependencies
+        const declaredPartials = metadata?.dependencies?.partials ?? []
+        const validationResult = validatePartialDependencies(
+            promptDef.template,
+            declaredPartials
+        )
+        
+        if (validationResult.hasIssues) {
+            // Use debug level for hot reload to reduce noise, warn level for initial load
+            logger.debug(
+                {
+                    filePath,
+                    promptId: promptDef.id,
+                    undeclaredPartials: validationResult.undeclaredPartials,
+                    unusedPartials: validationResult.unusedPartials,
+                },
+                `Partial dependencies validation issues: ${validationResult.warnings.join(' ')}`
+            )
+            
+            if (
+                runtimeState === 'active' &&
+                validationResult.undeclaredPartials.length > 0
+            ) {
+                runtimeState = 'warning'
+            }
+        }
+        
+        // Create PromptRuntime
+        const promptRuntime = createPromptRuntime(
+            promptDef as PromptDefinition,
+            metadata,
+            groupName,
+            registry,
+            runtimeState,
+            source
+        )
+        
+        // Store runtime information
+        promptRuntimeMap.set(promptDef.id, promptRuntime)
+        
+        // Only register active or legacy prompts as tools
+        if (promptRuntime.runtime_state !== 'active' && promptRuntime.runtime_state !== 'legacy') {
+            logger.debug(
+                { promptId: promptDef.id, filePath, runtime_state: promptRuntime.runtime_state },
+                'Skipping tool registration (not active or legacy)'
+            )
+            return { success: true }
+        }
+        
+        // Build Zod Schema
+        const zodShape: z.ZodRawShape = promptDef.args
+            ? buildZodSchema(promptDef.args as Record<
+                  string,
+                  {
+                      type: 'string' | 'number' | 'boolean'
+                      description?: string
+                      default?: string | number | boolean
+                      required?: boolean
+                  }
+              >)
+            : {}
+        
+        // Compile Handlebars template
+        let templateDelegate: HandlebarsTemplateDelegate
+        try {
+            templateDelegate = Handlebars.compile(promptDef.template, {
+                noEscape: true,
+            })
+        } catch (error) {
+            const compileError = error instanceof Error ? error : new Error(String(error))
+            logger.warn({ filePath, error: compileError }, 'Failed to compile Handlebars template')
+            // Fallback to full reload on template compilation error
+            logger.info({ filePath }, 'Falling back to full reload due to template compilation error')
+            await reloadPrompts(server, storageDir)
+            return { success: false, error: compileError }
+        }
+        
+        // Register prompt and tool (similar to loadPrompts logic)
+        try {
+            // Create prompt handler function
+            const promptHandler = (args: Record<string, unknown>) => {
+                try {
+                    logger.info(
+                        { promptId: promptDef.id, promptTitle: promptDef.title, args: Object.keys(args) },
+                        'Prompt invoked'
+                    )
+                    
+                    const context = {
+                        ...args,
+                        output_lang_rule: LANG_INSTRUCTION,
+                        sys_lang: LANG_SETTING,
+                    }
+                    const message = templateDelegate(context)
+                    
+                    logger.debug({ promptId: promptDef.id, messageLength: message.length }, 'Template rendered successfully')
+                    
+                    return {
+                        messages: [
+                            {
+                                role: 'user' as const,
+                                content: { type: 'text' as const, text: message },
+                            },
+                        ],
+                    }
+                } catch (error) {
+                    const execError = error instanceof Error ? error : new Error(String(error))
+                    logger.error({ promptId: promptDef.id, error: execError }, 'Template execution failed')
+                    throw execError
+                }
+            }
+            
+            // Register Prompt
+            // Check if prompt is already registered
+            const isAlreadyRegistered = registeredPromptIds.has(promptDef.id)
+            
+            if (isAlreadyRegistered) {
+                // Prompt is already registered, we can't re-register it (MCP SDK limitation)
+                // We'll only update the tool (which can be removed and re-registered)
+                // Note: If prompt's template or args changed, we need to fallback to full reload
+                logger.debug({ promptId: promptDef.id }, 'Prompt already registered, only updating tool')
+            } else {
+                // Register new prompt
+                // Use try-catch to handle race conditions where prompt might be registered
+                // between our check and the actual registration
+                try {
+                    server.prompt(promptDef.id, zodShape, promptHandler)
+                    registeredPromptIds.add(promptDef.id)
+                } catch (registerError) {
+                    const regError = registerError instanceof Error ? registerError : new Error(String(registerError))
+                    
+                    // If prompt is already registered, treat it as success and continue with tool update
+                    if (regError.message.includes('already registered')) {
+                        logger.debug(
+                            { promptId: promptDef.id },
+                            'Prompt already registered (race condition), only updating tool'
+                        )
+                        // Add to our tracking set even though registration failed
+                        registeredPromptIds.add(promptDef.id)
+                    } else {
+                        // Re-throw other errors
+                        throw registerError
+                    }
+                }
+            }
+            
+            // Build tool description
+            const description = promptDef.description || ''
+            let triggerText: string
+            if (promptDef.triggers && promptDef.triggers.patterns.length > 0) {
+                triggerText = `When user mentions "${promptDef.triggers.patterns.join('", "')}"`
+            } else {
+                const parsedTrigger = parseTriggerFromDescription(description)
+                triggerText = parsedTrigger || `When user needs ${promptDef.title.toLowerCase()}`
+            }
+            
+            let rules: string[] = []
+            if (promptDef.rules && promptDef.rules.length > 0) {
+                rules = [...promptDef.rules]
+            } else {
+                rules = parseRulesFromDescription(description)
+            }
+            
+            let enhancedDescription = description
+            if (promptDef.rules || promptDef.triggers) {
+                enhancedDescription = enhancedDescription
+                    .replace(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is, '')
+                    .replace(/TRIGGER:\s*(.+?)(?:\n|$)/i, '')
+                    .trim()
+            }
+            
+            if (triggerText) {
+                enhancedDescription += `\n\nTRIGGER: ${triggerText}`
+            }
+            if (rules.length > 0) {
+                enhancedDescription += `\n\nRULES:\n${rules.map((rule, index) => `  ${index + 1}. ${rule}`).join('\n')}`
+            }
+            
+            if (promptRuntime.tags && promptRuntime.tags.length > 0) {
+                enhancedDescription += `\n\nTags: ${promptRuntime.tags.join(', ')}`
+            }
+            
+            if (promptRuntime.use_cases && promptRuntime.use_cases.length > 0) {
+                enhancedDescription += `\n\nUse Cases: ${promptRuntime.use_cases.join(', ')}`
+            }
+            
+            const toolInputSchema = Object.keys(zodShape).length > 0
+                ? z.object(zodShape)
+                : z.object({})
+            
+            // Remove old tool if exists (to update it)
+            const oldToolRef = registeredToolRefs.get(promptDef.id)
+            if (oldToolRef) {
+                try {
+                    oldToolRef.remove()
+                    registeredToolRefs.delete(promptDef.id)
+                    logger.debug({ promptId: promptDef.id }, 'Old tool removed before registering new tool')
+                } catch (error) {
+                    logger.warn({ promptId: promptDef.id, error }, 'Failed to remove old tool')
+                }
+            }
+            
+            // Register new tool (or update existing tool)
+            const toolRef = server.registerTool(
+                promptDef.id,
+                {
+                    title: promptDef.title,
+                    description: enhancedDescription,
+                    inputSchema: toolInputSchema,
+                },
+                async (args: Record<string, unknown>) => {
+                    logger.info(
+                        { toolId: promptDef.id, toolTitle: promptDef.title, args: Object.keys(args) },
+                        '🔧 Tool invoked (calling prompt)'
+                    )
+                    
+                    const result = promptHandler(args)
+                    const firstMessage = result.messages[0]
+                    const messageText =
+                        firstMessage?.content && 'text' in firstMessage.content
+                            ? firstMessage.content.text
+                            : ''
+                    
+                    logger.info({ toolId: promptDef.id, messageLength: messageText.length }, '✅ Tool execution completed')
+                    
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: messageText,
+                            },
+                        ],
+                    }
+                }
+            )
+            
+            registeredToolRefs.set(promptDef.id, toolRef)
+            
+            // Update file path mapping
+            filePathToPromptIdMap.set(filePath, promptDef.id)
+            
+            logger.info(
+                { 
+                    promptId: promptDef.id, 
+                    filePath,
+                    description: enhancedDescription.substring(0, 100) + (enhancedDescription.length > 100 ? '...' : '')
+                }, 
+                'Single prompt reloaded successfully - tool updated'
+            )
+            return { success: true }
+        } catch (error) {
+            const registerError = error instanceof Error ? error : new Error(String(error))
+            logger.error(
+                { 
+                    filePath, 
+                    errorMessage: registerError.message,
+                    errorStack: registerError.stack,
+                    errorName: registerError.name
+                }, 
+                `Failed to register prompt: ${registerError.message}`
+            )
+            // Fallback to full reload on registration error
+            logger.info({ filePath }, 'Falling back to full reload due to registration error')
+            try {
+                await reloadPrompts(server, storageDir)
+            } catch (reloadError) {
+                const fullReloadError = reloadError instanceof Error ? reloadError : new Error(String(reloadError))
+                logger.error(
+                    { 
+                        filePath,
+                        errorMessage: fullReloadError.message,
+                        errorStack: fullReloadError.stack
+                    },
+                    `Full reload also failed: ${fullReloadError.message}`
+                )
+            }
+            return { success: false, error: registerError }
+        }
+    } catch (error) {
+        const reloadError = error instanceof Error ? error : new Error(String(error))
+        logger.error(
+            { 
+                filePath, 
+                errorMessage: reloadError.message,
+                errorStack: reloadError.stack,
+                errorName: reloadError.name
+            }, 
+            `Failed to reload single prompt: ${reloadError.message}`
+        )
+        // Fallback to full reload on any other error
+        logger.info({ filePath }, 'Falling back to full reload due to error')
+        try {
+            await reloadPrompts(server, storageDir)
+        } catch (fullReloadError) {
+            const fullError = fullReloadError instanceof Error ? fullReloadError : new Error(String(fullReloadError))
+            logger.error(
+                { 
+                    filePath,
+                    errorMessage: fullError.message,
+                    errorStack: fullError.stack
+                },
+                `Full reload also failed: ${fullError.message}`
+            )
+        }
+        return { success: false, error: reloadError }
+    }
+}
+
+/**
  * Reload all prompts from Git repository
  * 
  * This function performs a zero-downtime reload using dual registry swap:
@@ -1558,7 +2170,7 @@ export async function reloadPrompts(
 ): Promise<{ loaded: number; errors: LoadError[] }> {
     // Reentrancy protection: if reload is already in progress, return existing Promise
     if (reloadingPromise !== null) {
-        logger.warn('Reload already in progress, returning existing promise')
+        logger.debug('Reload already in progress, returning existing promise')
         return reloadingPromise
     }
     

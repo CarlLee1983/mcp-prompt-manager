@@ -126,6 +126,14 @@ const ConfigSchema = z.object({
         .string()
         .optional()
         .transform((val) => (val ? parseInt(val, 10) : undefined)),
+    WATCH_MODE: z
+        .string()
+        .optional()
+        .transform((val) => val === 'true' || val === '1'),
+    GIT_POLLING_INTERVAL: z
+        .string()
+        .optional()
+        .transform((val) => (val ? parseInt(val, 10) : 300000)),
 })
 
 /**
@@ -159,6 +167,8 @@ function loadConfig() {
             GIT_BRANCH: process.env.GIT_BRANCH,
             GIT_MAX_RETRIES: process.env.GIT_MAX_RETRIES,
             CACHE_CLEANUP_INTERVAL: process.env.CACHE_CLEANUP_INTERVAL,
+            WATCH_MODE: process.env.WATCH_MODE,
+            GIT_POLLING_INTERVAL: process.env.GIT_POLLING_INTERVAL,
         }
 
         const parsed = ConfigSchema.parse(rawConfig)
@@ -274,6 +284,8 @@ export const GIT_MAX_RETRIES = config.GIT_MAX_RETRIES
 export const TRANSPORT_TYPE: 'stdio' | 'http' | 'sse' = config.TRANSPORT_TYPE
 export const SYSTEM_REPO_URL = config.SYSTEM_REPO_URL || undefined
 export const PROMPT_REPO_URLS = config.PROMPT_REPO_URLS || undefined
+export const WATCH_MODE = config.WATCH_MODE || false
+export const GIT_POLLING_INTERVAL = config.GIT_POLLING_INTERVAL || 300000
 
 /**
  * Cache cleanup interval in milliseconds

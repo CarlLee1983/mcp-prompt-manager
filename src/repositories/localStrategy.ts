@@ -1,5 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
+import chokidar from 'chokidar'
+import type { FSWatcher } from 'chokidar'
 import type { RepositoryStrategy } from './strategy.js'
 import { logger } from '../utils/logger.js'
 import { clearFileCache } from '../utils/fileSystem.js'
@@ -28,6 +30,8 @@ const EXCLUDED_ITEMS = new Set([
  */
 export class LocalRepositoryStrategy implements RepositoryStrategy {
     private readonly repoPath: string
+    private watcher: FSWatcher | null = null
+    private watchCallback: ((filePath: string) => void) | null = null
 
     constructor(repoPath: string) {
         this.repoPath = repoPath
@@ -138,6 +142,113 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
                 )
             }
         }
+    }
+
+    /**
+     * Start watching for file changes
+     * @param onFileChange - Callback function to call when a file changes
+     * @param watchPath - Path to watch (defaults to repoPath, but can be storageDir for direct read mode)
+     */
+    startWatching(
+        onFileChange: (filePath: string) => void,
+        watchPath?: string
+    ): void {
+        if (this.watcher) {
+            logger.debug('Watcher already started, stopping existing watcher')
+            this.stopWatching()
+        }
+
+        const pathToWatch = watchPath || this.repoPath
+        this.watchCallback = onFileChange
+
+        logger.info({ path: pathToWatch }, 'Starting file watcher for local repository')
+
+        try {
+            // Create watcher with appropriate options
+            this.watcher = chokidar.watch(pathToWatch, {
+                ignored: [
+                    // Exclude common directories and files
+                    /(^|[\/\\])\../, // Hidden files and directories
+                    '**/node_modules/**',
+                    '**/.git/**',
+                    '**/dist/**',
+                    '**/build/**',
+                    '**/.next/**',
+                    '**/.nuxt/**',
+                    '**/.cache/**',
+                    '**/coverage/**',
+                    '**/.nyc_output/**',
+                    '**/.DS_Store',
+                    '**/.vscode/**',
+                    '**/.idea/**',
+                ],
+                persistent: true,
+                ignoreInitial: true, // Don't trigger events for existing files
+                awaitWriteFinish: {
+                    stabilityThreshold: 300, // Wait 300ms after file stops changing
+                    pollInterval: 100, // Check every 100ms
+                },
+            })
+
+            // Watch for changes, additions, and deletions
+            this.watcher
+                .on('change', (filePath: string) => {
+                    if (filePath.endsWith('.yaml') || filePath.endsWith('.yml')) {
+                        logger.info({ filePath }, 'File changed, triggering reload')
+                        this.watchCallback?.(filePath)
+                    }
+                })
+                .on('add', (filePath: string) => {
+                    if (filePath.endsWith('.yaml') || filePath.endsWith('.yml')) {
+                        logger.info({ filePath }, 'File added, triggering reload')
+                        this.watchCallback?.(filePath)
+                    }
+                })
+                .on('unlink', (filePath: string) => {
+                    if (filePath.endsWith('.yaml') || filePath.endsWith('.yml')) {
+                        logger.info({ filePath }, 'File deleted, triggering reload')
+                        this.watchCallback?.(filePath)
+                    }
+                })
+                .on('error', (error: unknown) => {
+                    const watchError = error instanceof Error ? error : new Error(String(error))
+                    logger.error({ error: watchError }, 'File watcher error')
+                })
+                .on('ready', () => {
+                    logger.info({ path: pathToWatch }, 'File watcher ready')
+                })
+
+            logger.info({ path: pathToWatch }, 'File watcher started successfully')
+        } catch (error) {
+            const watchError = error instanceof Error ? error : new Error(String(error))
+            logger.error({ error: watchError, path: pathToWatch }, 'Failed to start file watcher')
+            this.watcher = null
+            throw watchError
+        }
+    }
+
+    /**
+     * Stop watching for file changes
+     */
+    stopWatching(): void {
+        if (this.watcher) {
+            try {
+                this.watcher.close()
+                logger.info('File watcher stopped')
+            } catch (error) {
+                logger.warn({ error }, 'Error stopping file watcher')
+            }
+            this.watcher = null
+            this.watchCallback = null
+        }
+    }
+
+    /**
+     * Check if watcher is active
+     * @returns Whether watcher is currently active
+     */
+    isWatching(): boolean {
+        return this.watcher !== null
     }
 }
 

@@ -4,6 +4,7 @@ import {
     IS_DEFAULT_GROUPS,
     CACHE_CLEANUP_INTERVAL,
     TRANSPORT_TYPE,
+    WATCH_MODE,
     getRepoConfigs,
     getSystemRepoConfig,
 } from './config/env.js'
@@ -203,9 +204,24 @@ async function main() {
             'Cache cleanup mechanism started'
         )
 
-        // 12. Register graceful shutdown handlers
+        // 12. Start watch mode if enabled
+        if (WATCH_MODE) {
+            logger.info('Watch mode enabled, starting file watchers and Git polling')
+            repoManager.startWatchMode(server, STORAGE_DIR, systemStorageDir)
+            logger.info('Watch mode started successfully')
+        } else {
+            logger.debug('Watch mode disabled (set WATCH_MODE=true to enable)')
+        }
+
+        // 13. Register graceful shutdown handlers
         const shutdown = () => {
             logger.info('Shutting down gracefully...')
+            
+            // Stop watch mode
+            if (WATCH_MODE) {
+                repoManager.stopWatchMode()
+            }
+            
             stopCacheCleanup()
             transport.disconnect().catch((error) => {
                 logger.error({ error }, 'Error disconnecting transport')

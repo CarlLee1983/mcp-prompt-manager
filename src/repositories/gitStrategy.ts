@@ -4,7 +4,7 @@ import path from 'path'
 import type { RepositoryStrategy } from './strategy.js'
 import { logger } from '../utils/logger.js'
 import { ensureDirectoryAccess, clearFileCache } from '../utils/fileSystem.js'
-import { GIT_MAX_RETRIES } from '../config/env.js'
+import { GIT_MAX_RETRIES, GIT_POLLING_INTERVAL } from '../config/env.js'
 
 /**
  * Git Repository Strategy
@@ -14,6 +14,11 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
     private readonly repoUrl: string
     private readonly defaultBranch: string
     private readonly maxRetries: number
+    private pollingTimer: NodeJS.Timeout | null = null
+    private pollingCallback: (() => Promise<void>) | null = null
+    private storageDir: string | null = null
+    private currentBranch: string | null = null
+    private lastCommitHash: string | null = null
 
     constructor(
         repoUrl: string,
@@ -187,6 +192,167 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
         const git = simpleGit()
         const cloneOptions = branch ? ['-b', branch] : []
         await git.clone(repoUrl, targetDir, cloneOptions)
+    }
+
+    /**
+     * Start polling for Git repository updates
+     * @param onUpdate - Callback function to call when updates are detected
+     * @param storageDir - Storage directory path (where Git repo is cloned)
+     * @param branch - Branch name to monitor
+     * @param pollingInterval - Polling interval in milliseconds (optional, defaults to GIT_POLLING_INTERVAL)
+     */
+    startPolling(
+        onUpdate: () => Promise<void>,
+        storageDir: string,
+        branch?: string,
+        pollingInterval?: number
+    ): void {
+        if (this.pollingTimer) {
+            logger.debug('Polling already started, stopping existing polling')
+            this.stopPolling()
+        }
+
+        this.pollingCallback = onUpdate
+        this.storageDir = storageDir
+        this.currentBranch = branch || this.defaultBranch
+        const interval = pollingInterval || GIT_POLLING_INTERVAL
+
+        logger.info(
+            { repoUrl: this.repoUrl, branch: this.currentBranch, interval },
+            'Starting Git polling'
+        )
+
+        // Get initial commit hash
+        this.getCurrentCommitHash(storageDir)
+            .then((hash) => {
+                this.lastCommitHash = hash
+                logger.info({ commitHash: hash }, 'Initial commit hash recorded')
+            })
+            .catch((error) => {
+                logger.warn({ error }, 'Failed to get initial commit hash')
+            })
+
+        // Start polling
+        this.pollingTimer = setInterval(async () => {
+            await this.checkForUpdates()
+        }, interval)
+
+        logger.info({ interval }, 'Git polling started successfully')
+    }
+
+    /**
+     * Stop polling for Git repository updates
+     */
+    stopPolling(): void {
+        if (this.pollingTimer) {
+            clearInterval(this.pollingTimer)
+            this.pollingTimer = null
+            this.pollingCallback = null
+            this.storageDir = null
+            this.currentBranch = null
+            this.lastCommitHash = null
+            logger.info('Git polling stopped')
+        }
+    }
+
+    /**
+     * Check if polling is active
+     * @returns Whether polling is currently active
+     */
+    isPolling(): boolean {
+        return this.pollingTimer !== null
+    }
+
+    /**
+     * Check for Git repository updates
+     * Compares local and remote commit hashes
+     */
+    private async checkForUpdates(): Promise<void> {
+        if (!this.storageDir || !this.currentBranch) {
+            logger.warn('Cannot check for updates: storageDir or branch not set')
+            return
+        }
+
+        try {
+            const gitOptions: Partial<SimpleGitOptions> = {
+                baseDir: this.storageDir,
+                binary: 'git',
+                maxConcurrentProcesses: 6,
+            }
+
+            const git = simpleGit(gitOptions)
+
+            // Fetch remote updates (without merging)
+            await git.fetch()
+
+            // Get remote commit hash
+            const remoteBranch = `origin/${this.currentBranch}`
+            const remoteCommitHash = await git.revparse([remoteBranch]).catch(() => null)
+
+            if (!remoteCommitHash) {
+                logger.warn({ branch: this.currentBranch }, 'Failed to get remote commit hash')
+                return
+            }
+
+            // Get local commit hash
+            const localCommitHash = await this.getCurrentCommitHash(this.storageDir)
+
+            // Compare hashes
+            if (this.lastCommitHash && localCommitHash && remoteCommitHash.trim() !== this.lastCommitHash.trim()) {
+                logger.info(
+                    {
+                        oldHash: this.lastCommitHash,
+                        newHash: remoteCommitHash.trim(),
+                        branch: this.currentBranch,
+                    },
+                    'Git repository update detected'
+                )
+
+                // Update local repository
+                try {
+                    await this.sync(this.storageDir, this.currentBranch)
+                    this.lastCommitHash = remoteCommitHash.trim()
+
+                    // Trigger callback to reload prompts
+                    if (this.pollingCallback) {
+                        logger.info('Triggering prompt reload due to Git update')
+                        await this.pollingCallback()
+                    }
+                } catch (error) {
+                    const syncError = error instanceof Error ? error : new Error(String(error))
+                    logger.error({ error: syncError }, 'Failed to sync Git repository during polling')
+                }
+            } else if (!this.lastCommitHash) {
+                // First time, just record the hash
+                this.lastCommitHash = remoteCommitHash.trim()
+                logger.debug({ commitHash: this.lastCommitHash }, 'Initial commit hash set')
+            }
+        } catch (error) {
+            const checkError = error instanceof Error ? error : new Error(String(error))
+            logger.error({ error: checkError }, 'Error checking for Git updates')
+        }
+    }
+
+    /**
+     * Get current commit hash from Git repository
+     * @param storageDir - Storage directory path
+     * @returns Commit hash or null if not available
+     */
+    private async getCurrentCommitHash(storageDir: string): Promise<string | null> {
+        try {
+            const gitOptions: Partial<SimpleGitOptions> = {
+                baseDir: storageDir,
+                binary: 'git',
+                maxConcurrentProcesses: 6,
+            }
+
+            const git = simpleGit(gitOptions)
+            const commitHash = await git.revparse(['HEAD'])
+            return commitHash.trim() || null
+        } catch (error) {
+            logger.debug({ error }, 'Failed to get commit hash')
+            return null
+        }
     }
 }
 

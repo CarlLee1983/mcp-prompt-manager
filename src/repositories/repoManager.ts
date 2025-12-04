@@ -3,6 +3,11 @@ import { RepositoryFactory } from './factory.js'
 import type { RepoConfig } from '../config/repoConfig.js'
 import { logger } from '../utils/logger.js'
 import { GIT_MAX_RETRIES } from '../config/env.js'
+import { LocalRepositoryStrategy } from './localStrategy.js'
+import { GitRepositoryStrategy } from './gitStrategy.js'
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { reloadSinglePrompt, reloadPrompts } from '../services/loaders.js'
+import path from 'path'
 
 /**
  * Repo Manager
@@ -184,6 +189,183 @@ export class RepoManager {
      */
     getSystemStorageDir(baseStorageDir: string): string {
         return `${baseStorageDir}_system`
+    }
+
+    /**
+     * Start watch mode for loaded repositories
+     * @param server - MCP Server instance for reloading prompts
+     * @param storageDir - Storage directory path
+     * @param systemStorageDir - System storage directory path (optional)
+     */
+    startWatchMode(
+        server: McpServer,
+        storageDir: string,
+        systemStorageDir?: string
+    ): void {
+        logger.info('Starting watch mode for repositories')
+
+        // Start watching active repository
+        if (this.activeStrategy) {
+            this.startStrategyWatchMode(
+                this.activeStrategy,
+                server,
+                storageDir,
+                systemStorageDir,
+                this.repoConfigs.find((c) => c.url === this.activeStrategy?.getUrl())?.branch
+            )
+        }
+
+        // Start watching system repository
+        if (this.systemStrategy && systemStorageDir) {
+            this.startStrategyWatchMode(
+                this.systemStrategy,
+                server,
+                systemStorageDir,
+                undefined, // No nested system repo
+                this.systemRepoConfig?.branch
+            )
+        }
+
+        logger.info('Watch mode started for all repositories')
+    }
+
+    /**
+     * Stop watch mode for all repositories
+     */
+    stopWatchMode(): void {
+        logger.info('Stopping watch mode for repositories')
+
+        // Stop watching active repository
+        if (this.activeStrategy) {
+            this.stopStrategyWatchMode(this.activeStrategy)
+        }
+
+        // Stop watching system repository
+        if (this.systemStrategy) {
+            this.stopStrategyWatchMode(this.systemStrategy)
+        }
+
+        logger.info('Watch mode stopped for all repositories')
+    }
+
+    /**
+     * Start watch mode for a specific strategy
+     * @param strategy - Repository strategy
+     * @param server - MCP Server instance
+     * @param storageDir - Storage directory path
+     * @param systemStorageDir - System storage directory path (optional, for main repo only)
+     * @param branch - Branch name (for Git repositories)
+     */
+    private startStrategyWatchMode(
+        strategy: RepositoryStrategy,
+        server: McpServer,
+        storageDir: string,
+        systemStorageDir: string | undefined,
+        branch?: string
+    ): void {
+        try {
+            if (strategy instanceof LocalRepositoryStrategy) {
+                // Determine watch path: if source and target are same, watch source; otherwise watch target
+                const repoPath = strategy.getUrl()
+                const resolvedSource = path.resolve(repoPath)
+                const resolvedTarget = path.resolve(storageDir)
+                const watchPath = resolvedSource === resolvedTarget ? repoPath : storageDir
+
+                logger.info(
+                    { repoPath, storageDir, watchPath },
+                    'Starting file watcher for local repository'
+                )
+
+                strategy.startWatching(async (filePath: string) => {
+                    try {
+                        logger.info({ filePath }, 'File change detected, reloading single prompt')
+                        const result = await reloadSinglePrompt(server, filePath, storageDir)
+                        if (result.success) {
+                            logger.info({ filePath }, 'Single prompt reloaded successfully')
+                        } else if (result.error) {
+                            logger.info(
+                                { 
+                                    filePath, 
+                                    errorMessage: result.error.message,
+                                    errorStack: result.error.stack,
+                                    errorName: result.error.name
+                                },
+                                `Single prompt reload failed: ${result.error.message}. Full reload may have been triggered.`
+                            )
+                        } else {
+                            logger.info(
+                                { filePath },
+                                'Single prompt reload failed (no error details), full reload may have been triggered'
+                            )
+                        }
+                    } catch (error) {
+                        const reloadError = error instanceof Error ? error : new Error(String(error))
+                        logger.error(
+                            { 
+                                filePath, 
+                                errorMessage: reloadError.message,
+                                errorStack: reloadError.stack,
+                                errorName: reloadError.name
+                            }, 
+                            `Failed to reload single prompt: ${reloadError.message}`
+                        )
+                    }
+                }, watchPath)
+            } else if (strategy instanceof GitRepositoryStrategy) {
+                logger.info(
+                    { repoUrl: strategy.getUrl(), branch, storageDir },
+                    'Starting Git polling'
+                )
+
+                strategy.startPolling(
+                    async () => {
+                        try {
+                            logger.info('Git update detected, reloading all prompts')
+                            await reloadPrompts(server, storageDir, systemStorageDir)
+                        } catch (error) {
+                            const reloadError = error instanceof Error ? error : new Error(String(error))
+                            logger.error({ error: reloadError }, 'Failed to reload prompts after Git update')
+                        }
+                    },
+                    storageDir,
+                    branch
+                )
+            } else {
+                logger.warn(
+                    { strategyType: strategy.getType() },
+                    'Watch mode not supported for this strategy type'
+                )
+            }
+        } catch (error) {
+            const watchError = error instanceof Error ? error : new Error(String(error))
+            logger.error(
+                { strategyType: strategy.getType(), error: watchError },
+                'Failed to start watch mode for strategy'
+            )
+        }
+    }
+
+    /**
+     * Stop watch mode for a specific strategy
+     * @param strategy - Repository strategy
+     */
+    private stopStrategyWatchMode(strategy: RepositoryStrategy): void {
+        try {
+            if (strategy instanceof LocalRepositoryStrategy) {
+                if (strategy.isWatching()) {
+                    strategy.stopWatching()
+                    logger.info('File watcher stopped for local repository')
+                }
+            } else if (strategy instanceof GitRepositoryStrategy) {
+                if (strategy.isPolling()) {
+                    strategy.stopPolling()
+                    logger.info('Git polling stopped')
+                }
+            }
+        } catch (error) {
+            const stopError = error instanceof Error ? error : new Error(String(error))
+            logger.warn({ strategyType: strategy.getType(), error: stopError }, 'Error stopping watch mode')
+        }
     }
 }
 
