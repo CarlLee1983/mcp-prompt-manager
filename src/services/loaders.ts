@@ -1659,7 +1659,7 @@ export function getPromptRuntime(id: string): PromptRuntime | undefined {
 
 /**
  * Get Prompt statistics
- * @returns Statistics object
+ * @returns Statistics object including tool counts
  */
 export function getPromptStats(): {
     total: number
@@ -1668,8 +1668,18 @@ export function getPromptStats(): {
     invalid: number
     disabled: number
     warning: number
+    tools: {
+        basic: number
+        prompt: number
+        total: number
+    }
 } {
     const runtimes = Array.from(promptRuntimeMap.values())
+    // Count actual registered prompt tools (use registeredToolRefs for accurate count)
+    // This is more accurate than filtering by runtime_state, as it reflects actual tool registration
+    const promptToolsCount = registeredToolRefs.size
+    const basicToolsCount = 8 // mcp_reload, mcp_stats, mcp_list, mcp_inspect, mcp_reload_prompts, mcp_prompt_stats, mcp_prompt_list, mcp_repo_switch
+    
     return {
         total: runtimes.length,
         active: runtimes.filter((r) => r.runtime_state === 'active').length,
@@ -1677,5 +1687,10 @@ export function getPromptStats(): {
         invalid: runtimes.filter((r) => r.runtime_state === 'invalid').length,
         disabled: runtimes.filter((r) => r.runtime_state === 'disabled').length,
         warning: runtimes.filter((r) => r.runtime_state === 'warning').length,
+        tools: {
+            basic: basicToolsCount,
+            prompt: promptToolsCount,
+            total: basicToolsCount + promptToolsCount,
+        },
     }
 }

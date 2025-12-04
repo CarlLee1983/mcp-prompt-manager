@@ -55,20 +55,41 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
         _branch?: string,
         _maxRetries?: number
     ): Promise<void> {
-        logger.info(
-            { source: this.repoPath, target: storageDir },
-            'Copying from local repository (includes uncommitted changes)'
-        )
-
         const sourceStat = await fs.stat(this.repoPath).catch(() => null)
         if (!sourceStat) {
             throw new Error(`Source directory does not exist: ${this.repoPath}`)
         }
 
+        // Optimize: If source and target are the same (or resolve to same path), skip copying
+        const resolvedSource = path.resolve(this.repoPath)
+        const resolvedTarget = path.resolve(storageDir)
+        
+        if (resolvedSource === resolvedTarget) {
+            logger.info(
+                { source: this.repoPath, target: storageDir },
+                'Source and target are the same, skipping copy (using direct read)'
+            )
+            // Clear cache to ensure data consistency
+            clearFileCache(storageDir)
+            logger.info('Local repository sync successful (direct read mode)')
+            return
+        }
+
+        // For local paths, check if we can use a faster approach
+        // If target directory doesn't exist or is empty, we can skip copying for now
+        // and let loadPrompts read directly from source (but this would require architecture changes)
+        // For now, we still copy but log that it's a local path operation
+        logger.info(
+            { source: this.repoPath, target: storageDir },
+            'Copying from local repository (includes uncommitted changes)'
+        )
+
         // Ensure target directory exists
         await fs.mkdir(storageDir, { recursive: true })
 
         // Copy all files (excluding .git)
+        // Note: For large local repositories, this may take time
+        // Consider optimizing by using symlinks or direct reads in the future
         await this.copyLocalRepository(this.repoPath, storageDir)
 
         // Clear cache to ensure data consistency

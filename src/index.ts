@@ -73,7 +73,18 @@ async function main() {
         })
         logger.info({ type: transport.getType() }, 'Transport adapter created')
 
-        // 2. Create Repo Manager
+        // 2. Get MCP Server instance EARLY (before connecting)
+        const server = transport.getServer()
+        if (!server) {
+            throw new Error(
+                `Transport type "${transport.getType()}" does not support MCP Server. Only stdio transport is currently supported for full MCP functionality.`
+            )
+        }
+
+        // 3. Load repositories and prompts BEFORE connecting
+        // MCP SDK requires all tools to be registered before connection for clients to see them
+        // For local paths with STORAGE_DIR set to source, this should be fast (no copying)
+        // Create Repo Manager
         const repoConfigs = getRepoConfigs()
         const systemRepoConfig = getSystemRepoConfig()
         const repoManager = new RepoManager(repoConfigs, systemRepoConfig)
@@ -85,11 +96,11 @@ async function main() {
             'Repo manager created'
         )
 
-        // 3. Load Repository
+        // 4. Load Repository (optimized for local paths - skips copy if source == target)
         await repoManager.loadRepository(STORAGE_DIR)
         logger.info('Main repository loaded')
 
-        // 4. Load System Repository (if available)
+        // 5. Load System Repository (if available) - can be parallelized in future
         let systemStorageDir: string | undefined
         if (systemRepoConfig) {
             await repoManager.loadSystemRepository(STORAGE_DIR)
@@ -97,11 +108,11 @@ async function main() {
             logger.info('System repository loaded')
         }
 
-        // 5. Load Handlebars Partials
+        // 6. Load Handlebars Partials
         const partialsCount = await loadPartials(STORAGE_DIR)
         logger.info({ count: partialsCount }, 'Partials loaded')
 
-        // 6. Load and register Prompts
+        // 7. Load and register Prompts (this will register tools from prompts)
         // Notify user before loading (if using default values)
         if (IS_DEFAULT_GROUPS) {
             logger.info(
@@ -113,15 +124,7 @@ async function main() {
             )
         }
 
-        // Get MCP Server instance (for registering tools)
-        const server = transport.getServer()
-        if (!server) {
-            throw new Error(
-                `Transport type "${transport.getType()}" does not support MCP Server. Only stdio transport is currently supported for full MCP functionality.`
-            )
-        }
-
-        const { loaded, errors } = await loadPrompts(
+        const { loaded, errors, loadedToolIds } = await loadPrompts(
             server,
             STORAGE_DIR,
             systemStorageDir
@@ -149,17 +152,46 @@ async function main() {
             )
         }
 
-        // 7. Register tools using transport adapter
+        // 8. Register basic tools AFTER prompts (so all tools are registered together)
+        // This ensures all tools (basic + prompts) are available when client connects
         await registerTools(transport, server, startTime)
+        logger.info('Basic tools registered')
 
-        // 8. Register resources using transport adapter
+        // 9. Register basic resources
         await registerResources(transport, server, startTime)
+        logger.info('Basic resources registered')
 
-        // 9. Connect transport
+        // 10. Log total tool count before connecting
+        // This helps diagnose tool registration issues across different clients
+        // Use actual registered tool IDs count instead of loaded prompts count
+        // (only active/legacy prompts are registered as tools)
+        const promptToolsCount = loadedToolIds?.size ?? 0
+        const basicToolsCount = 8 // mcp_reload, mcp_stats, mcp_list, mcp_inspect, mcp_reload_prompts, mcp_prompt_stats, mcp_prompt_list, mcp_repo_switch
+        const totalToolsCount = basicToolsCount + promptToolsCount
+        logger.info(
+            {
+                basicTools: basicToolsCount,
+                promptTools: promptToolsCount,
+                loadedPrompts: loaded, // Total prompts loaded (including non-active ones)
+                totalTools: totalToolsCount,
+            },
+            'All tools registered - ready to connect'
+        )
+
+        // 11. Connect transport AFTER all tools are registered
+        // This ensures all tools (basic + prompts) are available when client connects
+        // For local paths with STORAGE_DIR=source, loading should be fast enough
         await transport.connect()
-        logger.info('Transport connected')
+        logger.info(
+            {
+                basicTools: basicToolsCount,
+                promptTools: promptToolsCount,
+                totalTools: totalToolsCount,
+            },
+            'Transport connected - all tools available'
+        )
 
-        // 10. Initialize cache cleanup mechanism
+        // 11. Initialize cache cleanup mechanism
         const cleanupInterval = CACHE_CLEANUP_INTERVAL ?? 10000
         startCacheCleanup(cleanupInterval, (cleaned) => {
             if (cleaned > 0) {
@@ -171,7 +203,7 @@ async function main() {
             'Cache cleanup mechanism started'
         )
 
-        // 11. Register graceful shutdown handlers
+        // 12. Register graceful shutdown handlers
         const shutdown = () => {
             logger.info('Shutting down gracefully...')
             stopCacheCleanup()
@@ -201,16 +233,16 @@ async function registerTools(
     server: any, // MCP Server instance
     startTime: number
 ): Promise<void> {
-    // Register mcp.reload() tool
+    // Register mcp_reload() tool
     transport.registerTool({
-        name: 'mcp.reload',
+        name: 'mcp_reload',
         title: 'Reload Prompts',
         description:
             'Reload all prompts from Git repository without restarting the server. This will: 1) Pull latest changes from Git, 2) Clear cache, 3) Reload all Handlebars partials, 4) Reload all prompts and tools (zero-downtime).',
         inputSchema: z.object({}),
         handler: async () => {
             try {
-                logger.info('mcp.reload tool invoked')
+                logger.info('mcp_reload tool invoked')
                 const result = await reloadPrompts(server, STORAGE_DIR)
 
                 const message = `Successfully reloaded ${result.loaded} prompts. ${result.errors.length} error(s) occurred.`
@@ -267,18 +299,18 @@ async function registerTools(
             }
         },
     })
-    logger.info('mcp.reload tool registered')
+    logger.info('mcp_reload tool registered')
 
-    // Register mcp.stats() tool
+    // Register mcp_stats() tool
     transport.registerTool({
-        name: 'mcp.stats',
+        name: 'mcp_stats',
         title: 'Get Prompt Statistics',
         description:
-            'Get statistics about all prompts including counts by runtime state (active, legacy, invalid, disabled, warning).',
+            'Get statistics about all prompts including counts by runtime state (active, legacy, invalid, disabled, warning) and tool counts (basic tools, prompt tools, total tools).',
         inputSchema: z.object({}),
         handler: async () => {
             try {
-                logger.info('mcp.stats tool invoked')
+                logger.info('mcp_stats tool invoked')
                 const stats = getPromptStats()
 
                 return {
@@ -316,11 +348,11 @@ async function registerTools(
             }
         },
     })
-    logger.info('mcp.stats tool registered')
+    logger.info('mcp_stats tool registered')
 
-    // Register mcp.list() tool
+    // Register mcp_list() tool
     transport.registerTool({
-        name: 'mcp.list',
+        name: 'mcp_list',
         title: 'List Prompts',
         description:
             'List all prompts with optional filtering by status, group, or tag. Returns prompt metadata including runtime state, version, tags, and use cases.',
@@ -344,7 +376,7 @@ async function registerTools(
         }),
         handler: async (args: Record<string, unknown>) => {
             try {
-                    logger.info({ args }, 'mcp.list tool invoked')
+                    logger.info({ args }, 'mcp_list tool invoked')
                     let runtimes = getAllPromptRuntimes()
 
                     // Filter by status
@@ -434,11 +466,11 @@ async function registerTools(
             }
         },
     })
-    logger.info('mcp.list tool registered')
+    logger.info('mcp_list tool registered')
 
-    // Register mcp.inspect() tool
+    // Register mcp_inspect() tool
     transport.registerTool({
-        name: 'mcp.inspect',
+        name: 'mcp_inspect',
         title: 'Inspect Prompt',
         description:
             'Get detailed runtime information for a specific prompt by ID. Returns complete runtime metadata including state, source, version, status, tags, and use cases.',
@@ -448,7 +480,7 @@ async function registerTools(
         handler: async (args: Record<string, unknown>) => {
             try {
                 const id = args.id as string
-                logger.info({ id }, 'mcp.inspect tool invoked')
+                logger.info({ id }, 'mcp_inspect tool invoked')
                 const runtime = getPromptRuntime(id)
 
                 if (!runtime) {
@@ -508,11 +540,11 @@ async function registerTools(
             }
         },
     })
-    logger.info('mcp.inspect tool registered')
+    logger.info('mcp_inspect tool registered')
 
     // Register MCP Control Tools
     transport.registerTool({
-        name: 'mcp.reload_prompts',
+        name: 'mcp_reload_prompts',
         title: 'Reload Prompts',
         description:
             'Reload all prompts from Git repository without restarting the server (hot-reload).',
@@ -521,10 +553,10 @@ async function registerTools(
             return await handleReload(server)
         },
     })
-    logger.info('mcp.reload_prompts tool registered')
+    logger.info('mcp_reload_prompts tool registered')
 
     transport.registerTool({
-        name: 'mcp.prompt.stats',
+        name: 'mcp_prompt_stats',
         title: 'Get Prompt Statistics',
         description:
             'Get statistics about all prompts including counts by runtime state.',
@@ -533,10 +565,10 @@ async function registerTools(
             return await handlePromptStats()
         },
     })
-    logger.info('mcp.prompt.stats tool registered')
+    logger.info('mcp_prompt_stats tool registered')
 
     transport.registerTool({
-        name: 'mcp.prompt.list',
+        name: 'mcp_prompt_list',
         title: 'List All Prompts',
         description:
             'List all prompt runtimes with complete metadata information.',
@@ -545,10 +577,10 @@ async function registerTools(
             return await handlePromptList()
         },
     })
-    logger.info('mcp.prompt.list tool registered')
+    logger.info('mcp_prompt_list tool registered')
 
     transport.registerTool({
-        name: 'mcp.repo.switch',
+        name: 'mcp_repo_switch',
         title: 'Switch Prompt Repository',
         description:
             'Switch to a different prompt repository and reload prompts (zero-downtime).',
@@ -563,7 +595,7 @@ async function registerTools(
             })
         },
     })
-    logger.info('mcp.repo.switch tool registered')
+    logger.info('mcp_repo_switch tool registered')
 }
 
 /**

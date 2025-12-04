@@ -17,7 +17,7 @@ export async function handleReload(
     server: McpServer
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
     try {
-        logger.info('mcp.reload_prompts tool invoked')
+        logger.info('mcp_reload_prompts tool invoked')
         const result = await reloadPrompts(server, STORAGE_DIR)
 
         const message = `Reload completed. Loaded: ${result.loaded}, Errors: ${result.errors.length}`
@@ -54,7 +54,7 @@ export async function handlePromptStats(): Promise<{
     content: Array<{ type: 'text'; text: string }>
 }> {
     try {
-        logger.info('mcp.prompt.stats tool invoked')
+        logger.info('mcp_prompt_stats tool invoked')
         const stats = getPromptStats()
 
         return {
@@ -89,7 +89,7 @@ export async function handlePromptList(): Promise<{
     content: Array<{ type: 'text'; text: string }>
 }> {
     try {
-        logger.info('mcp.prompt.list tool invoked')
+        logger.info('mcp_prompt_list tool invoked')
         const runtimes = getAllPromptRuntimes()
 
         return {
@@ -131,7 +131,7 @@ export async function handleRepoSwitch(
     try {
         logger.info(
             { repo_url: args.repo_url, branch: args.branch },
-            'mcp.repo.switch tool invoked'
+            'mcp_repo_switch tool invoked'
         )
 
         // Validate repo_url is string
