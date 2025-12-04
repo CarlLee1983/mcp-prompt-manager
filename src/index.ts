@@ -5,6 +5,8 @@ import {
     CACHE_CLEANUP_INTERVAL,
     TRANSPORT_TYPE,
     WATCH_MODE,
+    LANG_INSTRUCTION,
+    LANG_SETTING,
     getRepoConfigs,
     getSystemRepoConfig,
 } from './config/env.js'
@@ -16,6 +18,7 @@ import {
     getAllPromptRuntimes,
     getPromptStats,
     getPromptRuntime,
+    getPrompt,
 } from './services/loaders.js'
 import { startCacheCleanup, stopCacheCleanup } from './utils/fileSystem.js'
 import { getHealthStatus } from './services/health.js'
@@ -612,6 +615,163 @@ async function registerTools(
         },
     })
     logger.info('mcp_repo_switch tool registered')
+
+    // Register preview_prompt tool
+    transport.registerTool({
+        name: 'preview_prompt',
+        title: 'Preview Prompt',
+        description:
+            'Debug utility: Renders a prompt template with given arguments to show the final text without sending it to an LLM. Use this to verify template logic.',
+        inputSchema: z.object({
+            promptId: z.string().describe('The ID of the prompt to test (e.g., \'laravel:code-review\')'),
+            args: z.record(z.string(), z.unknown()).describe('JSON object containing the arguments/variables for the template'),
+        }),
+        handler: async (args: Record<string, unknown>) => {
+            try {
+                const promptId = args.promptId as string
+                const inputArgs = args.args as Record<string, unknown>
+
+                logger.info({ promptId }, 'preview_prompt tool invoked')
+
+                // 1. 驗證 promptId 是否存在
+                const cachedPrompt = getPrompt(promptId)
+                if (!cachedPrompt) {
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify({
+                                    success: false,
+                                    error: `Prompt not found: ${promptId}`,
+                                }),
+                            },
+                        ],
+                        structuredContent: {
+                            success: false,
+                            error: `Prompt not found: ${promptId}`,
+                        },
+                        isError: true,
+                    }
+                }
+
+                // 2. 驗證 args 參數
+                const zodSchema = Object.keys(cachedPrompt.zodShape).length > 0
+                    ? z.object(cachedPrompt.zodShape)
+                    : z.object({})
+
+                const validationResult = zodSchema.safeParse(inputArgs)
+                if (!validationResult.success) {
+                    const errorDetails = validationResult.error.issues.map((issue) => ({
+                        path: issue.path.join('.'),
+                        message: issue.message,
+                    }))
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify({
+                                    success: false,
+                                    error: 'Validation failed',
+                                    details: errorDetails,
+                                }),
+                            },
+                        ],
+                        structuredContent: {
+                            success: false,
+                            error: 'Validation failed',
+                            details: errorDetails,
+                        },
+                        isError: true,
+                    }
+                }
+
+                // 3. 渲染模板
+                try {
+                    const context = {
+                        ...validationResult.data,
+                        output_lang_rule: LANG_INSTRUCTION,
+                        sys_lang: LANG_SETTING,
+                    }
+
+                    const renderedText = cachedPrompt.compiledTemplate(context)
+
+                    logger.debug(
+                        {
+                            promptId,
+                            renderedLength: renderedText.length,
+                        },
+                        'Template rendered successfully'
+                    )
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify({
+                                    success: true,
+                                    renderedText,
+                                }),
+                            },
+                        ],
+                        structuredContent: {
+                            success: true,
+                            renderedText,
+                        },
+                    }
+                } catch (renderError) {
+                    const error =
+                        renderError instanceof Error
+                            ? renderError
+                            : new Error(String(renderError))
+
+                    logger.error(
+                        { promptId, error },
+                        'Template rendering failed'
+                    )
+
+                    return {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: JSON.stringify({
+                                    success: false,
+                                    error: `Template rendering failed: ${error.message}`,
+                                }),
+                            },
+                        ],
+                        structuredContent: {
+                            success: false,
+                            error: `Template rendering failed: ${error.message}`,
+                        },
+                        isError: true,
+                    }
+                }
+            } catch (error) {
+                const previewError =
+                    error instanceof Error ? error : new Error(String(error))
+                logger.error({ error: previewError }, 'preview_prompt tool failed')
+
+                return {
+                    content: [
+                        {
+                            type: 'text' as const,
+                            text: JSON.stringify({
+                                success: false,
+                                error: previewError.message,
+                            }),
+                        },
+                    ],
+                    structuredContent: {
+                        success: false,
+                        error: previewError.message,
+                    },
+                    isError: true,
+                }
+            }
+        },
+    })
+    logger.info('preview_prompt tool registered')
 }
 
 /**

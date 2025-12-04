@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { SourceManager, type LoadError } from './sourceManager.js'
+import { SourceManager, type LoadError, type CachedPrompt } from './sourceManager.js'
 import type { PromptRuntime } from '../types/promptRuntime.js'
 
 // --- Exported Functions (Delegating to SourceManager) ---
@@ -16,6 +16,13 @@ export function getAllPromptRuntimes(): PromptRuntime[] {
  */
 export function getPromptRuntime(id: string): PromptRuntime | undefined {
     return SourceManager.getInstance().getPromptRuntime(id)
+}
+
+/**
+ * Get CachedPrompt by ID (Fast retrieval)
+ */
+export function getPrompt(id: string): CachedPrompt | undefined {
+    return SourceManager.getInstance().getPrompt(id)
 }
 
 /**
