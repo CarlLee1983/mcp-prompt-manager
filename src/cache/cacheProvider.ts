@@ -1,96 +1,96 @@
 /**
- * 快取提供者抽象介面
- * 支援本地快取和 Redis 快取（未來）
+ * Cache provider abstract interface
+ * Supports local cache and Redis cache (future)
  */
 
 /**
- * 快取統計資訊
+ * Cache statistics information
  */
 export interface CacheStats {
-    /** 快取項目數量 */
+    /** Number of cache items */
     size: number
-    /** 快取命中次數 */
+    /** Number of cache hits */
     hits: number
-    /** 快取未命中次數 */
+    /** Number of cache misses */
     misses: number
-    /** 快取命中率（百分比） */
+    /** Cache hit rate (percentage) */
     hitRate: number
-    /** 被驅逐的項目數量 */
+    /** Number of evicted items */
     evictions: number
-    /** 過期項目數量 */
+    /** Number of expired items */
     expirations?: number
-    /** 平均存取次數 */
+    /** Average access count */
     averageAccessCount?: number
-    /** 最熱門的鍵（存取次數最多） */
+    /** Top keys (most accessed) */
     topKeys?: Array<{ key: string; accessCount: number }>
-    /** 快取建立時間 */
+    /** Cache creation timestamp */
     createdAt?: number
-    /** 最後清理時間 */
+    /** Last cleanup timestamp */
     lastCleanup?: number
 }
 
 /**
- * 快取提供者抽象介面
- * 定義所有快取實作必須提供的方法
+ * Cache provider abstract interface
+ * Defines methods that all cache implementations must provide
  */
 export interface CacheProvider {
     /**
-     * 取得快取值
-     * @param key - 快取鍵
-     * @returns 快取值，如果不存在則返回 null
+     * Get cache value
+     * @param key - Cache key
+     * @returns Cache value, or null if not exists
      */
     get<T>(key: string): Promise<T | null>
 
     /**
-     * 設定快取值
-     * @param key - 快取鍵
-     * @param value - 快取值
-     * @param ttl - 存活時間（毫秒），可選
+     * Set cache value
+     * @param key - Cache key
+     * @param value - Cache value
+     * @param ttl - Time to live (milliseconds), optional
      */
     set<T>(key: string, value: T, ttl?: number): Promise<void>
 
     /**
-     * 刪除快取值
-     * @param key - 快取鍵
+     * Delete cache value
+     * @param key - Cache key
      */
     delete(key: string): Promise<void>
 
     /**
-     * 檢查快取是否存在
-     * @param key - 快取鍵
-     * @returns 是否存在
+     * Check if cache exists
+     * @param key - Cache key
+     * @returns Whether the cache exists
      */
     has(key: string): Promise<boolean>
 
     /**
-     * 清除所有快取
+     * Clear all cache
      */
     clear(): Promise<void>
 
     /**
-     * 取得快取大小
-     * @returns 快取項目數量
+     * Get cache size
+     * @returns Number of cache items
      */
     size(): Promise<number>
 
     /**
-     * 取得快取統計資訊
-     * @returns 快取統計資訊
+     * Get cache statistics
+     * @returns Cache statistics information
      */
     getStats(): Promise<CacheStats>
 }
 
 /**
- * 快取配置
+ * Cache configuration
  */
 export interface CacheConfig {
-    /** 快取提供者類型 */
+    /** Cache provider type */
     provider: 'local' | 'redis'
-    /** 最大快取大小（僅用於本地快取） */
+    /** Maximum cache size (only for local cache) */
     maxSize?: number
-    /** 預設 TTL（毫秒） */
+    /** Default TTL (milliseconds) */
     ttl?: number
-    /** Redis 配置（僅用於 Redis 快取） */
+    /** Redis configuration (only for Redis cache) */
     redis?: {
         host: string
         port: number

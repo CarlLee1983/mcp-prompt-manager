@@ -13,7 +13,7 @@ import fs from 'fs/promises'
 import path from 'path'
 
 /**
- * 健康狀態資料結構
+ * Health status data structure
  */
 export interface HealthStatus {
     git: {
@@ -49,10 +49,10 @@ export interface HealthStatus {
 }
 
 /**
- * 取得 Git HEAD commit
- * 優先使用 simple-git，失敗時 fallback 到 exec
- * @param storageDir - Git repository 目錄
- * @returns HEAD commit hash 或 null
+ * Get Git HEAD commit
+ * Prefers simple-git, falls back to exec on failure
+ * @param storageDir - Git repository directory
+ * @returns HEAD commit hash or null
  */
 async function getGitHeadCommit(
     storageDir: string

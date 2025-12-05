@@ -99,15 +99,15 @@ export class SourceManager {
     private filePathToPromptIdMap = new Map<string, string>()
 
     // Optimization: Cache compiled prompts
-    // 使用快取抽象層，支援本地快取和 Redis（未來）
+    // Uses cache abstraction layer, supports local cache and Redis (future)
     private promptCache: CacheProvider
-    private isLocalCache: boolean // 標記是否為本地快取（用於同步方法）
+    private isLocalCache: boolean // Flag indicating if it's local cache (for synchronous methods)
 
     // Reentrancy protection lock
     private reloadingPromise: Promise<{ loaded: number; errors: LoadError[] }> | null = null
 
     private constructor() {
-        // 從環境變數建立快取提供者
+        // Create cache provider from environment variables
         this.promptCache = CacheFactory.createFromEnv()
         this.isLocalCache = this.promptCache instanceof LocalCache
         logger.info(
@@ -139,15 +139,15 @@ export class SourceManager {
 
     /**
      * Get CachedPrompt by ID (Fast retrieval)
-     * 使用同步方法以保持向後兼容（僅適用於本地快取）
+     * Uses synchronous method for backward compatibility (only for local cache)
      */
     public getPrompt(id: string): CachedPrompt | undefined {
         if (this.isLocalCache) {
             const result = (this.promptCache as LocalCache).getSync<CachedPrompt>(id)
             return result ?? undefined
         }
-        // 對於非本地快取（如 Redis），需要異步方法
-        // 但為了向後兼容，這裡返回 undefined 並記錄警告
+        // For non-local cache (e.g., Redis), async method is required
+        // But for backward compatibility, return undefined and log warning
         logger.warn(
             'getPrompt called synchronously but cache provider is not local. Use getPromptAsync instead.'
         )
@@ -156,7 +156,7 @@ export class SourceManager {
 
     /**
      * Get CachedPrompt by ID (Async version for remote cache)
-     * 異步版本，適用於所有快取提供者
+     * Async version, applicable to all cache providers
      */
     public async getPromptAsync(id: string): Promise<CachedPrompt | undefined> {
         const result = await this.promptCache.get<CachedPrompt>(id)
@@ -264,8 +264,8 @@ export class SourceManager {
         if (this.isLocalCache) {
             ;(this.promptCache as LocalCache).clearSync()
         } else {
-            // 對於非本地快取，需要異步清除
-            // 但為了保持方法同步，這裡使用 Promise（不等待）
+            // For non-local cache, async clear is required
+            // But to keep method synchronous, use Promise (not awaited)
             this.promptCache.clear().catch((error) => {
                 logger.error({ error }, 'Failed to clear cache')
             })
@@ -296,8 +296,8 @@ export class SourceManager {
                     if (this.isLocalCache) {
                         ;(this.promptCache as LocalCache).deleteSync(toolId)
                     } else {
-                        // 對於非本地快取，需要異步刪除
-                        // 但為了保持方法同步，這裡使用 Promise（不等待）
+                        // For non-local cache, async delete is required
+                        // But to keep method synchronous, use Promise (not awaited)
                         this.promptCache.delete(toolId).catch((error) => {
                             logger.error({ toolId, error }, 'Failed to delete from cache')
                         })
@@ -1402,7 +1402,7 @@ export class SourceManager {
 
             // I'll leave reloadSinglePrompt as a TODO or simplified version here
             // and focus on the main loadPrompts which is the optimization target.
-            // The user asked for "load() 階段就完成編譯".
+            // The user asked for "compile at load() stage".
 
             return { success: true }
         } catch (error) {

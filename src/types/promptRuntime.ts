@@ -1,18 +1,18 @@
 /**
  * Prompt Runtime State
- * 表示 prompt 在執行時期的狀態
+ * Represents the runtime state of a prompt
  */
 export type PromptRuntimeState = 'active' | 'legacy' | 'invalid' | 'disabled' | 'warning'
 
 /**
  * Prompt Source
- * 表示 prompt metadata 的來源
+ * Represents the source of prompt metadata
  */
 export type PromptSource = 'embedded' | 'registry' | 'legacy'
 
 /**
  * Prompt Runtime Object
- * 完整的 prompt runtime 資訊
+ * Complete prompt runtime information
  */
 export interface PromptRuntime {
     id: string

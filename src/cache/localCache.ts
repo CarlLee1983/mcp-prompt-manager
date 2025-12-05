@@ -2,27 +2,27 @@ import type { CacheProvider, CacheStats } from './cacheProvider.js'
 import { logger } from '../utils/logger.js'
 
 /**
- * 快取項目內部結構
+ * Internal cache entry structure
  */
 interface CacheEntry<T> {
-    /** 快取值 */
+    /** Cache value */
     value: T
-    /** 建立時間戳 */
+    /** Creation timestamp */
     timestamp: number
-    /** 存活時間（毫秒），可選 */
+    /** Time to live (milliseconds), optional */
     ttl: number | undefined
-    /** 存取次數 */
+    /** Access count */
     accessCount: number
-    /** 最後存取時間 */
+    /** Last access timestamp */
     lastAccessed: number
 }
 
 /**
- * 本地記憶體快取實作
- * 使用 Map 儲存，支援 LRU 策略和 TTL
+ * Local in-memory cache implementation
+ * Uses Map for storage, supports LRU strategy and TTL
  * 
- * 注意：為了向後兼容，LocalCache 提供同步方法
- * 這些方法僅用於本地快取，不適用於 Redis 等遠程快取
+ * Note: For backward compatibility, LocalCache provides synchronous methods
+ * These methods are only for local cache, not applicable to remote caches like Redis
  */
 export class LocalCache implements CacheProvider {
     private cache = new Map<string, CacheEntry<unknown>>()
@@ -41,10 +41,10 @@ export class LocalCache implements CacheProvider {
     private cleanupIntervalMs: number
 
     /**
-     * 建立本地快取實例
-     * @param maxSize - 最大快取大小，預設 1000
-     * @param defaultTTL - 預設 TTL（毫秒），可選
-     * @param cleanupIntervalMs - TTL 清理間隔（毫秒），預設 60000（1分鐘）
+     * Create local cache instance
+     * @param maxSize - Maximum cache size, default 1000
+     * @param defaultTTL - Default TTL (milliseconds), optional
+     * @param cleanupIntervalMs - TTL cleanup interval (milliseconds), default 60000 (1 minute)
      */
     constructor(maxSize: number = 1000, defaultTTL?: number, cleanupIntervalMs: number = 60000) {
         this.maxSize = maxSize
@@ -52,7 +52,7 @@ export class LocalCache implements CacheProvider {
         this.cleanupIntervalMs = cleanupIntervalMs
         this.createdAt = Date.now()
         
-        // 如果有 TTL，啟動定期清理
+        // Start periodic cleanup if TTL is set
         if (defaultTTL) {
             this.startCleanupInterval()
         }
@@ -65,7 +65,7 @@ export class LocalCache implements CacheProvider {
 
 
     /**
-     * 取得快取值
+     * Get cache value
      */
     async get<T>(key: string): Promise<T | null> {
         this.stats.totalAccesses++
@@ -76,7 +76,7 @@ export class LocalCache implements CacheProvider {
             return null
         }
 
-        // 檢查 TTL
+        // Check TTL
         const now = Date.now()
         if (entry.ttl && now - entry.timestamp > entry.ttl) {
             this.cache.delete(key)
@@ -86,12 +86,12 @@ export class LocalCache implements CacheProvider {
             return null
         }
 
-        // 更新存取統計
+        // Update access statistics
         entry.lastAccessed = now
         entry.accessCount++
         this.stats.hits++
 
-        // LRU: 移動到最後（表示最近使用）
+        // LRU: Move to end (indicates recently used)
         this.cache.delete(key)
         this.cache.set(key, entry)
 
@@ -99,10 +99,10 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 設定快取值
+     * Set cache value
      */
     async set<T>(key: string, value: T, ttl?: number): Promise<void> {
-        // 如果超過大小限制且鍵不存在，移除最舊的項目（LRU）
+        // If exceeds size limit and key doesn't exist, remove oldest item (LRU)
         if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
             this.evictOldest()
         }
@@ -120,7 +120,7 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 刪除快取值
+     * Delete cache value
      */
     async delete(key: string): Promise<void> {
         const deleted = this.cache.delete(key)
@@ -130,13 +130,13 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 檢查快取是否存在
+     * Check if cache exists
      */
     async has(key: string): Promise<boolean> {
         const entry = this.cache.get(key)
         if (!entry) return false
 
-        // 檢查 TTL
+        // Check TTL
         if (entry.ttl) {
             const now = Date.now()
             if (now - entry.timestamp > entry.ttl) {
@@ -150,7 +150,7 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 清除所有快取
+     * Clear all cache
      */
     async clear(): Promise<void> {
         const size = this.cache.size
@@ -166,14 +166,14 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 取得快取大小
+     * Get cache size
      */
     async size(): Promise<number> {
         return this.cache.size
     }
 
     /**
-     * 取得快取統計資訊
+     * Get cache statistics
      */
     async getStats(): Promise<CacheStats> {
         const hitRate =
@@ -181,7 +181,7 @@ export class LocalCache implements CacheProvider {
                 ? (this.stats.hits / this.stats.totalAccesses) * 100
                 : 0
 
-        // 計算平均存取次數
+        // Calculate average access count
         let totalAccessCount = 0
         const accessCounts: Array<{ key: string; accessCount: number }> = []
         
@@ -195,7 +195,7 @@ export class LocalCache implements CacheProvider {
                 ? parseFloat((totalAccessCount / this.cache.size).toFixed(2))
                 : 0
 
-        // 取得最熱門的鍵（前 10 個）
+        // Get top keys (top 10)
         const topKeys = accessCounts
             .sort((a, b) => b.accessCount - a.accessCount)
             .slice(0, 10)
@@ -208,7 +208,7 @@ export class LocalCache implements CacheProvider {
             evictions: this.stats.evictions,
         }
 
-        // 可選欄位
+        // Optional fields
         if (this.stats.expirations !== undefined) {
             stats.expirations = this.stats.expirations
         }
@@ -229,8 +229,8 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 同步取得快取值（僅用於本地快取）
-     * 為了向後兼容而提供
+     * Synchronously get cache value (only for local cache)
+     * Provided for backward compatibility
      */
     getSync<T>(key: string): T | null {
         this.stats.totalAccesses++
@@ -241,7 +241,7 @@ export class LocalCache implements CacheProvider {
             return null
         }
 
-        // 檢查 TTL
+        // Check TTL
         const now = Date.now()
         if (entry.ttl && now - entry.timestamp > entry.ttl) {
             this.cache.delete(key)
@@ -250,12 +250,12 @@ export class LocalCache implements CacheProvider {
             return null
         }
 
-        // 更新存取統計
+        // Update access statistics
         entry.lastAccessed = now
         entry.accessCount++
         this.stats.hits++
 
-        // LRU: 移動到最後（表示最近使用）
+        // LRU: Move to end (indicates recently used)
         this.cache.delete(key)
         this.cache.set(key, entry)
 
@@ -263,11 +263,11 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 同步設定快取值（僅用於本地快取）
-     * 為了向後兼容而提供
+     * Synchronously set cache value (only for local cache)
+     * Provided for backward compatibility
      */
     setSync<T>(key: string, value: T, ttl?: number): void {
-        // 如果超過大小限制且鍵不存在，移除最舊的項目（LRU）
+        // If exceeds size limit and key doesn't exist, remove oldest item (LRU)
         if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
             this.evictOldest()
         }
@@ -284,8 +284,8 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 同步刪除快取值（僅用於本地快取）
-     * 為了向後兼容而提供
+     * Synchronously delete cache value (only for local cache)
+     * Provided for backward compatibility
      */
     deleteSync(key: string): void {
         const deleted = this.cache.delete(key)
@@ -295,8 +295,8 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 同步清除所有快取（僅用於本地快取）
-     * 為了向後兼容而提供
+     * Synchronously clear all cache (only for local cache)
+     * Provided for backward compatibility
      */
     clearSync(): void {
         const size = this.cache.size
@@ -312,8 +312,8 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 驅逐最舊的快取項目（LRU 策略）
-     * 改進：同時考慮 lastAccessed 和 accessCount
+     * Evict oldest cache item (LRU strategy)
+     * Improved: Considers both lastAccessed and accessCount
      */
     private evictOldest(): void {
         let oldestKey: string | null = null
@@ -322,10 +322,10 @@ export class LocalCache implements CacheProvider {
         const now = Date.now()
         
         for (const [key, entry] of this.cache.entries()) {
-            // 計算驅逐分數：考慮最後存取時間和存取頻率
-            // 分數越高，越應該被驅逐
-            // 公式：時間距離（毫秒） / (存取次數 + 1)
-            // 這樣可以優先保留經常存取的項目
+            // Calculate eviction score: considers last access time and access frequency
+            // Higher score means more likely to be evicted
+            // Formula: time distance (ms) / (access count + 1)
+            // This prioritizes keeping frequently accessed items
             const timeSinceAccess = now - entry.lastAccessed
             const score = timeSinceAccess / (entry.accessCount + 1)
             
@@ -343,18 +343,18 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 啟動定期清理過期項目
+     * Start periodic cleanup of expired items
      */
     private startCleanupInterval(): void {
         if (this.cleanupInterval) {
-            return // 已經啟動
+            return // Already started
         }
 
         this.cleanupInterval = setInterval(() => {
             this.cleanupExpired()
         }, this.cleanupIntervalMs)
 
-        // 確保在進程退出時清理
+        // Ensure cleanup on process exit
         if (typeof process !== 'undefined') {
             process.once('SIGINT', () => this.stopCleanupInterval())
             process.once('SIGTERM', () => this.stopCleanupInterval())
@@ -362,7 +362,7 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 停止定期清理
+     * Stop periodic cleanup
      */
     private stopCleanupInterval(): void {
         if (this.cleanupInterval) {
@@ -372,22 +372,22 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 清理過期的快取項目
-     * @returns 清理的項目數量
+     * Clean up expired cache items
+     * @returns Number of cleaned items
      */
     private cleanupExpired(): number {
         const now = Date.now()
         let cleaned = 0
         const expiredKeys: string[] = []
 
-        // 收集過期的鍵
+        // Collect expired keys
         for (const [key, entry] of this.cache.entries()) {
             if (entry.ttl && now - entry.timestamp > entry.ttl) {
                 expiredKeys.push(key)
             }
         }
 
-        // 刪除過期的項目
+        // Delete expired items
         for (const key of expiredKeys) {
             this.cache.delete(key)
             this.stats.expirations++
@@ -403,14 +403,14 @@ export class LocalCache implements CacheProvider {
     }
 
     /**
-     * 手動觸發清理過期項目
+     * Manually trigger cleanup of expired items
      */
     public cleanup(): Promise<number> {
         return Promise.resolve(this.cleanupExpired())
     }
 
     /**
-     * 銷毀快取實例（清理資源）
+     * Destroy cache instance (clean up resources)
      */
     public destroy(): void {
         this.stopCleanupInterval()

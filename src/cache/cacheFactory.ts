@@ -3,21 +3,21 @@ import { LocalCache } from './localCache.js'
 import { logger } from '../utils/logger.js'
 
 /**
- * 快取工廠
- * 根據配置建立對應的快取提供者
+ * Cache factory
+ * Creates corresponding cache provider based on configuration
  */
 export class CacheFactory {
     /**
-     * 建立快取提供者
-     * @param config - 快取配置
-     * @returns 快取提供者實例
+     * Create cache provider
+     * @param config - Cache configuration
+     * @returns Cache provider instance
      */
     static create(config: CacheConfig): CacheProvider {
         switch (config.provider) {
             case 'local':
                 return new LocalCache(config.maxSize, config.ttl)
             case 'redis':
-                // Redis 快取將在未來實作
+                // Redis cache will be implemented in the future
                 throw new Error(
                     'Redis cache provider is not yet implemented. Please use "local" provider for now.'
                 )
@@ -29,8 +29,8 @@ export class CacheFactory {
     }
 
     /**
-     * 從環境變數建立快取提供者
-     * @returns 快取提供者實例
+     * Create cache provider from environment variables
+     * @returns Cache provider instance
      */
     static createFromEnv(): CacheProvider {
         const provider = (process.env.CACHE_PROVIDER || 'local') as
@@ -44,13 +44,13 @@ export class CacheFactory {
             : undefined
         const cleanupIntervalMs = process.env.CACHE_CLEANUP_INTERVAL
             ? parseInt(process.env.CACHE_CLEANUP_INTERVAL, 10)
-            : 60000 // 預設 1 分鐘
+            : 60000 // Default 1 minute
 
         if (provider === 'redis') {
             logger.warn(
                 'Redis cache provider is not yet implemented. Falling back to local cache.'
             )
-            // 暫時回退到本地快取
+            // Temporarily fall back to local cache
             const config: CacheConfig = {
                 provider: 'local',
                 maxSize,
@@ -66,7 +66,7 @@ export class CacheFactory {
             'Creating cache provider from environment'
         )
         
-        // 對於本地快取，需要直接建立 LocalCache 實例以支援 cleanupIntervalMs
+        // For local cache, need to directly create LocalCache instance to support cleanupIntervalMs
         if (provider === 'local') {
             return new LocalCache(maxSize, ttl, cleanupIntervalMs)
         }

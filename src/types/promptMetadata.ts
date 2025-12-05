@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 /**
  * Prompt Metadata Schema
- * 用於驗證 YAML 檔案中內嵌的 metadata
+ * Used to validate embedded metadata in YAML files
  */
 export const PromptMetadataSchema = z.object({
     id: z.string().min(1),
@@ -21,7 +21,7 @@ export const PromptMetadataSchema = z.object({
 
 /**
  * Prompt Metadata Type
- * 從 Zod Schema 推導出的型別
+ * Type inferred from Zod Schema
  */
 export type PromptMetadata = z.infer<typeof PromptMetadataSchema>
 

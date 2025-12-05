@@ -337,7 +337,6 @@ function checkSchemaWarnings(
                                    (schema as any).description || 
                                    ''
                 if (description.toLowerCase().includes('recommended') || 
-                    description.toLowerCase().includes('建議') ||
                     description.toLowerCase().includes('suggested')) {
                     warnings.push(`Missing recommended field: '${key}'`)
                 }
@@ -740,7 +739,7 @@ async function registerTools(
 
                 logger.info({ promptId }, 'preview_prompt tool invoked')
 
-                // 1. 驗證 promptId 是否存在
+                // 1. Validate if promptId exists
                 const cachedPrompt = getPrompt(promptId)
                 if (!cachedPrompt) {
                     return {
@@ -761,7 +760,7 @@ async function registerTools(
                     }
                 }
 
-                // 2. 驗證 args 參數
+                // 2. Validate args parameters
                 const zodSchema = Object.keys(cachedPrompt.zodShape).length > 0
                     ? z.object(cachedPrompt.zodShape)
                     : z.object({})
@@ -793,10 +792,10 @@ async function registerTools(
                     }
                 }
 
-                // 2.5. 檢查 Schema 警告（缺少的必填或建議欄位）
+                // 2.5. Check Schema warnings (missing required or recommended fields)
                 const warnings = checkSchemaWarnings(cachedPrompt.zodShape, inputArgs)
 
-                // 3. 渲染模板
+                // 3. Render template
                 try {
                     const context = {
                         ...validationResult.data,
@@ -806,11 +805,11 @@ async function registerTools(
 
                     const renderedText = cachedPrompt.compiledTemplate(context)
 
-                    // 4. 計算統計資訊（Token 估算）
+                    // 4. Calculate statistics (Token estimation)
                     const renderedLength = renderedText.length
                     const estimatedTokens = estimateTokens(renderedText)
 
-                    // 5. 生成變數高亮版本
+                    // 5. Generate variable highlighted version
                     const highlightedText = highlightVariables(
                         cachedPrompt.metadata.template,
                         renderedText,

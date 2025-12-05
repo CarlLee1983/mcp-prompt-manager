@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 /**
  * Registry Schema
- * 用於驗證 registry.yaml 檔案結構
+ * Used to validate registry.yaml file structure
  */
 export const RegistrySchema = z.object({
     prompts: z.array(
@@ -19,7 +19,7 @@ export const RegistrySchema = z.object({
 
 /**
  * Registry Type
- * 從 Zod Schema 推導出的型別
+ * Type inferred from Zod Schema
  */
 export type Registry = z.infer<typeof RegistrySchema>
 

@@ -17,7 +17,7 @@ import { ensureDirectoryAccess, clearFileCache } from '../utils/fileSystem.js'
  * @throws {Error} When Git operation fails
  */
 /**
- * 需要排除的目錄和檔案名稱（不區分大小寫）
+ * Directory and file names to exclude (case-insensitive)
  */
 const EXCLUDED_ITEMS = new Set([
     '.git',
@@ -35,9 +35,9 @@ const EXCLUDED_ITEMS = new Set([
 ])
 
 /**
- * 從本地目錄複製檔案到目標目錄（排除不需要的目錄和檔案）
- * @param sourceDir - 來源目錄
- * @param targetDir - 目標目錄
+ * Copy files from local directory to target directory (excluding unnecessary directories and files)
+ * @param sourceDir - Source directory
+ * @param targetDir - Target directory
  */
 async function copyLocalRepository(
     sourceDir: string,
