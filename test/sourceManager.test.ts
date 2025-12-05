@@ -710,4 +710,269 @@ template: 'Template'
             expect(prompt?.metadata.id).toBe('no-rules')
         })
     })
+
+    describe('getPromptAsync', () => {
+        it('should get prompt asynchronously', async () => {
+            const yamlContent = `
+id: 'async-test-prompt'
+title: 'Async Test Prompt'
+version: '1.0.0'
+status: 'stable'
+template: 'Template'
+`
+            const filePath = path.join(testDir, 'async-test-prompt.yaml')
+            await fs.writeFile(filePath, yamlContent)
+
+            const sourceManager = SourceManager.getInstance()
+            await sourceManager.loadPrompts(server, testDir)
+
+            const prompt = await sourceManager.getPromptAsync('async-test-prompt')
+            expect(prompt).toBeDefined()
+            expect(prompt?.metadata.id).toBe('async-test-prompt')
+        })
+
+        it('should return undefined for non-existent prompt (async)', async () => {
+            const sourceManager = SourceManager.getInstance()
+            const prompt = await sourceManager.getPromptAsync('non-existent')
+            expect(prompt).toBeUndefined()
+        })
+    })
+
+    describe('loadRegistry', () => {
+        it('should load registry.yaml successfully', async () => {
+            const registryContent = `
+prompts:
+  - id: 'test-prompt-1'
+    group: 'test'
+    visibility: 'public'
+  - id: 'test-prompt-2'
+    group: 'test'
+    visibility: 'private'
+`
+            const registryPath = path.join(testDir, 'registry.yaml')
+            await fs.writeFile(registryPath, registryContent)
+
+            const yamlContent = `
+id: 'test-prompt-1'
+title: 'Test Prompt 1'
+version: '1.0.0'
+status: 'stable'
+template: 'Template'
+`
+            await fs.writeFile(path.join(testDir, 'test-prompt-1.yaml'), yamlContent)
+
+            const sourceManager = SourceManager.getInstance()
+            await sourceManager.loadPrompts(server, testDir)
+
+            // Registry should be loaded and used
+            const prompt = sourceManager.getPrompt('test-prompt-1')
+            expect(prompt).toBeDefined()
+        })
+
+        it('should handle missing registry.yaml gracefully', async () => {
+            const yamlContent = `
+id: 'test-prompt'
+title: 'Test Prompt'
+version: '1.0.0'
+status: 'stable'
+template: 'Template'
+`
+            await fs.writeFile(path.join(testDir, 'test-prompt.yaml'), yamlContent)
+
+            const sourceManager = SourceManager.getInstance()
+            // Should not throw when registry.yaml doesn't exist
+            await expect(sourceManager.loadPrompts(server, testDir)).resolves.not.toThrow()
+
+            const prompt = sourceManager.getPrompt('test-prompt')
+            expect(prompt).toBeDefined()
+        })
+
+        it('should handle invalid registry.yaml gracefully', async () => {
+            const invalidRegistry = 'invalid: yaml: content: ['
+            const registryPath = path.join(testDir, 'registry.yaml')
+            await fs.writeFile(registryPath, invalidRegistry)
+
+            const yamlContent = `
+id: 'test-prompt'
+title: 'Test Prompt'
+version: '1.0.0'
+status: 'stable'
+template: 'Template'
+`
+            await fs.writeFile(path.join(testDir, 'test-prompt.yaml'), yamlContent)
+
+            const sourceManager = SourceManager.getInstance()
+            // Should not throw when registry.yaml is invalid
+            await expect(sourceManager.loadPrompts(server, testDir)).resolves.not.toThrow()
+
+            const prompt = sourceManager.getPrompt('test-prompt')
+            expect(prompt).toBeDefined()
+        })
+
+        it('should handle registry.yaml parsing errors gracefully', async () => {
+            const invalidRegistry = 'prompts: invalid structure'
+            const registryPath = path.join(testDir, 'registry.yaml')
+            await fs.writeFile(registryPath, invalidRegistry)
+
+            const yamlContent = `
+id: 'test-prompt'
+title: 'Test Prompt'
+version: '1.0.0'
+status: 'stable'
+template: 'Template'
+`
+            await fs.writeFile(path.join(testDir, 'test-prompt.yaml'), yamlContent)
+
+            const sourceManager = SourceManager.getInstance()
+            // Should not throw when registry.yaml fails schema validation
+            await expect(sourceManager.loadPrompts(server, testDir)).resolves.not.toThrow()
+
+            const prompt = sourceManager.getPrompt('test-prompt')
+            expect(prompt).toBeDefined()
+        })
+
+        it('should handle registry.yaml read errors (non-ENOENT)', async () => {
+            const registryPath = path.join(testDir, 'registry.yaml')
+            await fs.writeFile(registryPath, 'valid: yaml')
+
+            // Mock fs.readFile to throw a non-ENOENT error
+            const originalReadFile = fs.readFile
+            vi.spyOn(fs, 'readFile').mockImplementationOnce(async (pathArg: any) => {
+                if (String(pathArg).endsWith('registry.yaml')) {
+                    throw new Error('Permission denied')
+                }
+                return originalReadFile(pathArg)
+            })
+
+            const yamlContent = `
+id: 'test-prompt'
+title: 'Test Prompt'
+version: '1.0.0'
+status: 'stable'
+template: 'Template'
+`
+            await fs.writeFile(path.join(testDir, 'test-prompt.yaml'), yamlContent)
+
+            const sourceManager = SourceManager.getInstance()
+            // Should not throw when registry.yaml read fails
+            await expect(sourceManager.loadPrompts(server, testDir)).resolves.not.toThrow()
+
+            const prompt = sourceManager.getPrompt('test-prompt')
+            expect(prompt).toBeDefined()
+
+            vi.restoreAllMocks()
+        })
+    })
+
+    describe('shouldLoadPrompt logic', () => {
+        it('should load root prompts regardless of groups', async () => {
+            process.env.MCP_GROUPS = 'test,other'
+            
+            const yamlContent = `
+id: 'root-prompt'
+title: 'Root Prompt'
+version: '1.0.0'
+status: 'stable'
+template: 'Template'
+`
+            await fs.writeFile(path.join(testDir, 'root-prompt.yaml'), yamlContent)
+
+            const sourceManager = SourceManager.getInstance()
+            await sourceManager.loadPrompts(server, testDir)
+
+            const prompt = sourceManager.getPrompt('root-prompt')
+            expect(prompt).toBeDefined()
+
+            process.env.MCP_GROUPS = 'common'
+        })
+
+        it('should load common group when included in active groups', async () => {
+            process.env.MCP_GROUPS = 'common,test'
+            
+            const yamlContent = `
+id: 'common-prompt'
+title: 'Common Prompt'
+version: '1.0.0'
+status: 'stable'
+template: 'Template'
+`
+            const commonDir = path.join(testDir, 'common')
+            await fs.mkdir(commonDir, { recursive: true })
+            await fs.writeFile(path.join(commonDir, 'common-prompt.yaml'), yamlContent)
+
+            const sourceManager = SourceManager.getInstance()
+            await sourceManager.loadPrompts(server, testDir)
+
+            const prompt = sourceManager.getPrompt('common-prompt')
+            expect(prompt).toBeDefined()
+
+            process.env.MCP_GROUPS = 'common'
+        })
+
+        it('should not load group prompts when not in active groups', async () => {
+            process.env.MCP_GROUPS = 'test'
+            
+            const yamlContent = `
+id: 'other-group-prompt'
+title: 'Other Group Prompt'
+version: '1.0.0'
+status: 'stable'
+template: 'Template'
+`
+            const otherDir = path.join(testDir, 'other')
+            await fs.mkdir(otherDir, { recursive: true })
+            await fs.writeFile(path.join(otherDir, 'other-group-prompt.yaml'), yamlContent)
+
+            const sourceManager = SourceManager.getInstance()
+            await sourceManager.loadPrompts(server, testDir)
+
+            const prompt = sourceManager.getPrompt('other-group-prompt')
+            expect(prompt).toBeUndefined()
+
+            process.env.MCP_GROUPS = 'common'
+        })
+    })
+
+    describe('reloadSinglePrompt edge cases', () => {
+        it('should handle file read errors in reloadSinglePrompt', async () => {
+            const filePath = path.join(testDir, 'error-prompt.yaml')
+            await fs.writeFile(filePath, 'invalid yaml: [')
+            
+            // Create a file that will cause read error
+            vi.spyOn(fs, 'readFile').mockRejectedValueOnce(new Error('Read error'))
+
+            const sourceManager = SourceManager.getInstance()
+            const result = await sourceManager.reloadSinglePrompt(server, filePath, testDir)
+            
+            expect(result.success).toBe(false)
+            expect(result.error).toBeDefined()
+
+            vi.restoreAllMocks()
+        })
+
+        it('should handle YAML parsing errors in reloadSinglePrompt', async () => {
+            const filePath = path.join(testDir, 'invalid-yaml.yaml')
+            await fs.writeFile(filePath, 'invalid: yaml: [unclosed')
+
+            const sourceManager = SourceManager.getInstance()
+            const result = await sourceManager.reloadSinglePrompt(server, filePath, testDir)
+            
+            expect(result.success).toBe(false)
+            expect(result.error).toBeDefined()
+        })
+
+        it('should handle missing required fields in reloadSinglePrompt', async () => {
+            const filePath = path.join(testDir, 'missing-fields.yaml')
+            await fs.writeFile(filePath, `
+title: 'Missing ID'
+template: 'Template'
+`)
+
+            const sourceManager = SourceManager.getInstance()
+            const result = await sourceManager.reloadSinglePrompt(server, filePath, testDir)
+            
+            expect(result.success).toBe(false)
+            expect(result.error).toBeDefined()
+        })
+    })
 })

@@ -251,6 +251,84 @@ describe('快取抽象層測試', () => {
             })
             expect(cache).toBeInstanceOf(LocalCache)
         })
+
+        it('應該在嘗試使用不支援的 provider 時拋出錯誤', () => {
+            expect(() => {
+                CacheFactory.create({
+                    provider: 'invalid' as 'local' | 'redis',
+                    maxSize: 100,
+                })
+            }).toThrow('Unsupported cache provider: invalid')
+        })
+
+        it('應該在嘗試使用 Redis 時拋出錯誤（create 方法）', () => {
+            expect(() => {
+                CacheFactory.create({
+                    provider: 'redis',
+                    maxSize: 100,
+                })
+            }).toThrow('Redis cache provider is not yet implemented')
+        })
+
+        it('應該處理 cleanupIntervalMs 環境變數', () => {
+            process.env.CACHE_PROVIDER = 'local'
+            process.env.CACHE_CLEANUP_INTERVAL = '30000'
+
+            const cache = CacheFactory.createFromEnv()
+            expect(cache).toBeInstanceOf(LocalCache)
+
+            delete process.env.CACHE_PROVIDER
+            delete process.env.CACHE_CLEANUP_INTERVAL
+        })
+
+        it('應該使用預設 cleanupIntervalMs 當未設定時', () => {
+            process.env.CACHE_PROVIDER = 'local'
+            delete process.env.CACHE_CLEANUP_INTERVAL
+
+            const cache = CacheFactory.createFromEnv()
+            expect(cache).toBeInstanceOf(LocalCache)
+
+            delete process.env.CACHE_PROVIDER
+        })
+
+        it('應該處理 Redis fallback 時保留 TTL', () => {
+            process.env.CACHE_PROVIDER = 'redis'
+            process.env.CACHE_MAX_SIZE = '500'
+            process.env.CACHE_TTL = '10000'
+
+            const cache = CacheFactory.createFromEnv()
+            expect(cache).toBeInstanceOf(LocalCache)
+
+            delete process.env.CACHE_PROVIDER
+            delete process.env.CACHE_MAX_SIZE
+            delete process.env.CACHE_TTL
+        })
+
+        it('應該處理 Redis fallback 時沒有 TTL', () => {
+            process.env.CACHE_PROVIDER = 'redis'
+            process.env.CACHE_MAX_SIZE = '500'
+            delete process.env.CACHE_TTL
+
+            const cache = CacheFactory.createFromEnv()
+            expect(cache).toBeInstanceOf(LocalCache)
+
+            delete process.env.CACHE_PROVIDER
+            delete process.env.CACHE_MAX_SIZE
+        })
+
+        it('應該處理 createFromEnv 的 fallback 路徑', () => {
+            // 設定一個不為 'local' 或 'redis' 的值，但會被轉換為 'local'
+            process.env.CACHE_PROVIDER = 'local'
+            process.env.CACHE_MAX_SIZE = '500'
+            process.env.CACHE_TTL = '10000'
+
+            const cache = CacheFactory.createFromEnv()
+            expect(cache).toBeInstanceOf(LocalCache)
+
+            delete process.env.CACHE_PROVIDER
+            delete process.env.CACHE_MAX_SIZE
+            delete process.env.CACHE_TTL
+        })
     })
 })
 
