@@ -17,6 +17,16 @@ export interface CacheStats {
     hitRate: number
     /** 被驅逐的項目數量 */
     evictions: number
+    /** 過期項目數量 */
+    expirations?: number
+    /** 平均存取次數 */
+    averageAccessCount?: number
+    /** 最熱門的鍵（存取次數最多） */
+    topKeys?: Array<{ key: string; accessCount: number }>
+    /** 快取建立時間 */
+    createdAt?: number
+    /** 最後清理時間 */
+    lastCleanup?: number
 }
 
 /**

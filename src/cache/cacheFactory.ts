@@ -42,6 +42,9 @@ export class CacheFactory {
         const ttl = process.env.CACHE_TTL
             ? parseInt(process.env.CACHE_TTL, 10)
             : undefined
+        const cleanupIntervalMs = process.env.CACHE_CLEANUP_INTERVAL
+            ? parseInt(process.env.CACHE_CLEANUP_INTERVAL, 10)
+            : 60000 // 預設 1 分鐘
 
         if (provider === 'redis') {
             logger.warn(
@@ -59,9 +62,15 @@ export class CacheFactory {
         }
 
         logger.info(
-            { provider, maxSize, ttl },
+            { provider, maxSize, ttl, cleanupIntervalMs },
             'Creating cache provider from environment'
         )
+        
+        // 對於本地快取，需要直接建立 LocalCache 實例以支援 cleanupIntervalMs
+        if (provider === 'local') {
+            return new LocalCache(maxSize, ttl, cleanupIntervalMs)
+        }
+        
         return this.create({
             provider: 'local',
             maxSize,
