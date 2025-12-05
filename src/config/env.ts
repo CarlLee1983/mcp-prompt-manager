@@ -126,6 +126,18 @@ const ConfigSchema = z.object({
         .string()
         .optional()
         .transform((val) => (val ? parseInt(val, 10) : undefined)),
+    CACHE_PROVIDER: z
+        .enum(['local', 'redis'])
+        .default('local')
+        .describe('Cache provider: local or redis'),
+    CACHE_MAX_SIZE: z
+        .string()
+        .optional()
+        .transform((val) => (val ? parseInt(val, 10) : 1000)),
+    CACHE_TTL: z
+        .string()
+        .optional()
+        .transform((val) => (val ? parseInt(val, 10) : undefined)),
     WATCH_MODE: z
         .string()
         .optional()
@@ -167,6 +179,9 @@ function loadConfig() {
             GIT_BRANCH: process.env.GIT_BRANCH,
             GIT_MAX_RETRIES: process.env.GIT_MAX_RETRIES,
             CACHE_CLEANUP_INTERVAL: process.env.CACHE_CLEANUP_INTERVAL,
+            CACHE_PROVIDER: process.env.CACHE_PROVIDER,
+            CACHE_MAX_SIZE: process.env.CACHE_MAX_SIZE,
+            CACHE_TTL: process.env.CACHE_TTL,
             WATCH_MODE: process.env.WATCH_MODE,
             GIT_POLLING_INTERVAL: process.env.GIT_POLLING_INTERVAL,
         }

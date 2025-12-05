@@ -25,6 +25,9 @@ import type {
     PromptRuntimeState,
     PromptSource,
 } from '../types/promptRuntime.js'
+import type { CacheProvider } from '../cache/cacheProvider.js'
+import { CacheFactory } from '../cache/cacheFactory.js'
+import { LocalCache } from '../cache/localCache.js'
 
 // Excluded non-prompt file names (case-insensitive)
 const EXCLUDED_FILES = [
@@ -96,12 +99,22 @@ export class SourceManager {
     private filePathToPromptIdMap = new Map<string, string>()
 
     // Optimization: Cache compiled prompts
-    private promptCache = new Map<string, CachedPrompt>()
+    // 使用快取抽象層，支援本地快取和 Redis（未來）
+    private promptCache: CacheProvider
+    private isLocalCache: boolean // 標記是否為本地快取（用於同步方法）
 
     // Reentrancy protection lock
     private reloadingPromise: Promise<{ loaded: number; errors: LoadError[] }> | null = null
 
-    private constructor() { }
+    private constructor() {
+        // 從環境變數建立快取提供者
+        this.promptCache = CacheFactory.createFromEnv()
+        this.isLocalCache = this.promptCache instanceof LocalCache
+        logger.info(
+            { isLocalCache: this.isLocalCache },
+            'SourceManager initialized with cache provider'
+        )
+    }
 
     public static getInstance(): SourceManager {
         if (!SourceManager.instance) {
@@ -126,9 +139,28 @@ export class SourceManager {
 
     /**
      * Get CachedPrompt by ID (Fast retrieval)
+     * 使用同步方法以保持向後兼容（僅適用於本地快取）
      */
     public getPrompt(id: string): CachedPrompt | undefined {
-        return this.promptCache.get(id)
+        if (this.isLocalCache) {
+            const result = (this.promptCache as LocalCache).getSync<CachedPrompt>(id)
+            return result ?? undefined
+        }
+        // 對於非本地快取（如 Redis），需要異步方法
+        // 但為了向後兼容，這裡返回 undefined 並記錄警告
+        logger.warn(
+            'getPrompt called synchronously but cache provider is not local. Use getPromptAsync instead.'
+        )
+        return undefined
+    }
+
+    /**
+     * Get CachedPrompt by ID (Async version for remote cache)
+     * 異步版本，適用於所有快取提供者
+     */
+    public async getPromptAsync(id: string): Promise<CachedPrompt | undefined> {
+        const result = await this.promptCache.get<CachedPrompt>(id)
+        return result ?? undefined
     }
 
     /**
@@ -229,7 +261,15 @@ export class SourceManager {
         this.registeredToolRefs.clear()
         this.registeredPromptIds.clear()
         this.promptRuntimeMap.clear()
-        this.promptCache.clear()
+        if (this.isLocalCache) {
+            ;(this.promptCache as LocalCache).clearSync()
+        } else {
+            // 對於非本地快取，需要異步清除
+            // 但為了保持方法同步，這裡使用 Promise（不等待）
+            this.promptCache.clear().catch((error) => {
+                logger.error({ error }, 'Failed to clear cache')
+            })
+        }
         logger.info('All prompts and tools cleared')
     }
 
@@ -253,7 +293,15 @@ export class SourceManager {
                     this.registeredToolRefs.delete(toolId)
                     this.registeredPromptIds.delete(toolId)
                     this.promptRuntimeMap.delete(toolId)
-                    this.promptCache.delete(toolId)
+                    if (this.isLocalCache) {
+                        ;(this.promptCache as LocalCache).deleteSync(toolId)
+                    } else {
+                        // 對於非本地快取，需要異步刪除
+                        // 但為了保持方法同步，這裡使用 Promise（不等待）
+                        this.promptCache.delete(toolId).catch((error) => {
+                            logger.error({ toolId, error }, 'Failed to delete from cache')
+                        })
+                    }
                     logger.debug({ toolId }, 'Old tool removed')
                 } catch (error) {
                     logger.warn({ toolId, error }, 'Failed to remove old tool')
@@ -525,12 +573,17 @@ export class SourceManager {
         } of sortedRegistrations) {
             try {
                 // Store in Cache (Optimization)
-                this.promptCache.set(promptDef.id, {
+                const cachedPrompt: CachedPrompt = {
                     metadata: promptDef,
                     compiledTemplate: templateDelegate,
                     runtime: promptRuntime,
                     zodShape
-                })
+                }
+                if (this.isLocalCache) {
+                    ;(this.promptCache as LocalCache).setSync(promptDef.id, cachedPrompt)
+                } else {
+                    await this.promptCache.set(promptDef.id, cachedPrompt)
+                }
 
                 // Create prompt handler function using cached template
                 const promptHandler = (args: Record<string, unknown>) => {
@@ -986,12 +1039,17 @@ export class SourceManager {
         } of sortedRegistrations) {
             try {
                 // Store in Cache (Optimization)
-                this.promptCache.set(promptDef.id, {
+                const cachedPrompt: CachedPrompt = {
                     metadata: promptDef,
                     compiledTemplate: templateDelegate,
                     runtime: promptRuntime,
                     zodShape
-                })
+                }
+                if (this.isLocalCache) {
+                    ;(this.promptCache as LocalCache).setSync(promptDef.id, cachedPrompt)
+                } else {
+                    await this.promptCache.set(promptDef.id, cachedPrompt)
+                }
 
                 const promptHandler = (args: Record<string, unknown>) => {
                     try {
@@ -1276,7 +1334,11 @@ export class SourceManager {
                             this.registeredToolRefs.delete(promptIdToRemove)
                             this.registeredPromptIds.delete(promptIdToRemove)
                             this.promptRuntimeMap.delete(promptIdToRemove)
-                            this.promptCache.delete(promptIdToRemove)
+                            if (this.isLocalCache) {
+                                ;(this.promptCache as LocalCache).deleteSync(promptIdToRemove)
+                            } else {
+                                await this.promptCache.delete(promptIdToRemove)
+                            }
                             this.filePathToPromptIdMap.delete(filePath)
                             logger.info({ promptId: promptIdToRemove }, 'Prompt removed due to file deletion')
                         } catch (error) {
