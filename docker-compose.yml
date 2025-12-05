@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mcp-prompt-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-prompt-manager
+    restart: unless-stopped
+    
+    # 環境變數：從 .env 文件讀取
+    env_file:
+      - .env
+    
+    # 環境變數覆蓋（如果需要）
+    environment:
+      - NODE_ENV=development
+      - STORAGE_DIR=/app/.prompts_cache
+    
+    # 端口映射
+    # HTTP 模式使用 3000
+    # SSE 模式使用 3001
+    ports:
+      - "${HTTP_PORT:-3000}:3000"
+      - "${SSE_PORT:-3001}:3001"
+    
+    # 卷掛載
+    volumes:
+      # 持久化 Git 倉庫快取
+      - ./.prompts_cache:/app/.prompts_cache
+      # 開發時方便修改環境變數（只讀）
+      - ./.env:/app/.env:ro
+    
+    # 健康檢查（僅在 HTTP/SSE 模式時有效）
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # 網路配置（如果需要連接到其他服務）
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge
+

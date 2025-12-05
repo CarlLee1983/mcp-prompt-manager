@@ -1,0 +1,79 @@
+# 依賴目錄
+node_modules/
+
+# 編譯輸出（構建階段會重新編譯）
+dist/
+*.tsbuildinfo
+
+# 環境變數（通過 docker-compose 或運行時傳入）
+.env
+.env.local
+.env.*.local
+.env.*.backup
+
+# 本地緩存（使用卷掛載）
+.prompts_cache/
+
+# Git 相關
+.git/
+.gitignore
+
+# 測試相關
+test/
+coverage/
+.nyc_output/
+*.lcov
+
+# 作業系統文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDE / 編輯器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+*.code-workspace
+
+# 日誌文件
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 臨時文件
+*.tmp
+*.temp
+.cache/
+
+# pnpm
+.pnpm-store/
+.pnpm-debug.log
+
+# 其他
+*.pid
+*.seed
+*.pid.lock
+
+# 文檔（不需要在鏡像中）
+CODE_REVIEW.md
+REFACTORING_SUMMARY.md
+COMMIT_CHECKLIST.md
+TESTING_WATCH_MODE.md
+TESTING_WATCH_MODE_ERRORS.md
+
+# Docker 相關（避免遞歸）
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+

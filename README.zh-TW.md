@@ -40,6 +40,32 @@
 
 ## 🚀 快速開始
 
+### 選項 1：Docker 部署（推薦）
+
+最簡單的方式是使用 Docker：
+
+```bash
+# 1. 克隆倉庫
+git clone <project URL>
+cd mcp-prompt-manager
+
+# 2. 複製環境變數範例
+cp .env.docker.example .env
+
+# 3. 編輯 .env 並設定您的 Git 倉庫 URL
+# PROMPT_REPO_URL=https://github.com/yourusername/your-prompts-repo.git
+
+# 4. 使用 Docker Compose 啟動
+docker-compose up -d
+
+# 5. 查看日誌
+docker-compose logs -f
+```
+
+詳細的 Docker 部署說明，請參閱 [DOCKER.md](DOCKER.md)。
+
+### 選項 2：本地安裝
+
 ### 1. 安裝
 
 首先，Clone 本專案並安裝依賴：
@@ -1187,6 +1213,37 @@ export LOG_LEVEL=debug
 1. 確認 partial 檔案副檔名為 `.hbs`
 2. 檢查 partial 檔案內容是否正確
 3. 確認在模板中使用 `{{> partial-name }}` 語法
+
+## 🐳 Docker 部署
+
+MCP Prompt Manager 支援 Docker 部署，方便設置和生產使用。
+
+### 使用 Docker 快速開始
+
+```bash
+# 1. 複製環境變數範例
+cp .env.docker.example .env
+
+# 2. 編輯 .env 並配置您的設定
+# PROMPT_REPO_URL=https://github.com/yourusername/your-prompts-repo.git
+# TRANSPORT_TYPE=http
+
+# 3. 使用 Docker Compose 啟動
+docker-compose up -d
+
+# 4. 查看日誌
+docker-compose logs -f
+```
+
+### 部署模式
+
+- **stdio 模式**：用於 MCP 客戶端直接連接
+- **http 模式**：用於 RESTful API 訪問
+- **sse 模式**：用於 Server-Sent Events 實時推送
+
+### 文檔
+
+詳細的 Docker 部署說明，請參閱 [DOCKER.md](DOCKER.md)。
 
 ## 📦 主要依賴
 

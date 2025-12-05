@@ -40,6 +40,32 @@ This is a Git-driven Model Context Protocol (MCP) Server designed for managing a
 
 ## 🚀 Quick Start
 
+### Option 1: Docker Deployment (Recommended)
+
+The easiest way to get started is using Docker:
+
+```bash
+# 1. Clone the repository
+git clone <project URL>
+cd mcp-prompt-manager
+
+# 2. Copy environment variables example
+cp .env.docker.example .env
+
+# 3. Edit .env and set your Git repository URL
+# PROMPT_REPO_URL=https://github.com/yourusername/your-prompts-repo.git
+
+# 4. Start with Docker Compose
+docker-compose up -d
+
+# 5. View logs
+docker-compose logs -f
+```
+
+For detailed Docker deployment instructions, see [DOCKER.md](DOCKER.md).
+
+### Option 2: Local Installation
+
 ### 1. Installation
 
 First, clone this project and install dependencies:
