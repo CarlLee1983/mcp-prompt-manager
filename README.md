@@ -8,6 +8,7 @@
 [![License](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-blue.svg)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)](https://github.com/CarlLee1983/mcp-prompt-manager)
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
@@ -1016,9 +1017,9 @@ pnpm format:check
 
 The project includes a complete test suite:
 
-- **Unit Tests**: 53 test cases
-- **Integration Tests**: 9 test cases
-- **Total**: 62 tests, all passing
+- **Unit Tests**: Multiple test files covering all core functionality
+- **Integration Tests**: End-to-end testing for prompt loading and MCP tools
+- **Total**: 107 tests, all passing
 
 Run tests:
 
@@ -1031,6 +1032,41 @@ pnpm test:run
 
 # Open UI
 pnpm test:ui
+```
+
+### Test Coverage
+
+This project maintains high code quality through comprehensive test coverage with the following thresholds:
+
+- **Statements**: ≥ 80%
+- **Lines**: ≥ 75%
+- **Functions**: ≥ 75%
+- **Branches**: ≥ 70%
+
+> **Note**: Coverage reports use `@vitest/coverage-v8` which requires Node.js 19+. Coverage thresholds are enforced to maintain code quality. If coverage falls below thresholds, tests will fail to ensure quality standards.
+
+#### Viewing Coverage Reports
+
+1. **Local Development**: Run `pnpm test:coverage` to generate coverage reports, or use `pnpm test:coverage:view` to automatically open the HTML coverage report in your browser.
+
+2. **CI/CD**: Run `pnpm test:coverage:ci` to generate coverage reports and enforce thresholds. The CI pipeline will fail if coverage thresholds are not met, ensuring code quality standards are maintained before merging or releasing.
+
+3. **Coverage Reports**: Coverage reports are generated in the `coverage/` directory with multiple formats:
+   - `coverage/index.html` - Interactive HTML report
+   - `coverage/coverage-final.json` - JSON format for CI integration
+   - `coverage/lcov.info` - LCOV format for coverage services
+
+#### Coverage Commands
+
+```bash
+# Generate coverage report (local development)
+pnpm test:coverage
+
+# Generate coverage report with threshold enforcement (CI)
+pnpm test:coverage:ci
+
+# Generate coverage report and open HTML report
+pnpm test:coverage:view
 ```
 
 ## 🔧 Configuration

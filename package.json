@@ -13,7 +13,10 @@
         "format:check": "prettier --check \"src/**/*.ts\"",
         "test": "vitest",
         "test:ui": "vitest --ui",
-        "test:run": "vitest run"
+        "test:run": "vitest run",
+        "test:coverage": "vitest run --coverage",
+        "test:coverage:ci": "vitest run --coverage",
+        "test:coverage:view": "vitest run --coverage && open coverage/index.html"
     },
     "keywords": [
         "mcp",
@@ -62,9 +65,10 @@
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^24.10.1",
         "@types/pino-pretty": "^5.0.0",
-        "@vitest/ui": "^4.0.14",
+        "@vitest/coverage-v8": "^4.0.15",
+        "@vitest/ui": "^4.0.15",
         "prettier": "^3.7.3",
         "typescript": "^5.9.3",
-        "vitest": "^4.0.14"
+        "vitest": "^4.0.15"
     }
 }

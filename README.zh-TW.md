@@ -8,6 +8,7 @@
 [![License](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-blue.svg)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)](https://github.com/CarlLee1983/mcp-prompt-manager)
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
@@ -1017,9 +1018,9 @@ pnpm format:check
 
 專案包含完整的測試套件：
 
-- **單元測試**: 53 個測試案例
-- **整合測試**: 9 個測試案例
-- **總計**: 62 個測試，全部通過
+- **單元測試**: 多個測試檔案涵蓋所有核心功能
+- **整合測試**: 端對端測試，涵蓋 prompt 載入和 MCP 工具
+- **總計**: 107 個測試，全部通過
 
 運行測試：
 
@@ -1032,6 +1033,41 @@ pnpm test:run
 
 # 開啟 UI
 pnpm test:ui
+```
+
+### 測試覆蓋率
+
+本專案透過完善的測試覆蓋率維持高程式碼品質，設有以下門檻：
+
+- **語句覆蓋率**：≥ 80%
+- **行覆蓋率**：≥ 75%
+- **函數覆蓋率**：≥ 75%
+- **分支覆蓋率**：≥ 70%
+
+> **注意**：覆蓋率報告使用 `@vitest/coverage-v8`，需要 Node.js 19+。覆蓋率閾值會強制檢查以維持程式碼品質。如果覆蓋率低於閾值，測試會失敗以確保品質標準。
+
+#### 查看覆蓋率報告
+
+1. **本地開發**：執行 `pnpm test:coverage` 產生覆蓋率報告，或使用 `pnpm test:coverage:view` 自動在瀏覽器中開啟 HTML 覆蓋率報告。
+
+2. **CI/CD**：執行 `pnpm test:coverage:ci` 產生覆蓋率報告並強制檢查閾值。如果覆蓋率未達閾值，CI 流程會失敗，確保在合併或發布前維持程式碼品質標準。
+
+3. **覆蓋率報告**：覆蓋率報告會產生在 `coverage/` 目錄中，包含多種格式：
+   - `coverage/index.html` - 互動式 HTML 報告
+   - `coverage/coverage-final.json` - JSON 格式，用於 CI 整合
+   - `coverage/lcov.info` - LCOV 格式，用於覆蓋率服務
+
+#### 覆蓋率指令
+
+```bash
+# 產生覆蓋率報告（本地開發）
+pnpm test:coverage
+
+# 產生覆蓋率報告並強制檢查閾值（CI）
+pnpm test:coverage:ci
+
+# 產生覆蓋率報告並開啟 HTML 報告
+pnpm test:coverage:view
 ```
 
 ## 🔧 配置說明
