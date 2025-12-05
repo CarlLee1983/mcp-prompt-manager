@@ -60,6 +60,9 @@ coverage/
 *.seed
 *.pid.lock
 
+# Husky
+.husky/_
+
 # 文檔
 CODE_REVIEW.md
 REFACTORING_SUMMARY.md

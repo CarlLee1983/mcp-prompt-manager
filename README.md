@@ -19,6 +19,7 @@
 This is a Git-driven Model Context Protocol (MCP) Server designed for managing and providing Prompt templates. It allows you to store Prompts in a separate Git Repository and use them directly in AI editors like Cursor, Claude Desktop, etc., through the MCP protocol.
 
 **Key Benefits:**
+
 - 🔄 Team Collaboration: Ensure unified Prompt versions across teams through Git version control
 - 🎯 Dynamic Templates: Support Handlebars syntax to create reusable dynamic Prompts
 - 🚀 Zero-Downtime Reload: Hot-reload support to update Prompts without restarting
@@ -500,13 +501,13 @@ async def main():
 
 ### MCP Client Quick Reference
 
-| Client             | Configuration File Location                                                                           | Config Format | Notes                |
-| ------------------ | ----------------------------------------------------------------------------------------------------- | ------------- | --------------------- |
-| **Cursor**         | `~/Library/Application Support/Cursor/User/globalStorage/cursor.mcp/mcp.json` (macOS)                | `mcpServers`  | Supports UI config    |
-| **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)                            | `mcpServers`  | Requires full restart |
-| **VS Code**        | `settings.json`                                                                                       | `mcp.servers` | Requires MCP extension |
-| **Continue**       | `~/.continue/config.json`                                                                             | `mcpServers`  | Open-source AI assistant |
-| **Aider**          | `~/.aider/config.json`                                                                                 | `mcp_servers` | AI code editor        |
+| Client             | Configuration File Location                                                           | Config Format | Notes                    |
+| ------------------ | ------------------------------------------------------------------------------------- | ------------- | ------------------------ |
+| **Cursor**         | `~/Library/Application Support/Cursor/User/globalStorage/cursor.mcp/mcp.json` (macOS) | `mcpServers`  | Supports UI config       |
+| **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)             | `mcpServers`  | Requires full restart    |
+| **VS Code**        | `settings.json`                                                                       | `mcp.servers` | Requires MCP extension   |
+| **Continue**       | `~/.continue/config.json`                                                             | `mcpServers`  | Open-source AI assistant |
+| **Aider**          | `~/.aider/config.json`                                                                | `mcp_servers` | AI code editor           |
 
 > **Note**: The `~` in paths represents the user home directory, which expands to:
 >
@@ -644,9 +645,9 @@ You should see files cloned from the Git repository.
 
 1. Confirm `PROMPT_REPO_URL` is correct
 2. Check if `MCP_GROUPS` setting includes the groups you want
-   - **Note**: If `MCP_GROUPS` is not set, the system defaults to loading only the `common` group
-   - Check log messages to confirm if default groups are being used
-   - Set `MCP_GROUPS=laravel,vue` etc. to load other groups
+    - **Note**: If `MCP_GROUPS` is not set, the system defaults to loading only the `common` group
+    - Check log messages to confirm if default groups are being used
+    - Set `MCP_GROUPS=laravel,vue` etc. to load other groups
 3. Confirm Git repository contains `.yaml` or `.yml` files
 4. Use `LOG_LEVEL=debug` to view detailed logs and confirm which groups are loaded
 
@@ -680,6 +681,7 @@ my-prompts/
 #### Default Behavior
 
 When `MCP_GROUPS` is **not set**:
+
 - System automatically loads the `common` group (and root directory prompts)
 - Startup logs will explicitly prompt about using default groups
 - Logs will include messages suggesting to set `MCP_GROUPS` to load more groups
@@ -731,13 +733,13 @@ You can create a `registry.yaml` file in the root directory of your Prompt Repos
 
 ```yaml
 prompts:
-  - id: "code-review"
-    group: "common"
-    visibility: "public"  # public, private, internal
-    deprecated: false
-  - id: "old-prompt"
-    visibility: "private"
-    deprecated: true
+    - id: "code-review"
+      group: "common"
+      visibility: "public" # public, private, internal
+      deprecated: false
+    - id: "old-prompt"
+      visibility: "private"
+      deprecated: true
 ```
 
 #### Registry Field Descriptions
@@ -745,9 +747,9 @@ prompts:
 - **`id`**: Prompt ID (required)
 - **`group`**: Group name (optional)
 - **`visibility`**: Visibility setting
-  - `public`: Public (default)
-  - `private`: Private
-  - `internal`: Internal use
+    - `public`: Public (default)
+    - `private`: Private
+    - `internal`: Internal use
 - **`deprecated`**: Whether deprecated (default `false`)
 
 #### Registry Purpose
@@ -798,12 +800,12 @@ Reload all Prompts without restarting the server (hot-reload).
 - **Function**: Pull latest changes from Git repository, clear cache, reload all Handlebars partials and prompts
 - **Parameters**: None
 - **Usage Example**:
-  ```json
-  {
-    "tool": "mcp.reload",
-    "arguments": {}
-  }
-  ```
+    ```json
+    {
+        "tool": "mcp.reload",
+        "arguments": {}
+    }
+    ```
 
 #### 2. `mcp.stats` / `mcp.prompt.stats`
 
@@ -812,12 +814,12 @@ Get Prompts statistics.
 - **Function**: Returns statistics for all prompts, including counts by runtime state (active, legacy, invalid, disabled, warning)
 - **Parameters**: None
 - **Return Content**:
-  - `total`: Total count
-  - `active`: Active state count
-  - `legacy`: Legacy state count
-  - `invalid`: Invalid state count
-  - `disabled`: Disabled count
-  - `warning`: Warning state count
+    - `total`: Total count
+    - `active`: Active state count
+    - `legacy`: Legacy state count
+    - `invalid`: Invalid state count
+    - `disabled`: Disabled count
+    - `warning`: Warning state count
 
 #### 3. `mcp.list` / `mcp.prompt.list`
 
@@ -825,20 +827,20 @@ List all Prompts with multiple filter options.
 
 - **Function**: Lists all prompt runtimes with complete metadata information
 - **Parameters** (optional):
-  - `status`: Filter by status (`draft`, `stable`, `deprecated`, `legacy`)
-  - `group`: Filter by group name
-  - `tag`: Filter by tag (prompts must contain this tag)
-  - `runtime_state`: Filter by runtime state (`active`, `legacy`, `invalid`, `disabled`, `warning`)
+    - `status`: Filter by status (`draft`, `stable`, `deprecated`, `legacy`)
+    - `group`: Filter by group name
+    - `tag`: Filter by tag (prompts must contain this tag)
+    - `runtime_state`: Filter by runtime state (`active`, `legacy`, `invalid`, `disabled`, `warning`)
 - **Usage Example**:
-  ```json
-  {
-    "tool": "mcp.list",
-    "arguments": {
-      "group": "laravel",
-      "runtime_state": "active"
+    ```json
+    {
+        "tool": "mcp.list",
+        "arguments": {
+            "group": "laravel",
+            "runtime_state": "active"
+        }
     }
-  }
-  ```
+    ```
 
 #### 4. `mcp.inspect`
 
@@ -846,16 +848,16 @@ Inspect detailed runtime information for a specific Prompt.
 
 - **Function**: Get complete runtime metadata by Prompt ID, including state, source, version, tags, and use cases
 - **Parameters**:
-  - `id`: Prompt ID (required)
+    - `id`: Prompt ID (required)
 - **Usage Example**:
-  ```json
-  {
-    "tool": "mcp.inspect",
-    "arguments": {
-      "id": "code-review"
+    ```json
+    {
+        "tool": "mcp.inspect",
+        "arguments": {
+            "id": "code-review"
+        }
     }
-  }
-  ```
+    ```
 
 #### 5. `mcp.repo.switch`
 
@@ -863,18 +865,18 @@ Switch to a different Prompt repository and reload (zero-downtime).
 
 - **Function**: Switch to a new Git repository and reload all prompts
 - **Parameters**:
-  - `repo_url`: Repository URL (required)
-  - `branch`: Branch name (optional)
+    - `repo_url`: Repository URL (required)
+    - `branch`: Branch name (optional)
 - **Usage Example**:
-  ```json
-  {
-    "tool": "mcp.repo.switch",
-    "arguments": {
-      "repo_url": "/path/to/new/repo",
-      "branch": "main"
+    ```json
+    {
+        "tool": "mcp.repo.switch",
+        "arguments": {
+            "repo_url": "/path/to/new/repo",
+            "branch": "main"
+        }
     }
-  }
-  ```
+    ```
 
 #### 6. `preview_prompt`
 
@@ -882,32 +884,32 @@ Preview/render a prompt template with given arguments without executing it (debu
 
 - **Function**: Renders a prompt template with given arguments to show the final text without sending it to an LLM. Use this to verify template logic.
 - **Parameters**:
-  - `promptId`: Prompt ID (required, e.g., `'laravel:code-review'`)
-  - `args`: JSON object containing the arguments/variables for the template (required)
+    - `promptId`: Prompt ID (required, e.g., `'laravel:code-review'`)
+    - `args`: JSON object containing the arguments/variables for the template (required)
 - **Returns**:
-  - `success`: Boolean indicating success or failure
-  - `renderedText`: The rendered prompt text
-  - `highlightedText`: The rendered text with variables highlighted in Markdown bold
-  - `statistics`: Object containing `renderedLength` (character count) and `estimatedTokens` (estimated token count)
-  - `warnings`: Array of schema validation warnings (e.g., missing recommended fields)
+    - `success`: Boolean indicating success or failure
+    - `renderedText`: The rendered prompt text
+    - `highlightedText`: The rendered text with variables highlighted in Markdown bold
+    - `statistics`: Object containing `renderedLength` (character count) and `estimatedTokens` (estimated token count)
+    - `warnings`: Array of schema validation warnings (e.g., missing recommended fields)
 - **Usage Example**:
-  ```json
-  {
-    "tool": "preview_prompt",
-    "arguments": {
-      "promptId": "laravel:code-review",
-      "args": {
-        "code": "function test() { return true; }",
-        "language": "php"
-      }
+    ```json
+    {
+        "tool": "preview_prompt",
+        "arguments": {
+            "promptId": "laravel:code-review",
+            "args": {
+                "code": "function test() { return true; }",
+                "language": "php"
+            }
+        }
     }
-  }
-  ```
+    ```
 - **Advanced Features**:
-  - **Schema Validation**: Strict validation of arguments against prompt's Zod schema
-  - **Token Estimation**: Estimates token count (supports both English and Chinese text)
-  - **Variable Highlighting**: Highlights dynamically replaced variables with Markdown bold formatting
-  - **Schema Warnings**: Detects and reports missing required or recommended fields
+    - **Schema Validation**: Strict validation of arguments against prompt's Zod schema
+    - **Token Estimation**: Estimates token count (supports both English and Chinese text)
+    - **Variable Highlighting**: Highlights dynamically replaced variables with Markdown bold formatting
+    - **Schema Warnings**: Detects and reports missing required or recommended fields
 
 ### MCP Resources
 
@@ -918,11 +920,11 @@ System health status resource.
 - **URI**: `system://health`
 - **MIME Type**: `application/json`
 - **Content**: Includes the following information:
-  - `git`: Git repository information (URL, path, HEAD commit)
-  - `prompts`: Prompts statistics (total, counts by state, loaded count, group list)
-  - `registry`: Registry status (enabled, source)
-  - `cache`: Cache information (size, cleanup interval)
-  - `system`: System information (uptime, memory usage)
+    - `git`: Git repository information (URL, path, HEAD commit)
+    - `prompts`: Prompts statistics (total, counts by state, loaded count, group list)
+    - `registry`: Registry status (enabled, source)
+    - `cache`: Cache information (size, cleanup interval)
+    - `system`: System information (uptime, memory usage)
 
 #### 2. `prompts://list`
 
@@ -931,16 +933,16 @@ Prompts list resource.
 - **URI**: `prompts://list`
 - **MIME Type**: `application/json`
 - **Content**: Complete metadata list of all prompts, including:
-  - `id`: Prompt ID
-  - `title`: Title
-  - `version`: Version
-  - `status`: Status
-  - `runtime_state`: Runtime state
-  - `source`: Source
-  - `tags`: Tags array
-  - `use_cases`: Use cases array
-  - `group`: Group name
-  - `visibility`: Visibility
+    - `id`: Prompt ID
+    - `title`: Title
+    - `version`: Version
+    - `status`: Status
+    - `runtime_state`: Runtime state
+    - `source`: Source
+    - `tags`: Tags array
+    - `use_cases`: Use cases array
+    - `group`: Group name
+    - `visibility`: Visibility
 
 ### Tool Usage Recommendations
 
@@ -1078,9 +1080,9 @@ This project maintains high code quality through comprehensive test coverage wit
 2. **CI/CD**: Run `pnpm test:coverage:ci` to generate coverage reports and enforce thresholds. The CI pipeline will fail if coverage thresholds are not met, ensuring code quality standards are maintained before merging or releasing.
 
 3. **Coverage Reports**: Coverage reports are generated in the `coverage/` directory with multiple formats:
-   - `coverage/index.html` - Interactive HTML report
-   - `coverage/coverage-final.json` - JSON format for CI integration
-   - `coverage/lcov.info` - LCOV format for coverage services
+    - `coverage/index.html` - Interactive HTML report
+    - `coverage/coverage-final.json` - JSON format for CI integration
+    - `coverage/lcov.info` - LCOV format for coverage services
 
 #### Coverage Commands
 
@@ -1095,20 +1097,63 @@ pnpm test:coverage:ci
 pnpm test:coverage:view
 ```
 
+### Code Quality and CI/CD
+
+This project enforces code quality through multiple layers of checks:
+
+#### Pre-commit Hooks
+
+Pre-commit hooks automatically run linting and formatting before each commit using [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/okonet/lint-staged):
+
+- **ESLint**: Automatically fixes linting issues in TypeScript files
+- **Prettier**: Automatically formats code to ensure consistent style
+- **Type Safety**: TypeScript strict mode is enabled (`strict: true` in `tsconfig.json`)
+
+The pre-commit hook runs on staged files only, ensuring fast commit times while maintaining code quality.
+
+#### Continuous Integration (CI)
+
+GitHub Actions CI workflow runs on every push and pull request:
+
+- **Node.js Compatibility**: Tests across Node.js 16.x, 18.x, and 20.x
+- **Linting**: ESLint checks for code quality and style
+- **Type Checking**: TypeScript type checking (`tsc --noEmit`)
+- **Testing**: Full test suite with coverage reporting
+- **Coverage Upload**: Automatic upload to Codecov
+
+#### Required Checks for Pull Requests
+
+To ensure code quality, the following checks must pass before a PR can be merged:
+
+1. **Lint**: All ESLint rules must pass
+2. **Typecheck**: TypeScript compilation must succeed with no errors
+3. **Tests**: All tests must pass with coverage thresholds met
+
+**Setting up Required Checks in GitHub:**
+
+1. Go to your repository settings
+2. Navigate to **Branches** → **Branch protection rules**
+3. Add or edit a rule for your main branch
+4. Under **Require status checks to pass before merging**, enable:
+    - `Test (Node.js 16.x)` or `Test (Node.js 18.x)` or `Test (Node.js 20.x)` (at least one)
+    - These checks will automatically include lint, typecheck, and test steps
+
+The CI workflow will automatically fail if any of these checks fail, preventing merging of code that doesn't meet quality standards.
+
 ## 🔧 Configuration
 
 ### Environment Variables
 
-| Variable Name            | Required | Default Value    | Description                                    |
-| ------------------------ | -------- | ---------------- | ---------------------------------------------- |
-| `PROMPT_REPO_URL`       | ✅       | -                | Git repository URL or local path               |
-| `MCP_LANGUAGE`          | ❌       | `en`             | Output language (`en` or `zh`)                 |
-| `MCP_GROUPS`            | ❌       | `common`         | Groups to load (comma-separated), system will prompt about default behavior when not set |
-| `STORAGE_DIR`           | ❌       | `.prompts_cache` | Local cache directory                          |
-| `GIT_BRANCH`            | ❌       | `main`           | Git branch name                                |
-| `GIT_MAX_RETRIES`       | ❌       | `3`              | Maximum retry count for Git operations        |
-| `CACHE_CLEANUP_INTERVAL` | ❌       | `10000`          | Cache cleanup interval (milliseconds), periodic cleanup of expired cache items |
-| `LOG_LEVEL`             | ❌       | `warn` (prod) / `info` (dev) | Log level, production defaults to warnings and errors only |
+| Variable Name            | Required | Default Value                | Description                                                                              |
+| ------------------------ | -------- | ---------------------------- | ---------------------------------------------------------------------------------------- |
+| `PROMPT_REPO_URL`        | ✅       | -                            | Git repository URL or local path                                                         |
+| `MCP_LANGUAGE`           | ❌       | `en`                         | Output language (`en` or `zh`)                                                           |
+| `MCP_GROUPS`             | ❌       | `common`                     | Groups to load (comma-separated), system will prompt about default behavior when not set |
+| `STORAGE_DIR`            | ❌       | `.prompts_cache`             | Local cache directory                                                                    |
+| `GIT_BRANCH`             | ❌       | `main`                       | Git branch name                                                                          |
+| `GIT_MAX_RETRIES`        | ❌       | `3`                          | Maximum retry count for Git operations                                                   |
+| `CACHE_CLEANUP_INTERVAL` | ❌       | `10000`                      | Cache cleanup interval (milliseconds), periodic cleanup of expired cache items           |
+| `LOG_LEVEL`              | ❌       | `warn` (prod) / `info` (dev) | Log level, production defaults to warnings and errors only                               |
 
 ### Cache Expiration Strategy
 
@@ -1171,6 +1216,7 @@ The project uses [pino](https://github.com/pinojs/pino) as the logging system, s
 - `silent`: Completely disable log output
 
 **Default Behavior**:
+
 - **Production Environment** (`NODE_ENV` not set or not `development`): Defaults to `warn`, only outputs warnings and errors
 - **Development Environment** (`NODE_ENV=development`): Defaults to `info`, outputs all info level and above logs
 - Can override default value via `LOG_LEVEL` environment variable
