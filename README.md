@@ -849,6 +849,39 @@ Switch to a different Prompt repository and reload (zero-downtime).
   }
   ```
 
+#### 6. `preview_prompt`
+
+Preview/render a prompt template with given arguments without executing it (debug utility).
+
+- **Function**: Renders a prompt template with given arguments to show the final text without sending it to an LLM. Use this to verify template logic.
+- **Parameters**:
+  - `promptId`: Prompt ID (required, e.g., `'laravel:code-review'`)
+  - `args`: JSON object containing the arguments/variables for the template (required)
+- **Returns**:
+  - `success`: Boolean indicating success or failure
+  - `renderedText`: The rendered prompt text
+  - `highlightedText`: The rendered text with variables highlighted in Markdown bold
+  - `statistics`: Object containing `renderedLength` (character count) and `estimatedTokens` (estimated token count)
+  - `warnings`: Array of schema validation warnings (e.g., missing recommended fields)
+- **Usage Example**:
+  ```json
+  {
+    "tool": "preview_prompt",
+    "arguments": {
+      "promptId": "laravel:code-review",
+      "args": {
+        "code": "function test() { return true; }",
+        "language": "php"
+      }
+    }
+  }
+  ```
+- **Advanced Features**:
+  - **Schema Validation**: Strict validation of arguments against prompt's Zod schema
+  - **Token Estimation**: Estimates token count (supports both English and Chinese text)
+  - **Variable Highlighting**: Highlights dynamically replaced variables with Markdown bold formatting
+  - **Schema Warnings**: Detects and reports missing required or recommended fields
+
 ### MCP Resources
 
 #### 1. `system://health`
@@ -885,9 +918,10 @@ Prompts list resource.
 ### Tool Usage Recommendations
 
 - **During Development**: Use `mcp.reload` to quickly reload prompts without restarting the server
-- **During Debugging**: Use `mcp.inspect` to check detailed information for specific prompts
+- **During Debugging**: Use `mcp.inspect` to check detailed information for specific prompts, or use `preview_prompt` to test template rendering
 - **During Monitoring**: Use `mcp.stats` and `system://health` resource to monitor system status
 - **During Querying**: Use `mcp.list` with filter conditions to find specific prompts
+- **During Testing**: Use `preview_prompt` to verify template logic, check token counts, and see variable replacements before actual execution
 
 ## 💻 Development Guide
 

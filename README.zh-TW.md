@@ -763,6 +763,8 @@ prompts:
 
 ### MCP 工具（Tools）
 
+伺服器提供 6 個管理工具，並會動態註冊從載入的 prompts 產生的工具。
+
 #### 1. `mcp.reload` / `mcp.reload_prompts`
 
 重載所有 Prompts，無需重啟伺服器（熱重載）。
@@ -848,6 +850,39 @@ prompts:
   }
   ```
 
+#### 6. `preview_prompt`
+
+預覽/渲染 Prompt 模板（除錯工具）。
+
+- **功能**：使用給定的參數渲染 Prompt 模板，顯示最終文字而不執行它。用於驗證模板邏輯。
+- **參數**：
+  - `promptId`: Prompt ID（必填，例如 `'laravel:code-review'`）
+  - `args`: JSON 物件，包含要傳入模板的變數（必填）
+- **返回內容**：
+  - `success`: 布林值，表示成功或失敗
+  - `renderedText`: 渲染後的 Prompt 文字
+  - `highlightedText`: 渲染後的文字，變數以 Markdown 粗體標示
+  - `statistics`: 物件，包含 `renderedLength`（字元數）和 `estimatedTokens`（估算的 token 數）
+  - `warnings`: Schema 驗證警告陣列（例如缺少建議欄位）
+- **使用範例**：
+  ```json
+  {
+    "tool": "preview_prompt",
+    "arguments": {
+      "promptId": "laravel:code-review",
+      "args": {
+        "code": "function test() { return true; }",
+        "language": "php"
+      }
+    }
+  }
+  ```
+- **進階功能**：
+  - **Schema 驗證**：嚴格驗證參數是否符合 Prompt 的 Zod schema
+  - **Token 估算**：估算 token 數量（支援英文和中文文字）
+  - **變數高亮**：使用 Markdown 粗體標示動態替換的變數
+  - **Schema 警告**：檢測並報告缺少的必填或建議欄位
+
 ### MCP 資源（Resources）
 
 #### 1. `system://health`
@@ -884,9 +919,10 @@ Prompts 列表資源。
 ### 工具使用建議
 
 - **開發時**：使用 `mcp.reload` 快速重載 prompts，無需重啟伺服器
-- **除錯時**：使用 `mcp.inspect` 檢查特定 prompt 的詳細資訊
+- **除錯時**：使用 `mcp.inspect` 檢查特定 prompt 的詳細資訊，或使用 `preview_prompt` 測試模板渲染
 - **監控時**：使用 `mcp.stats` 和 `system://health` 資源監控系統狀態
 - **查詢時**：使用 `mcp.list` 配合過濾條件查找特定 prompts
+- **測試時**：使用 `preview_prompt` 驗證模板邏輯、檢查 token 數量，並在實際執行前查看變數替換結果
 
 ## 💻 開發指南
 
