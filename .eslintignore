@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.prompts_cache/
+*.config.js
+*.config.ts
+scripts/
+.github/
+

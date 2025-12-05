@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-blue.svg)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)](https://github.com/CarlLee1983/mcp-prompt-manager)
+[![codecov](https://codecov.io/gh/CarlLee1983/mcp-prompt-manager/branch/main/graph/badge.svg)](https://codecov.io/gh/CarlLee1983/mcp-prompt-manager)
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
