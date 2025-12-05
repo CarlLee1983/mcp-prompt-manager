@@ -245,6 +245,113 @@ async function main() {
 }
 
 /**
+ * Estimate token count for text
+ * Simple estimation: ~4 chars per token for English, ~1.5-2 chars per token for Chinese
+ */
+function estimateTokens(text: string): number {
+    // Count Chinese characters (CJK Unified Ideographs)
+    const chineseRegex = /[\u4e00-\u9fff]/g
+    const chineseChars = (text.match(chineseRegex) || []).length
+    const otherChars = text.length - chineseChars
+
+    // Chinese: ~1.5 chars per token, English/others: ~4 chars per token
+    const chineseTokens = Math.ceil(chineseChars / 1.5)
+    const otherTokens = Math.ceil(otherChars / 4)
+
+    return chineseTokens + otherTokens
+}
+
+/**
+ * Highlight variables in rendered text by wrapping variable values with Markdown bold
+ */
+function highlightVariables(
+    template: string,
+    renderedText: string,
+    context: Record<string, unknown>
+): string {
+    let highlightedText = renderedText
+
+    // Get all variable values from context (excluding system variables)
+    const variableEntries = Object.entries(context)
+        .filter(([key]) => key !== 'output_lang_rule' && key !== 'sys_lang')
+        .map(([key, value]) => [key, String(value ?? '')])
+        .filter(([, value]) => value && value.length > 0) as [string, string][]
+
+    // Sort by length (longest first) to avoid partial matches
+    variableEntries.sort((a, b) => b[1].length - a[1].length)
+
+    // Replace each variable value with bolded version
+    for (const [, value] of variableEntries) {
+        // Skip if value is too short (likely to cause false matches)
+        if (value.length < 2) continue
+
+        // Escape special regex characters
+        const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        
+        // Try to match the value, but be careful with word boundaries
+        // For values with spaces or special chars, use a more flexible approach
+        let regex: RegExp
+        if (/^[a-zA-Z0-9_]+$/.test(value)) {
+            // Simple alphanumeric value - use word boundaries
+            regex = new RegExp(`\\b${escapedValue}\\b`, 'g')
+        } else {
+            // Complex value - match as-is (but escape special chars)
+            regex = new RegExp(escapedValue.replace(/\s+/g, '\\s+'), 'g')
+        }
+
+        // Only replace if not already highlighted
+        highlightedText = highlightedText.replace(regex, (match) => {
+            // Skip if already wrapped in markdown bold
+            if (match.startsWith('**') && match.endsWith('**')) {
+                return match
+            }
+            return `**${value}**`
+        })
+    }
+
+    return highlightedText
+}
+
+/**
+ * Check for missing required fields and generate warnings
+ */
+function checkSchemaWarnings(
+    zodShape: z.ZodRawShape,
+    providedArgs: Record<string, unknown>
+): string[] {
+    const warnings: string[] = []
+    const providedKeys = new Set(Object.keys(providedArgs))
+
+    for (const [key, schema] of Object.entries(zodShape)) {
+        if (!providedKeys.has(key)) {
+            // Check if schema is optional or has default
+            const schemaDef = (schema as any)._def
+            const isOptional = schemaDef?.typeName === 'ZodOptional' || 
+                              schemaDef?.typeName === 'ZodDefault' ||
+                              schema instanceof z.ZodOptional ||
+                              schema instanceof z.ZodDefault
+
+            if (isOptional) {
+                // Optional field - check description for hints about importance
+                const description = schemaDef?.description || 
+                                   (schema as any).description || 
+                                   ''
+                if (description.toLowerCase().includes('recommended') || 
+                    description.toLowerCase().includes('建議') ||
+                    description.toLowerCase().includes('suggested')) {
+                    warnings.push(`Missing recommended field: '${key}'`)
+                }
+            } else {
+                // Required field (validation should have caught this, but warn anyway)
+                warnings.push(`Missing required field: '${key}'`)
+            }
+        }
+    }
+
+    return warnings
+}
+
+/**
  * Register all tools
  */
 async function registerTools(
@@ -686,6 +793,9 @@ async function registerTools(
                     }
                 }
 
+                // 2.5. 檢查 Schema 警告（缺少的必填或建議欄位）
+                const warnings = checkSchemaWarnings(cachedPrompt.zodShape, inputArgs)
+
                 // 3. 渲染模板
                 try {
                     const context = {
@@ -696,10 +806,22 @@ async function registerTools(
 
                     const renderedText = cachedPrompt.compiledTemplate(context)
 
+                    // 4. 計算統計資訊（Token 估算）
+                    const renderedLength = renderedText.length
+                    const estimatedTokens = estimateTokens(renderedText)
+
+                    // 5. 生成變數高亮版本
+                    const highlightedText = highlightVariables(
+                        cachedPrompt.metadata.template,
+                        renderedText,
+                        context
+                    )
+
                     logger.debug(
                         {
                             promptId,
-                            renderedLength: renderedText.length,
+                            renderedLength,
+                            estimatedTokens,
                         },
                         'Template rendered successfully'
                     )
@@ -711,12 +833,24 @@ async function registerTools(
                                 text: JSON.stringify({
                                     success: true,
                                     renderedText,
+                                    highlightedText,
+                                    statistics: {
+                                        renderedLength,
+                                        estimatedTokens,
+                                    },
+                                    warnings,
                                 }),
                             },
                         ],
                         structuredContent: {
                             success: true,
                             renderedText,
+                            highlightedText,
+                            statistics: {
+                                renderedLength,
+                                estimatedTokens,
+                            },
+                            warnings,
                         },
                     }
                 } catch (renderError) {

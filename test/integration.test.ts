@@ -5,6 +5,7 @@ import os from 'os'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { loadPartials, loadPrompts } from '../src/services/loaders.js'
 import { getFilesRecursively, clearFileCache } from '../src/utils/fileSystem.js'
+import { SourceManager } from '../src/services/sourceManager.js'
 
 describe('整合測試', () => {
     let testDir: string
@@ -21,6 +22,9 @@ describe('整合測試', () => {
             name: 'test-server',
             version: '1.0.0',
         })
+        // 清除 SourceManager 狀態
+        SourceManager.getInstance().clearAllPrompts()
+        SourceManager.getInstance().clearAllPartials()
         // 清除緩存
         clearFileCache()
     })
@@ -39,18 +43,18 @@ describe('整合測試', () => {
     describe('完整載入流程', () => {
         it('應該能夠載入完整的 prompt 和 partials', async () => {
             // 建立測試檔案結構
-            await fs.mkdir(path.join(testDir, 'common'), { recursive: true })
-            await fs.mkdir(path.join(testDir, 'common', 'partials'), {
+            // 將 prompt 放在根目錄，這樣無論 ACTIVE_GROUPS 如何設定都會被載入
+            await fs.mkdir(path.join(testDir, 'partials'), {
                 recursive: true,
             })
 
             // 建立 partial
             await fs.writeFile(
-                path.join(testDir, 'common', 'partials', 'role-expert.hbs'),
+                path.join(testDir, 'partials', 'role-expert.hbs'),
                 '你是一位資深工程師。'
             )
 
-            // 建立 prompt
+            // 建立 prompt（放在根目錄）
             const promptYaml = `
 id: 'test-prompt'
 title: '測試 Prompt'
@@ -70,7 +74,7 @@ template: |
 `
 
             await fs.writeFile(
-                path.join(testDir, 'common', 'test-prompt.yaml'),
+                path.join(testDir, 'test-prompt.yaml'),
                 promptYaml
             )
 
@@ -86,9 +90,7 @@ template: |
         })
 
         it('應該處理多個 prompts 和 partials', async () => {
-            // 建立多個檔案
-            await fs.mkdir(path.join(testDir, 'common'), { recursive: true })
-
+            // 建立多個檔案（放在根目錄）
             // 建立多個 partials
             await fs.writeFile(
                 path.join(testDir, 'header.hbs'),
@@ -99,7 +101,7 @@ template: |
                 '=== Footer ==='
             )
 
-            // 建立多個 prompts
+            // 建立多個 prompts（放在根目錄）
             const prompt1 = `
 id: 'prompt-1'
 title: 'Prompt 1'
@@ -116,11 +118,11 @@ template: 'Hello {{name}}'
 `
 
             await fs.writeFile(
-                path.join(testDir, 'common', 'prompt-1.yaml'),
+                path.join(testDir, 'prompt-1.yaml'),
                 prompt1
             )
             await fs.writeFile(
-                path.join(testDir, 'common', 'prompt-2.yaml'),
+                path.join(testDir, 'prompt-2.yaml'),
                 prompt2
             )
 
@@ -166,17 +168,15 @@ template: 'Hello {{name}}'
         })
 
         it('應該處理無效的 YAML 檔案', async () => {
-            await fs.mkdir(path.join(testDir, 'common'), { recursive: true })
-
-            // 建立無效的 YAML
+            // 建立無效的 YAML（放在根目錄）
             await fs.writeFile(
-                path.join(testDir, 'common', 'invalid.yaml'),
+                path.join(testDir, 'invalid.yaml'),
                 'invalid: yaml: content: ['
             )
 
-            // 建立有效的 prompt
+            // 建立有效的 prompt（放在根目錄）
             await fs.writeFile(
-                path.join(testDir, 'common', 'valid.yaml'),
+                path.join(testDir, 'valid.yaml'),
                 "id: 'valid'\ntitle: 'Valid'\ntemplate: 'Valid template'"
             )
 
@@ -189,17 +189,15 @@ template: 'Hello {{name}}'
         })
 
         it('應該處理缺少必要欄位的 prompt', async () => {
-            await fs.mkdir(path.join(testDir, 'common'), { recursive: true })
-
-            // 缺少 id
+            // 缺少 id（放在根目錄）
             await fs.writeFile(
-                path.join(testDir, 'common', 'no-id.yaml'),
+                path.join(testDir, 'no-id.yaml'),
                 "title: 'No ID'\ntemplate: 'Template'"
             )
 
-            // 缺少 template
+            // 缺少 template（放在根目錄）
             await fs.writeFile(
-                path.join(testDir, 'common', 'no-template.yaml'),
+                path.join(testDir, 'no-template.yaml'),
                 "id: 'no-template'\ntitle: 'No Template'"
             )
 
@@ -252,17 +250,15 @@ template: 'Hello {{name}}'
 
     describe('錯誤處理', () => {
         it('應該正確統計載入錯誤', async () => {
-            await fs.mkdir(path.join(testDir, 'common'), { recursive: true })
-
-            // 建立一個有效的 prompt
+            // 建立一個有效的 prompt（放在根目錄）
             await fs.writeFile(
-                path.join(testDir, 'common', 'valid.yaml'),
+                path.join(testDir, 'valid.yaml'),
                 "id: 'valid'\ntitle: 'Valid'\ntemplate: 'Valid'"
             )
 
-            // 建立一個無效的 prompt（缺少 template）
+            // 建立一個無效的 prompt（缺少 template，放在根目錄）
             await fs.writeFile(
-                path.join(testDir, 'common', 'invalid.yaml'),
+                path.join(testDir, 'invalid.yaml'),
                 "id: 'invalid'\ntitle: 'Invalid'"
             )
 
@@ -275,21 +271,19 @@ template: 'Hello {{name}}'
         })
 
         it('應該在部分失敗時繼續載入其他 prompts', async () => {
-            await fs.mkdir(path.join(testDir, 'common'), { recursive: true })
-
-            // 建立多個 prompts，其中一個無效
+            // 建立多個 prompts，其中一個無效（放在根目錄）
             await fs.writeFile(
-                path.join(testDir, 'common', 'prompt1.yaml'),
+                path.join(testDir, 'prompt1.yaml'),
                 "id: 'prompt1'\ntitle: 'Prompt 1'\ntemplate: 'Template 1'"
             )
 
             await fs.writeFile(
-                path.join(testDir, 'common', 'prompt2.yaml'),
+                path.join(testDir, 'prompt2.yaml'),
                 "id: 'prompt2'\ntitle: 'Prompt 2'"
             )
 
             await fs.writeFile(
-                path.join(testDir, 'common', 'prompt3.yaml'),
+                path.join(testDir, 'prompt3.yaml'),
                 "id: 'prompt3'\ntitle: 'Prompt 3'\ntemplate: 'Template 3'"
             )
 
