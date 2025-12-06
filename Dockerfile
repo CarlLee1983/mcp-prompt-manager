@@ -56,7 +56,11 @@ COPY --from=builder --chown=mcp:nodejs /app/dist ./dist
 COPY --from=builder --chown=mcp:nodejs /app/package.json ./
 COPY --from=builder --chown=mcp:nodejs /app/node_modules ./node_modules
 
-# 創建快取目錄並設置權限
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Create cache directory and set permissions
 RUN mkdir -p /app/.prompts_cache && \
     chown -R mcp:nodejs /app/.prompts_cache
 
@@ -81,6 +85,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # 啟動命令
 # 根據 TRANSPORT_TYPE 環境變數選擇不同的啟動方式
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["/sbin/tini", "--", "docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]
 
