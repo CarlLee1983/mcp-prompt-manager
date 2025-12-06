@@ -21,24 +21,24 @@ This is a Git-driven Model Context Protocol (MCP) Server designed for managing a
 
 **Key Benefits:**
 
-- 🔄 Team Collaboration: Ensure unified Prompt versions across teams through Git version control
-- 🎯 Dynamic Templates: Support Handlebars syntax to create reusable dynamic Prompts
-- 🚀 Zero-Downtime Reload: Hot-reload support to update Prompts without restarting
-- 🔍 Smart Management: Built-in Prompt version management, state tracking, and group filtering
-- 📊 Complete Monitoring: System health status and Prompt statistics
+-   🔄 Team Collaboration: Ensure unified Prompt versions across teams through Git version control
+-   🎯 Dynamic Templates: Support Handlebars syntax to create reusable dynamic Prompts
+-   🚀 Zero-Downtime Reload: Hot-reload support to update Prompts without restarting
+-   🔍 Smart Management: Built-in Prompt version management, state tracking, and group filtering
+-   📊 Complete Monitoring: System health status and Prompt statistics
 
 ## ✨ Features
 
-- **Git Sync**: Prompts are synced directly from the specified Git Repository, ensuring teams use unified Prompt versions.
-- **Handlebars Templates**: Support powerful Handlebars syntax to create dynamic, reusable Prompt templates.
-- **Partials Support**: Support Handlebars Partials for splitting and reusing Prompt fragments (e.g., role settings, output formats).
-- **Local Cache**: Automatically cache Git Repo content to local `.prompts_cache` directory for faster reads.
-- **Cache Expiration Strategy**: Automatically clean up expired cache items periodically to prevent memory leaks and ensure data consistency.
-- **Group Filtering**: Support filtering prompts by group, loading only what you need.
-- **Error Handling**: Complete error statistics and reporting for issue tracking.
-- **Retry Mechanism**: Automatic retry for Git operations to improve reliability.
-- **Type Safety**: Use Zod to validate configuration and prompt definitions for type safety.
-- **Professional Logging**: Use pino logging system with structured logs and multiple log levels.
+-   **Git Sync**: Prompts are synced directly from the specified Git Repository, ensuring teams use unified Prompt versions.
+-   **Handlebars Templates**: Support powerful Handlebars syntax to create dynamic, reusable Prompt templates.
+-   **Partials Support**: Support Handlebars Partials for splitting and reusing Prompt fragments (e.g., role settings, output formats).
+-   **Local Cache**: Automatically cache Git Repo content to local `.prompts_cache` directory for faster reads.
+-   **Cache Expiration Strategy**: Automatically clean up expired cache items periodically to prevent memory leaks and ensure data consistency.
+-   **Group Filtering**: Support filtering prompts by group, loading only what you need.
+-   **Error Handling**: Complete error statistics and reporting for issue tracking.
+-   **Retry Mechanism**: Automatic retry for Git operations to improve reliability.
+-   **Type Safety**: Use Zod to validate configuration and prompt definitions for type safety.
+-   **Professional Logging**: Use pino logging system with structured logs and multiple log levels.
 
 ## 🚀 Quick Start
 
@@ -202,10 +202,10 @@ This automatically runs `build` and then starts Inspector, ensuring you're testi
 
 Inspector launches a web interface where you can:
 
-- View all loaded prompts
-- Test prompt output
-- Check error messages
-- Verify environment variable settings
+-   View all loaded prompts
+-   Test prompt output
+-   Check error messages
+-   Verify environment variable settings
 
 ### Using in Cursor
 
@@ -232,6 +232,7 @@ Inspector launches a web interface where you can:
 #### Configuration Steps
 
 1. **Find the configuration file**:
+
     - Method 1: In Cursor, press `Cmd/Ctrl + Shift + P`, search for "MCP: Add server"
     - Method 2: Directly edit the `mcp.json` file at the path above
 
@@ -254,6 +255,7 @@ Inspector launches a web interface where you can:
 ```
 
 3. **Important Configuration Notes**:
+
     - `command`: Use `node` to execute the compiled JavaScript file
     - `args`: Must be an **absolute path** pointing to `dist/index.js`
     - `env`: Environment variables (optional, if already set in `.env`)
@@ -265,9 +267,9 @@ Inspector launches a web interface where you can:
 
 > **Note**:
 >
-> - Replace `/path/to/mcp-prompt-manager` with the actual absolute path of this project
-> - If environment variables are already set in `.env`, the `env` block can be omitted, but specifying directly in JSON is usually more robust
-> - If the configuration file doesn't exist, you need to create the `mcp.json` file first
+> -   Replace `/path/to/mcp-prompt-manager` with the actual absolute path of this project
+> -   If environment variables are already set in `.env`, the `env` block can be omitted, but specifying directly in JSON is usually more robust
+> -   If the configuration file doesn't exist, you need to create the `mcp.json` file first
 
 ### Using in Claude Desktop
 
@@ -328,9 +330,9 @@ touch ~/Library/Application\ Support/Claude/claude_desktop_config.json
 
 > **Note**:
 >
-> - Configuration file must be valid JSON format
-> - Paths must use absolute paths
-> - After modifying the configuration file, you must completely restart Claude Desktop
+> -   Configuration file must be valid JSON format
+> -   Paths must use absolute paths
+> -   After modifying the configuration file, you must completely restart Claude Desktop
 
 ### Using in VS Code (via Extension)
 
@@ -339,6 +341,7 @@ VS Code can use MCP Server through MCP extensions.
 #### Configuration Steps
 
 1. **Install MCP Extension**:
+
     - Search for "MCP" or "Model Context Protocol" in VS Code Extension Marketplace
     - Install the corresponding extension
 
@@ -528,8 +531,8 @@ async def main():
 
 > **Note**: The `~` in paths represents the user home directory, which expands to:
 >
-> - macOS/Linux: `/Users/username` or `/home/username`
-> - Windows: `C:\Users\username`
+> -   macOS/Linux: `/Users/username` or `/home/username`
+> -   Windows: `C:\Users\username`
 
 ### Universal Configuration Format
 
@@ -605,9 +608,9 @@ pnpm run inspector:dev
 
 This launches a web interface where you can:
 
-- View all loaded prompts
-- Test prompt output
-- Check error messages
+-   View all loaded prompts
+-   Test prompt output
+-   Check error messages
 
 > **Note**: Inspector runs `dist/index.js`, so after modifying source code, you must run `build` first to see the latest changes.
 
@@ -648,17 +651,17 @@ You should see files cloned from the Git repository.
 
 **Solution**:
 
-- Confirm the application has been started at least once (will automatically create configuration directory)
-- Manually create the configuration file and directory
-- Check if the path is correct (note case sensitivity and spaces)
+-   Confirm the application has been started at least once (will automatically create configuration directory)
+-   Manually create the configuration file and directory
+-   Check if the path is correct (note case sensitivity and spaces)
 
 #### Issue 2: JSON Format Error
 
 **Solution**:
 
-- Use JSON validation tools to check format (e.g., [JSONLint](https://jsonlint.com/))
-- Ensure all strings use double quotes
-- Ensure no comma after the last item
+-   Use JSON validation tools to check format (e.g., [JSONLint](https://jsonlint.com/))
+-   Ensure all strings use double quotes
+-   Ensure no comma after the last item
 
 #### Issue 3: Server Cannot Start
 
@@ -705,22 +708,22 @@ my-prompts/
 
 ### Group Filtering Rules
 
-- **Root directory** (`/`): Always loaded
-- **common group** (`common/`): Always loaded
-- **Other groups**: Only loaded when specified in `MCP_GROUPS` environment variable
+-   **Root directory** (`/`): Always loaded
+-   **common group** (`common/`): Always loaded
+-   **Other groups**: Only loaded when specified in `MCP_GROUPS` environment variable
 
 #### Default Behavior
 
 When `MCP_GROUPS` is **not set**:
 
-- System automatically loads the `common` group (and root directory prompts)
-- Startup logs will explicitly prompt about using default groups
-- Logs will include messages suggesting to set `MCP_GROUPS` to load more groups
+-   System automatically loads the `common` group (and root directory prompts)
+-   Startup logs will explicitly prompt about using default groups
+-   Logs will include messages suggesting to set `MCP_GROUPS` to load more groups
 
 #### Examples
 
-- `MCP_GROUPS=laravel,vue` → Load root, common, laravel, vue
-- `MCP_GROUPS=` or not set → Only load root and common (system will prompt about using default)
+-   `MCP_GROUPS=laravel,vue` → Load root, common, laravel, vue
+-   `MCP_GROUPS=` or not set → Only load root and common (system will prompt about using default)
 
 ### Prompt Definition File Example (`.yaml`)
 
@@ -752,9 +755,9 @@ template: |
 
 Prompts support three parameter types:
 
-- `string`: String type (default)
-- `number`: Number type
-- `boolean`: Boolean type
+-   `string`: String type (default)
+-   `number`: Number type
+-   `boolean`: Boolean type
 
 ### Registry Feature (Optional)
 
@@ -775,19 +778,19 @@ prompts:
 
 #### Registry Field Descriptions
 
-- **`id`**: Prompt ID (required)
-- **`group`**: Group name (optional)
-- **`visibility`**: Visibility setting
-    - `public`: Public (default)
-    - `private`: Private
-    - `internal`: Internal use
-- **`deprecated`**: Whether deprecated (default `false`)
+-   **`id`**: Prompt ID (required)
+-   **`group`**: Group name (optional)
+-   **`visibility`**: Visibility setting
+    -   `public`: Public (default)
+    -   `private`: Private
+    -   `internal`: Internal use
+-   **`deprecated`**: Whether deprecated (default `false`)
 
 #### Registry Purpose
 
-- **Centralized Management**: Manage all prompts' visibility and deprecation status in a single file
-- **Override Defaults**: Can override default settings in prompt definition files
-- **Version Control**: Track prompt lifecycle through Git
+-   **Centralized Management**: Manage all prompts' visibility and deprecation status in a single file
+-   **Override Defaults**: Can override default settings in prompt definition files
+-   **Version Control**: Track prompt lifecycle through Git
 
 > **Note**: `registry.yaml` is optional. If it doesn't exist, the system will use default values from prompt definition files.
 
@@ -795,28 +798,28 @@ prompts:
 
 Each prompt has a runtime state (`runtime_state`) indicating the prompt's current availability:
 
-- **`active`**: Active state, prompt works normally and can be used as an MCP Tool
-- **`legacy`**: Legacy state, prompt is still available but marked as old version, recommend using new version
-- **`invalid`**: Invalid state, prompt definition has issues (e.g., missing required fields, template errors, etc.), cannot be used
-- **`disabled`**: Disabled, prompt is explicitly disabled (e.g., marked as deprecated in registry)
-- **`warning`**: Warning state, prompt can work but has some warnings (e.g., version too old)
+-   **`active`**: Active state, prompt works normally and can be used as an MCP Tool
+-   **`legacy`**: Legacy state, prompt is still available but marked as old version, recommend using new version
+-   **`invalid`**: Invalid state, prompt definition has issues (e.g., missing required fields, template errors, etc.), cannot be used
+-   **`disabled`**: Disabled, prompt is explicitly disabled (e.g., marked as deprecated in registry)
+-   **`warning`**: Warning state, prompt can work but has some warnings (e.g., version too old)
 
 ### Prompt Source
 
 Each prompt has a source (`source`) tag indicating where the metadata comes from:
 
-- **`embedded`**: Metadata embedded in prompt definition file (using `metadata:` block)
-- **`registry`**: Settings from `registry.yaml`
-- **`legacy`**: Legacy mode, no metadata, uses default values
+-   **`embedded`**: Metadata embedded in prompt definition file (using `metadata:` block)
+-   **`registry`**: Settings from `registry.yaml`
+-   **`legacy`**: Legacy mode, no metadata, uses default values
 
 ### Prompt Status
 
 Each prompt has a status (`status`) indicating the prompt's development stage:
 
-- **`draft`**: Draft, under development
-- **`stable`**: Stable version, can be used normally
-- **`deprecated`**: Deprecated, not recommended for use
-- **`legacy`**: Legacy version, still available but recommend upgrading
+-   **`draft`**: Draft, under development
+-   **`stable`**: Stable version, can be used normally
+-   **`deprecated`**: Deprecated, not recommended for use
+-   **`legacy`**: Legacy version, still available but recommend upgrading
 
 ## 🔧 MCP Tools and Resources
 
@@ -828,9 +831,9 @@ This project provides multiple MCP tools and resources for managing and querying
 
 Reload all Prompts without restarting the server (hot-reload).
 
-- **Function**: Pull latest changes from Git repository, clear cache, reload all Handlebars partials and prompts
-- **Parameters**: None
-- **Usage Example**:
+-   **Function**: Pull latest changes from Git repository, clear cache, reload all Handlebars partials and prompts
+-   **Parameters**: None
+-   **Usage Example**:
     ```json
     {
         "tool": "mcp.reload",
@@ -842,27 +845,27 @@ Reload all Prompts without restarting the server (hot-reload).
 
 Get Prompts statistics.
 
-- **Function**: Returns statistics for all prompts, including counts by runtime state (active, legacy, invalid, disabled, warning)
-- **Parameters**: None
-- **Return Content**:
-    - `total`: Total count
-    - `active`: Active state count
-    - `legacy`: Legacy state count
-    - `invalid`: Invalid state count
-    - `disabled`: Disabled count
-    - `warning`: Warning state count
+-   **Function**: Returns statistics for all prompts, including counts by runtime state (active, legacy, invalid, disabled, warning)
+-   **Parameters**: None
+-   **Return Content**:
+    -   `total`: Total count
+    -   `active`: Active state count
+    -   `legacy`: Legacy state count
+    -   `invalid`: Invalid state count
+    -   `disabled`: Disabled count
+    -   `warning`: Warning state count
 
 #### 3. `mcp.list` / `mcp.prompt.list`
 
 List all Prompts with multiple filter options.
 
-- **Function**: Lists all prompt runtimes with complete metadata information
-- **Parameters** (optional):
-    - `status`: Filter by status (`draft`, `stable`, `deprecated`, `legacy`)
-    - `group`: Filter by group name
-    - `tag`: Filter by tag (prompts must contain this tag)
-    - `runtime_state`: Filter by runtime state (`active`, `legacy`, `invalid`, `disabled`, `warning`)
-- **Usage Example**:
+-   **Function**: Lists all prompt runtimes with complete metadata information
+-   **Parameters** (optional):
+    -   `status`: Filter by status (`draft`, `stable`, `deprecated`, `legacy`)
+    -   `group`: Filter by group name
+    -   `tag`: Filter by tag (prompts must contain this tag)
+    -   `runtime_state`: Filter by runtime state (`active`, `legacy`, `invalid`, `disabled`, `warning`)
+-   **Usage Example**:
     ```json
     {
         "tool": "mcp.list",
@@ -877,10 +880,10 @@ List all Prompts with multiple filter options.
 
 Inspect detailed runtime information for a specific Prompt.
 
-- **Function**: Get complete runtime metadata by Prompt ID, including state, source, version, tags, and use cases
-- **Parameters**:
-    - `id`: Prompt ID (required)
-- **Usage Example**:
+-   **Function**: Get complete runtime metadata by Prompt ID, including state, source, version, tags, and use cases
+-   **Parameters**:
+    -   `id`: Prompt ID (required)
+-   **Usage Example**:
     ```json
     {
         "tool": "mcp.inspect",
@@ -894,11 +897,11 @@ Inspect detailed runtime information for a specific Prompt.
 
 Switch to a different Prompt repository and reload (zero-downtime).
 
-- **Function**: Switch to a new Git repository and reload all prompts
-- **Parameters**:
-    - `repo_url`: Repository URL (required)
-    - `branch`: Branch name (optional)
-- **Usage Example**:
+-   **Function**: Switch to a new Git repository and reload all prompts
+-   **Parameters**:
+    -   `repo_url`: Repository URL (required)
+    -   `branch`: Branch name (optional)
+-   **Usage Example**:
     ```json
     {
         "tool": "mcp.repo.switch",
@@ -913,17 +916,17 @@ Switch to a different Prompt repository and reload (zero-downtime).
 
 Preview/render a prompt template with given arguments without executing it (debug utility).
 
-- **Function**: Renders a prompt template with given arguments to show the final text without sending it to an LLM. Use this to verify template logic.
-- **Parameters**:
-    - `promptId`: Prompt ID (required, e.g., `'laravel:code-review'`)
-    - `args`: JSON object containing the arguments/variables for the template (required)
-- **Returns**:
-    - `success`: Boolean indicating success or failure
-    - `renderedText`: The rendered prompt text
-    - `highlightedText`: The rendered text with variables highlighted in Markdown bold
-    - `statistics`: Object containing `renderedLength` (character count) and `estimatedTokens` (estimated token count)
-    - `warnings`: Array of schema validation warnings (e.g., missing recommended fields)
-- **Usage Example**:
+-   **Function**: Renders a prompt template with given arguments to show the final text without sending it to an LLM. Use this to verify template logic.
+-   **Parameters**:
+    -   `promptId`: Prompt ID (required, e.g., `'laravel:code-review'`)
+    -   `args`: JSON object containing the arguments/variables for the template (required)
+-   **Returns**:
+    -   `success`: Boolean indicating success or failure
+    -   `renderedText`: The rendered prompt text
+    -   `highlightedText`: The rendered text with variables highlighted in Markdown bold
+    -   `statistics`: Object containing `renderedLength` (character count) and `estimatedTokens` (estimated token count)
+    -   `warnings`: Array of schema validation warnings (e.g., missing recommended fields)
+-   **Usage Example**:
     ```json
     {
         "tool": "preview_prompt",
@@ -936,11 +939,11 @@ Preview/render a prompt template with given arguments without executing it (debu
         }
     }
     ```
-- **Advanced Features**:
-    - **Schema Validation**: Strict validation of arguments against prompt's Zod schema
-    - **Token Estimation**: Estimates token count (supports both English and Chinese text)
-    - **Variable Highlighting**: Highlights dynamically replaced variables with Markdown bold formatting
-    - **Schema Warnings**: Detects and reports missing required or recommended fields
+-   **Advanced Features**:
+    -   **Schema Validation**: Strict validation of arguments against prompt's Zod schema
+    -   **Token Estimation**: Estimates token count (supports both English and Chinese text)
+    -   **Variable Highlighting**: Highlights dynamically replaced variables with Markdown bold formatting
+    -   **Schema Warnings**: Detects and reports missing required or recommended fields
 
 ### MCP Resources
 
@@ -948,40 +951,40 @@ Preview/render a prompt template with given arguments without executing it (debu
 
 System health status resource.
 
-- **URI**: `system://health`
-- **MIME Type**: `application/json`
-- **Content**: Includes the following information:
-    - `git`: Git repository information (URL, path, HEAD commit)
-    - `prompts`: Prompts statistics (total, counts by state, loaded count, group list)
-    - `registry`: Registry status (enabled, source)
-    - `cache`: Cache information (size, cleanup interval)
-    - `system`: System information (uptime, memory usage)
+-   **URI**: `system://health`
+-   **MIME Type**: `application/json`
+-   **Content**: Includes the following information:
+    -   `git`: Git repository information (URL, path, HEAD commit)
+    -   `prompts`: Prompts statistics (total, counts by state, loaded count, group list)
+    -   `registry`: Registry status (enabled, source)
+    -   `cache`: Cache information (size, cleanup interval)
+    -   `system`: System information (uptime, memory usage)
 
 #### 2. `prompts://list`
 
 Prompts list resource.
 
-- **URI**: `prompts://list`
-- **MIME Type**: `application/json`
-- **Content**: Complete metadata list of all prompts, including:
-    - `id`: Prompt ID
-    - `title`: Title
-    - `version`: Version
-    - `status`: Status
-    - `runtime_state`: Runtime state
-    - `source`: Source
-    - `tags`: Tags array
-    - `use_cases`: Use cases array
-    - `group`: Group name
-    - `visibility`: Visibility
+-   **URI**: `prompts://list`
+-   **MIME Type**: `application/json`
+-   **Content**: Complete metadata list of all prompts, including:
+    -   `id`: Prompt ID
+    -   `title`: Title
+    -   `version`: Version
+    -   `status`: Status
+    -   `runtime_state`: Runtime state
+    -   `source`: Source
+    -   `tags`: Tags array
+    -   `use_cases`: Use cases array
+    -   `group`: Group name
+    -   `visibility`: Visibility
 
 ### Tool Usage Recommendations
 
-- **During Development**: Use `mcp.reload` to quickly reload prompts without restarting the server
-- **During Debugging**: Use `mcp.inspect` to check detailed information for specific prompts, or use `preview_prompt` to test template rendering
-- **During Monitoring**: Use `mcp.stats` and `system://health` resource to monitor system status
-- **During Querying**: Use `mcp.list` with filter conditions to find specific prompts
-- **During Testing**: Use `preview_prompt` to verify template logic, check token counts, and see variable replacements before actual execution
+-   **During Development**: Use `mcp.reload` to quickly reload prompts without restarting the server
+-   **During Debugging**: Use `mcp.inspect` to check detailed information for specific prompts, or use `preview_prompt` to test template rendering
+-   **During Monitoring**: Use `mcp.stats` and `system://health` resource to monitor system status
+-   **During Querying**: Use `mcp.list` with filter conditions to find specific prompts
+-   **During Testing**: Use `preview_prompt` to verify template logic, check token counts, and see variable replacements before actual execution
 
 ## 💻 Development Guide
 
@@ -992,11 +995,13 @@ The MCP Prompt Manager follows a modular architecture with clear separation of c
 #### Core Components
 
 1. **Repository Interface** (`src/repositories/strategy.ts`)
+
     - Abstract interface for different repository types (Git, Local)
     - Supports multiple repository strategies with priority-based loading
     - Handles repository synchronization and file watching
 
 2. **Source Manager** (`src/services/sourceManager.ts`)
+
     - Singleton pattern for managing prompt lifecycle
     - Handles prompt loading, caching, and registration
     - Compiles Handlebars templates at load time for performance
@@ -1056,11 +1061,11 @@ The MCP Prompt Manager follows a modular architecture with clear separation of c
 
 #### Key Modules
 
-- **Repository Interface**: Abstract strategy pattern for Git and local repositories
-- **Source Manager**: Centralized prompt lifecycle management with caching
-- **Cache Provider**: Pluggable cache system (local memory or Redis)
-- **Loaders**: High-level API for loading prompts and partials
-- **MCP Tools**: Dynamic tool registration based on loaded prompts
+-   **Repository Interface**: Abstract strategy pattern for Git and local repositories
+-   **Source Manager**: Centralized prompt lifecycle management with caching
+-   **Cache Provider**: Pluggable cache system (local memory or Redis)
+-   **Loaders**: High-level API for loading prompts and partials
+-   **MCP Tools**: Dynamic tool registration based on loaded prompts
 
 ### Project Structure
 
@@ -1158,17 +1163,17 @@ pnpm format:check
 
 > **Important Notes**:
 >
-> - The `inspector` command runs `dist/index.js` (compiled file)
-> - After modifying source code, you must run `build` first to see the latest changes
-> - Using `inspector:dev` can auto-compile and start, suitable for development
+> -   The `inspector` command runs `dist/index.js` (compiled file)
+> -   After modifying source code, you must run `build` first to see the latest changes
+> -   Using `inspector:dev` can auto-compile and start, suitable for development
 
 ## 🧪 Testing
 
 The project includes a complete test suite:
 
-- **Unit Tests**: Multiple test files covering all core functionality
-- **Integration Tests**: End-to-end testing for prompt loading and MCP tools
-- **Total**: 107 tests, all passing
+-   **Unit Tests**: Multiple test files covering all core functionality
+-   **Integration Tests**: End-to-end testing for prompt loading and MCP tools
+-   **Total**: 107 tests, all passing
 
 Run tests:
 
@@ -1187,10 +1192,10 @@ pnpm test:ui
 
 This project maintains high code quality through comprehensive test coverage with the following thresholds:
 
-- **Statements**: ≥ 80%
-- **Lines**: ≥ 75%
-- **Functions**: ≥ 75%
-- **Branches**: ≥ 70%
+-   **Statements**: ≥ 80%
+-   **Lines**: ≥ 75%
+-   **Functions**: ≥ 75%
+-   **Branches**: ≥ 70%
 
 > **Note**: Coverage reports use `@vitest/coverage-v8` which requires Node.js 19+. Coverage thresholds are enforced to maintain code quality. If coverage falls below thresholds, tests will fail to ensure quality standards.
 
@@ -1226,9 +1231,9 @@ This project enforces code quality through multiple layers of checks:
 
 Pre-commit hooks automatically run linting and formatting before each commit using [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/okonet/lint-staged):
 
-- **ESLint**: Automatically fixes linting issues in TypeScript files
-- **Prettier**: Automatically formats code to ensure consistent style
-- **Type Safety**: TypeScript strict mode is enabled (`strict: true` in `tsconfig.json`)
+-   **ESLint**: Automatically fixes linting issues in TypeScript files
+-   **Prettier**: Automatically formats code to ensure consistent style
+-   **Type Safety**: TypeScript strict mode is enabled (`strict: true` in `tsconfig.json`)
 
 The pre-commit hook runs on staged files only, ensuring fast commit times while maintaining code quality.
 
@@ -1236,11 +1241,11 @@ The pre-commit hook runs on staged files only, ensuring fast commit times while 
 
 GitHub Actions CI workflow runs on every push and pull request:
 
-- **Node.js Compatibility**: Tests across Node.js 16.x, 18.x, and 20.x
-- **Linting**: ESLint checks for code quality and style
-- **Type Checking**: TypeScript type checking (`tsc --noEmit`)
-- **Testing**: Full test suite with coverage reporting
-- **Coverage Upload**: Automatic upload to Codecov
+-   **Node.js Compatibility**: Tests across Node.js 16.x, 18.x, and 20.x
+-   **Linting**: ESLint checks for code quality and style
+-   **Type Checking**: TypeScript type checking (`tsc --noEmit`)
+-   **Testing**: Full test suite with coverage reporting
+-   **Coverage Upload**: Automatic upload to Codecov
 
 #### Required Checks for Pull Requests
 
@@ -1282,10 +1287,10 @@ The system uses a TTL-based periodic cleanup mechanism to manage file list cache
 
 #### Cache Mechanism
 
-- **Cache TTL**: 5 seconds (hardcoded)
-- **Cleanup Interval**: Default 10 seconds (`CACHE_TTL * 2`), adjustable via `CACHE_CLEANUP_INTERVAL` environment variable
-- **Auto Cleanup**: Cleanup mechanism starts automatically when application starts
-- **Graceful Shutdown**: Cleanup timer stops automatically when application closes
+-   **Cache TTL**: 5 seconds (hardcoded)
+-   **Cleanup Interval**: Default 10 seconds (`CACHE_TTL * 2`), adjustable via `CACHE_CLEANUP_INTERVAL` environment variable
+-   **Auto Cleanup**: Cleanup mechanism starts automatically when application starts
+-   **Graceful Shutdown**: Cleanup timer stops automatically when application closes
 
 #### How It Works
 
@@ -1318,9 +1323,9 @@ See [CACHE_VERIFICATION.md](./CACHE_VERIFICATION.md) for complete verification m
 
 ### Security
 
-- ✅ Input Validation: All environment variables are validated with Zod
-- ✅ Path Security: Prevents path traversal attacks
-- ✅ Group Validation: Group name format validation (only letters, numbers, underscores, dashes allowed)
+-   ✅ Input Validation: All environment variables are validated with Zod
+-   ✅ Path Security: Prevents path traversal attacks
+-   ✅ Group Validation: Group name format validation (only letters, numbers, underscores, dashes allowed)
 
 ## 📝 Logging
 
@@ -1328,19 +1333,19 @@ The project uses [pino](https://github.com/pinojs/pino) as the logging system, s
 
 ### Log Levels
 
-- `fatal`: Fatal errors that cause program exit
-- `error`: Error messages
-- `warn`: Warning messages
-- `info`: General information
-- `debug`: Debug messages
-- `trace`: Trace messages
-- `silent`: Completely disable log output
+-   `fatal`: Fatal errors that cause program exit
+-   `error`: Error messages
+-   `warn`: Warning messages
+-   `info`: General information
+-   `debug`: Debug messages
+-   `trace`: Trace messages
+-   `silent`: Completely disable log output
 
 **Default Behavior**:
 
-- **Production Environment** (`NODE_ENV` not set or not `development`): Defaults to `warn`, only outputs warnings and errors
-- **Development Environment** (`NODE_ENV=development`): Defaults to `info`, outputs all info level and above logs
-- Can override default value via `LOG_LEVEL` environment variable
+-   **Production Environment** (`NODE_ENV` not set or not `development`): Defaults to `warn`, only outputs warnings and errors
+-   **Development Environment** (`NODE_ENV=development`): Defaults to `info`, outputs all info level and above logs
+-   Can override default value via `LOG_LEVEL` environment variable
 
 ### Setting Log Level
 
@@ -1352,9 +1357,21 @@ LOG_LEVEL=debug
 export LOG_LEVEL=debug
 ```
 
-## 🐛 Troubleshooting
+## ❓ FAQ & Troubleshooting
 
-### Issue: Git Sync Failed
+### Q: How do I run the server locally?
+
+**A**: You can use `pnpm dev` for development (with inspector) or `pnpm start` for production mode. See `package.json` scripts for more details.
+
+### Q: I'm getting a Git Clone Error (Exit Code 128).
+
+**A**: This usually means a permission issue or invalid URL.
+
+1. **SSH vs HTTPS**: If using SSH (`git@github.com...`), ensure your SSH keys are correctly mounted or available. If using HTTPS, ensure you don't need a token (or provide it).
+2. **Known Hosts**: If running in Docker, ensure `ssh-keyscan` was run or your `known_hosts` file is mounted.
+3. **Repo Validity**: Manually try `git clone <URL>` on your machine to verify the URL.
+
+### Issue: Git Sync Failed (General)
 
 **Solution**:
 
@@ -1368,7 +1385,7 @@ export LOG_LEVEL=debug
 **Solution**:
 
 1. Check if `MCP_GROUPS` setting is correct
-2. Confirm prompt files are in the correct directory structure
+2. Confirm prompt files are in the correct directory structure (`prompts/<group>/...`)
 3. Check if YAML file format is correct
 4. Check error messages in logs
 
@@ -1377,26 +1394,27 @@ export LOG_LEVEL=debug
 **Solution**:
 
 1. Confirm partial file extension is `.hbs`
-2. Check if partial file content is correct
-3. Confirm using `{{> partial-name }}` syntax in templates
+2. Confirm partials are in the `partials/` directory
+3. Check if partial file content is correct
+4. Confirm using `{{> partial-name }}` syntax in templates
 
 ## 📦 Key Dependencies
 
-- **@modelcontextprotocol/sdk**: MCP SDK, provides MCP Server core functionality
-- **handlebars**: Handlebars template engine, supports dynamic Prompt generation
-- **simple-git**: Git operations library for syncing Git repositories
-- **js-yaml**: YAML parser for parsing Prompt definition files
-- **zod**: TypeScript-first schema validation library for configuration and type validation
-- **pino**: High-performance structured logging library
-- **dotenv**: Environment variable loading utility
+-   **@modelcontextprotocol/sdk**: MCP SDK, provides MCP Server core functionality
+-   **handlebars**: Handlebars template engine, supports dynamic Prompt generation
+-   **simple-git**: Git operations library for syncing Git repositories
+-   **js-yaml**: YAML parser for parsing Prompt definition files
+-   **zod**: TypeScript-first schema validation library for configuration and type validation
+-   **pino**: High-performance structured logging library
+-   **dotenv**: Environment variable loading utility
 
 ## 📚 Related Resources
 
-- [Model Context Protocol Official Documentation](https://modelcontextprotocol.io/)
-- [Handlebars Documentation](https://handlebarsjs.com/)
-- [Zod Documentation](https://zod.dev/)
-- [Simple Git Documentation](https://github.com/steveukx/git-js)
-- [Pino Documentation](https://getpino.io/)
+-   [Model Context Protocol Official Documentation](https://modelcontextprotocol.io/)
+-   [Handlebars Documentation](https://handlebarsjs.com/)
+-   [Zod Documentation](https://zod.dev/)
+-   [Simple Git Documentation](https://github.com/steveukx/git-js)
+-   [Pino Documentation](https://getpino.io/)
 
 ## 📄 License
 
