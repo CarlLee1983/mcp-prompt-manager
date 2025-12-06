@@ -52,9 +52,8 @@ describe('GitRepositoryStrategy', () => {
             expect(await sshStrategy.validate()).toBe(true)
         })
 
-        it('should return false for invalid URL', async () => {
-            const invalidStrategy = new GitRepositoryStrategy('invalid-url')
-            expect(await invalidStrategy.validate()).toBe(false)
+        it('should throw error for invalid URL', () => {
+            expect(() => new GitRepositoryStrategy('invalid-url')).toThrow()
         })
     })
 
