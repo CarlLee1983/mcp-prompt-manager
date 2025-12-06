@@ -188,12 +188,8 @@ function loadConfig() {
 
         const parsed = ConfigSchema.parse(rawConfig)
 
-        // Validation: at least one of PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided
-        if (!parsed.PROMPT_REPO_URL && !parsed.PROMPT_REPO_URLS) {
-            throw new Error(
-                "Either PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided"
-            )
-        }
+        // Note: Validation of PROMPT_REPO_URL/PROMPT_REPO_URLS is deferred to getRepoConfigs()
+        // to allow module loading in test environments or when using dynamic repo switching
 
         return parsed
     } catch (error) {
@@ -331,6 +327,14 @@ export function getRepoConfigs(): RepoConfig[] {
     // Backward compatibility: if no PROMPT_REPO_URLS, use PROMPT_REPO_URL
     if (configs.length === 0 && config.PROMPT_REPO_URL) {
         configs.push(parseSingleRepoUrl(config.PROMPT_REPO_URL, GIT_BRANCH))
+    }
+
+    // Validation: at least one of PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided
+    // This is checked when actually using the config, not at module load time
+    if (configs.length === 0) {
+        throw new Error(
+            "Either PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided"
+        )
     }
 
     return sortReposByPriority(configs)

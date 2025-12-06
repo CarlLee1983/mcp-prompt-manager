@@ -582,7 +582,9 @@ describe('env.ts Configuration Tests', () => {
                 delete process.env.PROMPT_REPO_URLS
             }
 
-            await expect(import('../src/config/env.js')).rejects.toThrow('Either PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided')
+            // Module can load without error, but getRepoConfigs() should throw
+            const env = await import('../src/config/env.js')
+            expect(() => env.getRepoConfigs()).toThrow('Either PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided')
         })
     })
 
@@ -799,7 +801,9 @@ describe('env.ts Configuration Tests', () => {
                 delete process.env.PROMPT_REPO_URLS
             }
 
-            await expect(import('../src/config/env.js')).rejects.toThrow('Either PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided')
+            // Module can load without error, but getRepoConfigs() should throw
+            const env = await import('../src/config/env.js')
+            expect(() => env.getRepoConfigs()).toThrow('Either PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided')
         })
     })
 })
