@@ -32,7 +32,7 @@ describe('SourceManager & Optimization Tests', () => {
         await fs.rm(testDir, { recursive: true, force: true })
     })
 
-    describe('Singleton 模式', () => {
+    describe('Singleton Pattern', () => {
         it('should be a singleton', () => {
             const instance1 = SourceManager.getInstance()
             const instance2 = SourceManager.getInstance()
@@ -40,7 +40,7 @@ describe('SourceManager & Optimization Tests', () => {
         })
     })
 
-    describe('快取機制', () => {
+    describe('Caching Mechanism', () => {
         it('should cache compiled templates after loading', async () => {
             const yamlContent = `
 id: 'cached-prompt'
@@ -104,7 +104,7 @@ template: 'Version 2'
         })
     })
 
-    describe('Partials 管理', () => {
+    describe('Partials Management', () => {
         it('should load Handlebars partials', async () => {
             const partialContent = 'Partial content: {{value}}'
             await fs.writeFile(path.join(testDir, 'test-partial.hbs'), partialContent)
@@ -142,11 +142,11 @@ template: 'Version 2'
 
             const sourceManager = SourceManager.getInstance()
             await sourceManager.loadPartials(testDir)
-            
+
             expect(sourceManager.getLoadedPromptCount()).toBe(0) // Partials don't count as prompts
-            
+
             sourceManager.clearAllPartials()
-            
+
             // After clearing, partials should be unregistered
             // (We can't directly test Handlebars state, but we can verify the method runs)
             expect(sourceManager.getLoadedPromptCount()).toBe(0)
@@ -155,7 +155,7 @@ template: 'Version 2'
         it('should handle errors when loading partials gracefully', async () => {
             // Create a directory that doesn't exist (simulate error)
             const invalidDir = path.join(testDir, 'nonexistent', 'nested')
-            
+
             const sourceManager = SourceManager.getInstance()
             // getFilesRecursively will throw, so loadPartials will also throw
             // This is expected behavior - the error propagates
@@ -163,7 +163,7 @@ template: 'Version 2'
         })
     })
 
-    describe('Prompt 管理方法', () => {
+    describe('Prompt Management Methods', () => {
         beforeEach(async () => {
             const yamlContent = `
 id: 'test-prompt'
@@ -173,7 +173,7 @@ status: 'stable'
 template: 'Test template'
 `
             await fs.writeFile(path.join(testDir, 'test-prompt.yaml'), yamlContent)
-            
+
             const sourceManager = SourceManager.getInstance()
             await sourceManager.loadPrompts(server, testDir)
         })
@@ -181,7 +181,7 @@ template: 'Test template'
         it('should get prompt runtime by ID', () => {
             const sourceManager = SourceManager.getInstance()
             const runtime = sourceManager.getPromptRuntime('test-prompt')
-            
+
             expect(runtime).toBeDefined()
             expect(runtime?.id).toBe('test-prompt')
         })
@@ -189,14 +189,14 @@ template: 'Test template'
         it('should return undefined for non-existent prompt runtime', () => {
             const sourceManager = SourceManager.getInstance()
             const runtime = sourceManager.getPromptRuntime('non-existent')
-            
+
             expect(runtime).toBeUndefined()
         })
 
         it('should get all prompt runtimes', () => {
             const sourceManager = SourceManager.getInstance()
             const runtimes = sourceManager.getAllPromptRuntimes()
-            
+
             expect(runtimes.length).toBeGreaterThan(0)
             expect(runtimes.some(r => r.id === 'test-prompt')).toBe(true)
         })
@@ -204,21 +204,21 @@ template: 'Test template'
         it('should get registered prompt IDs', () => {
             const sourceManager = SourceManager.getInstance()
             const ids = sourceManager.getRegisteredPromptIds()
-            
+
             expect(ids).toContain('test-prompt')
         })
 
         it('should get loaded prompt count', () => {
             const sourceManager = SourceManager.getInstance()
             const count = sourceManager.getLoadedPromptCount()
-            
+
             expect(count).toBeGreaterThan(0)
         })
 
         it('should get prompt statistics', () => {
             const sourceManager = SourceManager.getInstance()
             const stats = sourceManager.getPromptStats()
-            
+
             expect(stats).toHaveProperty('total')
             expect(stats).toHaveProperty('active')
             expect(stats).toHaveProperty('tools')
@@ -228,7 +228,7 @@ template: 'Test template'
         })
     })
 
-    describe('清除方法', () => {
+    describe('Clear Methods', () => {
         beforeEach(async () => {
             const yamlContent = `
 id: 'test-prompt'
@@ -238,28 +238,28 @@ status: 'stable'
 template: 'Test template'
 `
             await fs.writeFile(path.join(testDir, 'test-prompt.yaml'), yamlContent)
-            
+
             const sourceManager = SourceManager.getInstance()
             await sourceManager.loadPrompts(server, testDir)
         })
 
         it('should clear all prompts', () => {
             const sourceManager = SourceManager.getInstance()
-            
+
             expect(sourceManager.getLoadedPromptCount()).toBeGreaterThan(0)
-            
+
             sourceManager.clearAllPrompts()
-            
+
             expect(sourceManager.getLoadedPromptCount()).toBe(0)
             expect(sourceManager.getRegisteredPromptIds()).toHaveLength(0)
         })
 
         it('should remove old prompts that are not in new set', async () => {
             const sourceManager = SourceManager.getInstance()
-            
+
             // Clear first
             sourceManager.clearAllPrompts()
-            
+
             // Use the same format as working tests
             const prompt1Content = `id: test-prompt-1
 title: Test Prompt 1
@@ -276,9 +276,9 @@ template: Template 2
             // Place in root directory (always loaded)
             await fs.writeFile(path.join(testDir, 'test-prompt-1.yaml'), prompt1Content)
             await fs.writeFile(path.join(testDir, 'test-prompt-2.yaml'), prompt2Content)
-            
+
             const result = await sourceManager.loadPrompts(server, testDir)
-            
+
             // Verify prompts were loaded (check errors if not)
             if (result.loaded === 0) {
                 // Log errors for debugging
@@ -289,16 +289,16 @@ template: Template 2
                 // The removeOldPrompts functionality is tested indirectly through other tests
                 return
             }
-            
+
             // Both prompts should be loaded
             const prompt1 = sourceManager.getPrompt('test-prompt-1')
             const prompt2 = sourceManager.getPrompt('test-prompt-2')
-            
+
             if (prompt1 && prompt2) {
                 // Now remove prompt-1 using removeOldPrompts (only keep prompt-2)
                 const newToolIds = new Set(['test-prompt-2'])
                 sourceManager.removeOldPrompts(newToolIds)
-                
+
                 // prompt-1 should be removed
                 expect(sourceManager.getPrompt('test-prompt-1')).toBeUndefined()
                 // prompt-2 should still exist
@@ -312,7 +312,7 @@ template: Template 2
         })
     })
 
-    describe('錯誤處理', () => {
+    describe('Error Handling', () => {
         it('should handle invalid YAML files gracefully', async () => {
             const invalidYaml = 'invalid: yaml: content: ['
             await fs.writeFile(path.join(testDir, 'invalid.yaml'), invalidYaml)
@@ -349,7 +349,7 @@ template: 'Template'
         })
     })
 
-    describe('群組過濾', () => {
+    describe('Group Filtering', () => {
         it('should load prompts from root directory', async () => {
             const yamlContent = `
 id: 'root-prompt'
@@ -371,7 +371,7 @@ template: 'Root template'
             // Clear first to ensure clean state
             const sourceManager = SourceManager.getInstance()
             sourceManager.clearAllPrompts()
-            
+
             // Common group is typically always loaded or in default groups
             // Let's test with a root-level prompt instead, which is always loaded
             const yamlContent = `
@@ -394,12 +394,12 @@ template: 'Root template'
             // Clear first
             const sourceManager = SourceManager.getInstance()
             sourceManager.clearAllPrompts()
-            
+
             // Set groups to only 'common', not 'laravel'
             process.env.MCP_GROUPS = 'common'
-            
+
             await fs.mkdir(path.join(testDir, 'laravel'), { recursive: true })
-            
+
             const yamlContent = `
 id: 'laravel-prompt'
 title: 'Laravel Prompt'
@@ -434,7 +434,7 @@ template: 'Unselected template'
         })
     })
 
-    describe('Metadata 處理', () => {
+    describe('Metadata Handling', () => {
         it('should handle prompts with metadata', async () => {
             const yamlContent = `
 id: 'metadata-prompt'
@@ -547,8 +547,8 @@ template: 'Template'
         })
     })
 
-    describe('buildZodSchema - 覆蓋未測試的分支', () => {
-        it('應該處理 required=false 且有 default 值的參數', async () => {
+    describe('buildZodSchema - Cover Untested Branches', () => {
+        it('should handle optional param with default value', async () => {
             const yamlContent = `
 id: 'optional-with-default'
 title: 'Optional With Default'
@@ -568,12 +568,12 @@ template: 'Template with {{optional_param}}'
 
             const prompt = sourceManager.getPrompt('optional-with-default')
             expect(prompt).toBeDefined()
-            // 驗證 schema 有 default 值
+            // Verify schema has default value
             const schema = prompt?.zodShape.optional_param
             expect(schema).toBeDefined()
         })
 
-        it('應該處理 description 中包含 optional 的參數', async () => {
+        it('should handle param with optional in description', async () => {
             const yamlContent = `
 id: 'optional-in-desc'
 title: 'Optional In Description'
@@ -593,7 +593,7 @@ template: 'Template'
             expect(prompt).toBeDefined()
         })
 
-        it('應該處理 description 中包含 (required) 的參數', async () => {
+        it('should handle param with (required) in description', async () => {
             const yamlContent = `
 id: 'required-in-desc'
 title: 'Required In Description'
@@ -613,7 +613,7 @@ template: 'Template'
             expect(prompt).toBeDefined()
         })
 
-        it('應該處理有 default 值但沒有 required 標記的參數', async () => {
+        it('should handle param with default value but without required flag', async () => {
             const yamlContent = `
 id: 'default-without-required'
 title: 'Default Without Required'
@@ -635,8 +635,8 @@ template: 'Template'
         })
     })
 
-    describe('parseRulesFromDescription - 覆蓋未測試的分支', () => {
-        it('應該解析 RULES 區塊中的編號規則', async () => {
+    describe('parseRulesFromDescription - Cover Untested Branches', () => {
+        it('should parse numbered rules in RULES section', async () => {
             const yamlContent = `
 id: 'rules-with-numbers'
 title: 'Rules With Numbers'
@@ -659,12 +659,12 @@ template: 'Template'
 
             const prompt = sourceManager.getPrompt('rules-with-numbers')
             expect(prompt).toBeDefined()
-            // rules 在 PromptDefinition 中，不在 PromptRuntime 中
-            // 但我們可以驗證 prompt 已成功載入，這表示 parseRulesFromDescription 被調用
+            // rules are in PromptDefinition, not in PromptRuntime
+            // But we can verify prompt is loaded successfully, which means parseRulesFromDescription was called
             expect(prompt?.metadata.id).toBe('rules-with-numbers')
         })
 
-        it('應該解析 RULES 區塊中的非編號規則（fallback 到行分割）', async () => {
+        it('should parse non-numbered rules in RULES section (fallback to line split)', async () => {
             const yamlContent = `
 id: 'rules-without-numbers'
 title: 'Rules Without Numbers'
@@ -687,11 +687,11 @@ template: 'Template'
 
             const prompt = sourceManager.getPrompt('rules-without-numbers')
             expect(prompt).toBeDefined()
-            // 驗證 prompt 已成功載入，這表示 parseRulesFromDescription 被調用（包括 fallback 分支）
+            // Verify prompt loaded successfully, which means parseRulesFromDescription was called (including fallback branch)
             expect(prompt?.metadata.id).toBe('rules-without-numbers')
         })
 
-        it('應該處理沒有 RULES 區塊的 description', async () => {
+        it('should handle description without RULES section', async () => {
             const yamlContent = `
 id: 'no-rules'
 title: 'No Rules'
@@ -706,7 +706,7 @@ template: 'Template'
 
             const prompt = sourceManager.getPrompt('no-rules')
             expect(prompt).toBeDefined()
-            // 驗證 prompt 已成功載入，這表示 parseRulesFromDescription 被調用（返回空陣列）
+            // Verify prompt loaded successfully, which means parseRulesFromDescription was called(return empty array)
             expect(prompt?.metadata.id).toBe('no-rules')
         })
     })
@@ -935,13 +935,13 @@ template: 'Template'
         it('should handle file read errors in reloadSinglePrompt', async () => {
             const filePath = path.join(testDir, 'error-prompt.yaml')
             await fs.writeFile(filePath, 'invalid yaml: [')
-            
+
             // Create a file that will cause read error
             vi.spyOn(fs, 'readFile').mockRejectedValueOnce(new Error('Read error'))
 
             const sourceManager = SourceManager.getInstance()
             const result = await sourceManager.reloadSinglePrompt(server, filePath, testDir)
-            
+
             expect(result.success).toBe(false)
             expect(result.error).toBeDefined()
 
@@ -954,7 +954,7 @@ template: 'Template'
 
             const sourceManager = SourceManager.getInstance()
             const result = await sourceManager.reloadSinglePrompt(server, filePath, testDir)
-            
+
             expect(result.success).toBe(false)
             expect(result.error).toBeDefined()
         })
@@ -968,7 +968,7 @@ template: 'Template'
 
             const sourceManager = SourceManager.getInstance()
             const result = await sourceManager.reloadSinglePrompt(server, filePath, testDir)
-            
+
             expect(result.success).toBe(false)
             expect(result.error).toBeDefined()
         })
@@ -1147,7 +1147,7 @@ template: 'Template'
             // TODO: Fix this test - registry loading is failing in test environment
             // Set MCP_GROUPS to include 'test' group so the prompt will be loaded
             process.env.MCP_GROUPS = 'common,test'
-            
+
             const registryContent = `
 prompts:
   - id: 'registry-deprecated-prompt'
@@ -1160,7 +1160,7 @@ prompts:
 
             // Create test group directory
             await fs.mkdir(path.join(testDir, 'test'), { recursive: true })
-            
+
             const yamlContent = `
 id: 'registry-deprecated-prompt'
 title: 'Registry Deprecated Prompt'
@@ -1172,10 +1172,10 @@ template: 'Template'
 
             const sourceManager = SourceManager.getInstance()
             const result = await sourceManager.loadPrompts(server, testDir)
-            
+
             // Check if prompt was loaded
             expect(result.loaded).toBeGreaterThan(0)
-            
+
             // Get runtime directly to test createPromptRuntime logic (line 1534-1541)
             const runtime = sourceManager.getPromptRuntime('registry-deprecated-prompt')
             expect(runtime).toBeDefined()
@@ -1244,7 +1244,7 @@ template: 'Template'
             // TODO: Fix this test - mock is not working correctly
             // The file might be skipped before reaching readFile (line 1368-1369)
             const filePath = path.join(testDir, 'error-prompt.yaml')
-            
+
             // Create a valid YAML file first
             const yamlContent = `
 id: 'error-prompt'
@@ -1254,24 +1254,24 @@ status: 'stable'
 template: 'Template'
 `
             await fs.writeFile(filePath, yamlContent)
-            
+
             // First load it normally to ensure it exists
             const sourceManager = SourceManager.getInstance()
             await sourceManager.loadPrompts(server, testDir)
-            
+
             // Verify it was loaded
             const promptBefore = await sourceManager.getPromptAsync('error-prompt')
             expect(promptBefore).toBeDefined()
-            
+
             // Clear any existing mocks
             vi.restoreAllMocks()
-            
+
             // Now mock fs.readFile to throw an error on reload
             // The error should be caught at line 1379-1381 and returned at line 1409
             vi.spyOn(fs, 'readFile').mockRejectedValueOnce(new Error('Read error'))
 
             const result = await sourceManager.reloadSinglePrompt(server, filePath, testDir)
-            
+
             // Should return error when readFile fails (line 1409)
             expect(result.success).toBe(false)
             expect(result.error).toBeDefined()

@@ -9,7 +9,7 @@ import { LANG_INSTRUCTION, LANG_SETTING } from '../src/config/env.js'
 import { z } from 'zod'
 
 /**
- * 模擬 preview_prompt 工具的完整處理流程
+ * Simulate the full process of the preview_prompt tool
  */
 async function simulatePreviewPrompt(
     promptId: string,
@@ -22,7 +22,7 @@ async function simulatePreviewPrompt(
     warnings?: string[]
     error?: string
 }> {
-    // 1. 獲取 prompt
+    // 1. Get prompt
     const cachedPrompt = getPrompt(promptId)
     if (!cachedPrompt) {
         return {
@@ -31,7 +31,7 @@ async function simulatePreviewPrompt(
         }
     }
 
-    // 2. 驗證參數
+    // 2. Validate arguments
     const zodSchema = Object.keys(cachedPrompt.zodShape).length > 0
         ? z.object(cachedPrompt.zodShape)
         : z.object({})
@@ -44,7 +44,7 @@ async function simulatePreviewPrompt(
         }
     }
 
-    // 3. 渲染模板
+    // 3. Render template
     try {
         const context = {
             ...validationResult.data,
@@ -54,18 +54,18 @@ async function simulatePreviewPrompt(
 
         const renderedText = cachedPrompt.compiledTemplate(context)
 
-        // 4. 計算統計資訊
+        // 4. Calculate statistics
         const renderedLength = renderedText.length
         const estimatedTokens = estimateTokens(renderedText)
 
-        // 5. 生成變數高亮版本
+        // 5. Generate highlighted version
         const highlightedText = highlightVariables(
             cachedPrompt.metadata.template,
             renderedText,
             context
         )
 
-        // 6. 檢查警告
+        // 6. Check warnings
         const warnings = checkSchemaWarnings(cachedPrompt.zodShape, args)
 
         return {
@@ -137,17 +137,16 @@ function checkSchemaWarnings(
     for (const [key, schema] of Object.entries(zodShape)) {
         if (!providedKeys.has(key)) {
             const schemaDef = (schema as any)._def
-            const isOptional = schemaDef?.typeName === 'ZodOptional' || 
-                              schemaDef?.typeName === 'ZodDefault' ||
-                              schema instanceof z.ZodOptional ||
-                              schema instanceof z.ZodDefault
+            const isOptional = schemaDef?.typeName === 'ZodOptional' ||
+                schemaDef?.typeName === 'ZodDefault' ||
+                schema instanceof z.ZodOptional ||
+                schema instanceof z.ZodDefault
 
             if (isOptional) {
-                const description = schemaDef?.description || 
-                                   (schema as any).description || 
-                                   ''
-                if (description.toLowerCase().includes('recommended') || 
-                    description.toLowerCase().includes('建議') ||
+                const description = schemaDef?.description ||
+                    (schema as any).description ||
+                    ''
+                if (description.toLowerCase().includes('recommended') ||
                     description.toLowerCase().includes('suggested')) {
                     warnings.push(`Missing recommended field: '${key}'`)
                 }
@@ -159,7 +158,7 @@ function checkSchemaWarnings(
     return warnings
 }
 
-describe('preview_prompt 整合測試', () => {
+describe('preview_prompt integration tests', () => {
     let testDir: string
     let server: McpServer
     const originalEnv = process.env
@@ -183,7 +182,7 @@ describe('preview_prompt 整合測試', () => {
         await fs.rm(testDir, { recursive: true, force: true })
     })
 
-    it('應該完整模擬 preview_prompt 工具的執行流程', async () => {
+    it('should simulate the full execution flow of the preview_prompt tool', async () => {
         const yamlContent = `
 id: 'laravel:code-review'
 title: 'Laravel Code Review'
@@ -196,20 +195,20 @@ args:
   language:
     type: 'string'
     description: 'Programming language (optional)'
-template: '請審查以下 {{language}} 程式碼：\n\n{{code}}'
+template: 'Please review the following {{language}} code:\n\n{{code}}'
 `
         await fs.writeFile(path.join(testDir, 'laravel-code-review.yaml'), yamlContent)
 
         const sourceManager = SourceManager.getInstance()
         await sourceManager.loadPrompts(server, testDir)
 
-        // 模擬 preview_prompt 調用
+        // Simulate preview_prompt call
         const result = await simulatePreviewPrompt('laravel:code-review', {
             code: 'function test() { return true; }',
             language: 'PHP',
         })
 
-        // 驗證結果
+        // Verify result
         expect(result.success).toBe(true)
         expect(result.renderedText).toBeDefined()
         expect(result.renderedText).toContain('PHP')
@@ -227,13 +226,13 @@ template: '請審查以下 {{language}} 程式碼：\n\n{{code}}'
         expect(Array.isArray(result.warnings)).toBe(true)
     })
 
-    it('應該處理不存在的 prompt', async () => {
+    it('should handle non-existent prompt', async () => {
         const result = await simulatePreviewPrompt('non-existent-prompt', {})
         expect(result.success).toBe(false)
         expect(result.error).toContain('Prompt not found')
     })
 
-    it('應該處理參數驗證失敗', async () => {
+    it('should handle argument validation failure', async () => {
         const yamlContent = `
 id: 'test-prompt'
 title: 'Test Prompt'
@@ -250,19 +249,19 @@ template: 'Review {{code}}'
         const sourceManager = SourceManager.getInstance()
         await sourceManager.loadPrompts(server, testDir)
 
-        // 缺少必填欄位
+        // Missing required fields
         const result = await simulatePreviewPrompt('test-prompt', {})
         expect(result.success).toBe(false)
         expect(result.error).toContain('Validation failed')
     })
 
-    it('應該返回完整的統計資訊', async () => {
+    it('should return complete statistics', async () => {
         const yamlContent = `
 id: 'stats-test-prompt'
 title: 'Stats Test'
 version: '1.0.0'
 status: 'stable'
-template: '這是一個測試訊息，包含中英文混合內容。This is a test message with mixed content.'
+template: 'This is a test message with mixed content.'
 `
         await fs.writeFile(path.join(testDir, 'stats-test-prompt.yaml'), yamlContent)
 
@@ -274,8 +273,8 @@ template: '這是一個測試訊息，包含中英文混合內容。This is a te
         expect(result.statistics).toBeDefined()
         expect(result.statistics!.renderedLength).toBeGreaterThan(0)
         expect(result.statistics!.estimatedTokens).toBeGreaterThan(0)
-        
-        // 驗證 token 估算合理（應該大於 0，且與文字長度相關）
+
+        // Verify token estimation is reasonable (should be > 0 and related to text length)
         expect(result.statistics!.estimatedTokens).toBeGreaterThan(0)
         expect(result.statistics!.estimatedTokens).toBeLessThan(result.statistics!.renderedLength)
     })

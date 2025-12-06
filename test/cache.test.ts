@@ -2,43 +2,43 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { LocalCache } from '../src/cache/localCache.js'
 import { CacheFactory } from '../src/cache/cacheFactory.js'
 
-describe('快取抽象層測試', () => {
+describe('Cache Abstraction Layer Tests', () => {
     describe('LocalCache', () => {
         let cache: LocalCache
 
         beforeEach(() => {
-            cache = new LocalCache(100, 5000) // maxSize: 100, ttl: 5秒
+            cache = new LocalCache(100, 5000) // maxSize: 100, ttl: 5s
         })
 
-        it('應該可以設定和取得值', async () => {
+        it('should verify that setting and getting values works', async () => {
             await cache.set('test-key', 'test-value')
             const value = await cache.get<string>('test-key')
             expect(value).toBe('test-value')
         })
 
-        it('應該支援同步方法', () => {
+        it('should support synchronous methods', () => {
             cache.setSync('sync-key', 'sync-value')
             const value = cache.getSync<string>('sync-key')
             expect(value).toBe('sync-value')
         })
 
-        it('應該在 TTL 過期後返回 null', async () => {
+        it('should return null after TTL expiration', async () => {
             await cache.set('ttl-key', 'ttl-value', 100) // 100ms TTL
             const value1 = await cache.get<string>('ttl-key')
             expect(value1).toBe('ttl-value')
 
-            // 等待 TTL 過期
+            // Wait for TTL expiration
             await new Promise((resolve) => setTimeout(resolve, 150))
 
             const value2 = await cache.get<string>('ttl-key')
             expect(value2).toBeNull()
         })
 
-        it('應該支援 LRU 驅逐策略', async () => {
-            const smallCache = new LocalCache(3) // 最大 3 個項目
+        it('should support LRU eviction policy', async () => {
+            const smallCache = new LocalCache(3) // max 3 items
 
-            // 設定 3 個項目（快取滿了）
-            // 確保時間戳不同，key1 最舊
+            // Set 3 items (cache full)
+            // Ensure timestamps are different, key1 is oldest
             await smallCache.set('key1', 'value1')
             await new Promise(resolve => setTimeout(resolve, 20))
             await smallCache.set('key2', 'value2')
@@ -46,53 +46,53 @@ describe('快取抽象層測試', () => {
             await smallCache.set('key3', 'value3')
             await new Promise(resolve => setTimeout(resolve, 20))
 
-            // 確認所有項目都存在（但不存取，保持原始狀態）
-            // 不調用 get() 或 has()，因為它們會更新 lastAccessed
+            // Verify all items exist (but don't access, to keep original state)
+            // Do not call get() or has(), as they update lastAccessed
             expect(await smallCache.size()).toBe(3)
 
-            // 設定第 4 個項目，應該驅逐最舊的（key1，因為它是最先加入且 lastAccessed 最舊）
+            // Set 4th item, should evict oldest (key1, as it was added first and lastAccessed is oldest)
             await smallCache.set('key4', 'value4')
 
-            // key1 應該被驅逐（最舊的，且未被存取）
+            // key1 should be evicted (oldest, and not accessed)
             const value1 = await smallCache.get<string>('key1')
             expect(value1).toBeNull()
 
-            // key4 應該存在
+            // key4 should exist
             const value4 = await smallCache.get<string>('key4')
             expect(value4).toBe('value4')
         })
 
-        it('應該正確追蹤存取次數（LRU）', async () => {
-            const smallCache = new LocalCache(2) // 最大 2 個項目
-            
-            // 設定 2 個項目（快取滿了）
+        it('should correctly track access count (LRU)', async () => {
+            const smallCache = new LocalCache(2) // max 2 items
+
+            // Set 2 items (cache full)
             await smallCache.set('key1', 'value1')
-            // 等待一小段時間，確保時間戳不同
+            // Wait a small amount of time to ensure different timestamps
             await new Promise(resolve => setTimeout(resolve, 10))
             await smallCache.set('key2', 'value2')
-            
-            // 確認兩個項目都存在
+
+            // Verify both items exist
             expect(await smallCache.get('key1')).toBe('value1')
             expect(await smallCache.get('key2')).toBe('value2')
-            
-            // 多次存取 key1，增加其存取頻率
+
+            // Access key1 multiple times to increase its frequency
             await new Promise(resolve => setTimeout(resolve, 10))
             await smallCache.get('key1')
             await smallCache.get('key1')
             await smallCache.get('key1')
-            
-            // 設定新項目，應該驅逐 key2（因為 key1 存取頻率高，key2 的存取頻率低）
+
+            // Set new item, should evict key2 (since key1 access is high, key2 access is low)
             await smallCache.set('key3', 'value3')
 
-            // key1 應該存在（高存取頻率）
+            // key1 should exist (high frequency)
             expect(await smallCache.get('key1')).toBe('value1')
-            // key2 應該被驅逐（低存取頻率）
+            // key2 should be evicted (low frequency)
             expect(await smallCache.get('key2')).toBeNull()
-            // key3 應該存在（新加入）
+            // key3 should exist (newly added)
             expect(await smallCache.get('key3')).toBe('value3')
         })
 
-        it('應該可以刪除項目', async () => {
+        it('should be able to delete items', async () => {
             await cache.set('delete-key', 'delete-value')
             expect(await cache.has('delete-key')).toBe(true)
 
@@ -100,7 +100,7 @@ describe('快取抽象層測試', () => {
             expect(await cache.has('delete-key')).toBe(false)
         })
 
-        it('應該可以清除所有快取', async () => {
+        it('should be able to clear all cache', async () => {
             await cache.set('key1', 'value1')
             await cache.set('key2', 'value2')
 
@@ -110,7 +110,7 @@ describe('快取抽象層測試', () => {
             expect(await cache.size()).toBe(0)
         })
 
-        it('應該提供統計資訊', async () => {
+        it('should provide statistics', async () => {
             await cache.set('key1', 'value1')
             await cache.get('key1') // hit
             await cache.get('key1') // hit
@@ -123,7 +123,7 @@ describe('快取抽象層測試', () => {
             expect(stats.hitRate).toBeGreaterThan(0)
         })
 
-        it('應該正確計算命中率', async () => {
+        it('should correctly calculate hit rate', async () => {
             await cache.set('key1', 'value1')
             await cache.get('key1') // hit
             await cache.get('key1') // hit
@@ -134,7 +134,7 @@ describe('快取抽象層測試', () => {
             expect(stats.hitRate).toBe(50) // 2 hits / 4 total = 50%
         })
 
-        it('應該提供詳細統計資訊', async () => {
+        it('should provide detailed statistics', async () => {
             await cache.set('key1', 'value1')
             await cache.set('key2', 'value2')
             await cache.get('key1') // hit
@@ -150,48 +150,48 @@ describe('快取抽象層測試', () => {
             expect(stats.createdAt).toBeDefined()
         })
 
-        it('應該追蹤過期項目', async () => {
+        it('should track expired items', async () => {
             await cache.set('ttl-key1', 'value1', 50) // 50ms TTL
             await cache.set('ttl-key2', 'value2', 50) // 50ms TTL
-            
-            // 等待過期
+
+            // Wait for expiration
             await new Promise((resolve) => setTimeout(resolve, 100))
-            
-            await cache.get('ttl-key1') // 應該過期
-            await cache.get('ttl-key2') // 應該過期
+
+            await cache.get('ttl-key1') // Should be expired
+            await cache.get('ttl-key2') // Should be expired
 
             const stats = await cache.getStats()
             expect(stats.expirations).toBeGreaterThan(0)
         })
 
-        it('應該支援定期清理過期項目', async () => {
-            const cleanupCache = new LocalCache(100, 100, 200) // TTL: 100ms, 清理間隔: 200ms
-            
+        it('should support periodic cleanup of expired items', async () => {
+            const cleanupCache = new LocalCache(100, 100, 200) // TTL: 100ms, cleanup interval: 200ms
+
             await cleanupCache.set('ttl-key1', 'value1', 50)
             await cleanupCache.set('ttl-key2', 'value2', 50)
-            
+
             expect(await cleanupCache.size()).toBe(2)
-            
-            // 等待過期和清理
+
+            // Wait for expiration and cleanup
             await new Promise((resolve) => setTimeout(resolve, 300))
-            
-            // 手動觸發清理以確保
+
+            // Manually trigger cleanup to ensure
             await cleanupCache.cleanup()
-            
+
             const size = await cleanupCache.size()
-            expect(size).toBeLessThan(2) // 應該有項目被清理
-            
+            expect(size).toBeLessThan(2) // Should have items cleaned up
+
             cleanupCache.destroy()
         })
 
-        it('應該在 getSync 中處理 TTL 過期', () => {
+        it('should handle TTL expiration in getSync', () => {
             const cache = new LocalCache(100, 50) // TTL: 50ms
-            
+
             cache.setSync('ttl-sync-key', 'ttl-sync-value', 50)
             const value1 = cache.getSync<string>('ttl-sync-key')
             expect(value1).toBe('ttl-sync-value')
 
-            // 等待 TTL 過期
+            // Wait for TTL expiration
             return new Promise<void>((resolve) => {
                 setTimeout(() => {
                     const value2 = cache.getSync<string>('ttl-sync-key')
@@ -201,76 +201,76 @@ describe('快取抽象層測試', () => {
             })
         })
 
-        it('應該在 setSync 中觸發 LRU 驅逐', () => {
-            const smallCache = new LocalCache(2) // 最大 2 個項目
+        it('should trigger LRU eviction in setSync', async () => {
+            const smallCache = new LocalCache(2) // max 2 items
 
-            // 設定 2 個項目（快取滿了）
+            // Set 2 items (cache full)
             smallCache.setSync('sync-key1', 'sync-value1')
             smallCache.setSync('sync-key2', 'sync-value2')
 
-            expect(smallCache.cache.size).toBe(2)
+            expect(await smallCache.size()).toBe(2)
 
-            // 設定第 3 個項目，應該驅逐最舊的
+            // Set 3rd item, should evict oldest
             smallCache.setSync('sync-key3', 'sync-value3')
 
-            // key1 應該被驅逐
+            // key1 should be evicted
             const value1 = smallCache.getSync<string>('sync-key1')
             expect(value1).toBeNull()
 
-            // key3 應該存在
+            // key3 should exist
             const value3 = smallCache.getSync<string>('sync-key3')
             expect(value3).toBe('sync-value3')
         })
 
-        it('應該處理 cleanup interval 的啟動和停止', async () => {
+        it('should handle cleanup interval start and stop', async () => {
             const cache = new LocalCache(100, 100, 200) // TTL: 100ms, cleanup: 200ms
-            
-            // 設置一些會過期的項目
+
+            // Set some items that will expire
             await cache.set('ttl-key1', 'value1', 50)
             await cache.set('ttl-key2', 'value2', 50)
-            
+
             expect(await cache.size()).toBe(2)
-            
-            // 等待清理間隔觸發（200ms）
+
+            // Wait for cleanup interval to trigger (200ms)
             await new Promise((resolve) => setTimeout(resolve, 250))
-            
-            // 手動觸發清理
+
+            // Manually trigger cleanup
             await cache.cleanup()
-            
-            // 項目應該被清理
+
+            // Items should be cleaned up
             const size = await cache.size()
             expect(size).toBeLessThan(2)
-            
+
             cache.destroy()
         })
 
-        it('應該改進的 LRU 策略考慮存取頻率', async () => {
+        it('should consider access frequency in improved LRU strategy', async () => {
             const smallCache = new LocalCache(2)
-            
-            // 設定兩個項目
+
+            // Set two items
             await smallCache.set('key1', 'value1')
             await new Promise(resolve => setTimeout(resolve, 10))
             await smallCache.set('key2', 'value2')
-            
-            // 多次存取 key1，使其存取頻率更高
+
+            // Access key1 multiple times to increase its frequency
             await smallCache.get('key1')
             await smallCache.get('key1')
             await smallCache.get('key1')
-            
-            // 設定新項目，應該驅逐 key2（因為 key1 存取頻率高）
+
+            // Set new item, should evict key2 (since key1 has high frequency)
             await smallCache.set('key3', 'value3')
-            
-            // key1 應該存在（高存取頻率）
+
+            // key1 should exist (high frequency)
             expect(await smallCache.get('key1')).toBe('value1')
-            // key2 應該被驅逐
+            // key2 should be evicted
             expect(await smallCache.get('key2')).toBeNull()
-            // key3 應該存在
+            // key3 should exist
             expect(await smallCache.get('key3')).toBe('value3')
         })
     })
 
     describe('CacheFactory', () => {
-        it('應該從環境變數建立本地快取', () => {
+        it('should create local cache from environment variables', () => {
             process.env.CACHE_PROVIDER = 'local'
             process.env.CACHE_MAX_SIZE = '500'
             process.env.CACHE_TTL = '10000'
@@ -278,13 +278,13 @@ describe('快取抽象層測試', () => {
             const cache = CacheFactory.createFromEnv()
             expect(cache).toBeInstanceOf(LocalCache)
 
-            // 清理
+            // Cleanup
             delete process.env.CACHE_PROVIDER
             delete process.env.CACHE_MAX_SIZE
             delete process.env.CACHE_TTL
         })
 
-        it('應該使用預設值當環境變數未設定時', () => {
+        it('should use default values when environment variables are not set', () => {
             delete process.env.CACHE_PROVIDER
             delete process.env.CACHE_MAX_SIZE
             delete process.env.CACHE_TTL
@@ -293,17 +293,17 @@ describe('快取抽象層測試', () => {
             expect(cache).toBeInstanceOf(LocalCache)
         })
 
-        it('應該在嘗試使用 Redis 時回退到本地快取', () => {
+        it('should fallback to local cache when attempting to use Redis', () => {
             process.env.CACHE_PROVIDER = 'redis'
 
             const cache = CacheFactory.createFromEnv()
             expect(cache).toBeInstanceOf(LocalCache)
 
-            // 清理
+            // Cleanup
             delete process.env.CACHE_PROVIDER
         })
 
-        it('應該可以手動建立快取', () => {
+        it('should be able to create cache manually', () => {
             const cache = CacheFactory.create({
                 provider: 'local',
                 maxSize: 200,
@@ -312,7 +312,7 @@ describe('快取抽象層測試', () => {
             expect(cache).toBeInstanceOf(LocalCache)
         })
 
-        it('應該在嘗試使用不支援的 provider 時拋出錯誤', () => {
+        it('should throw error when attempting to use unsupported provider', () => {
             expect(() => {
                 CacheFactory.create({
                     provider: 'invalid' as 'local' | 'redis',
@@ -321,7 +321,7 @@ describe('快取抽象層測試', () => {
             }).toThrow('Unsupported cache provider: invalid')
         })
 
-        it('應該在嘗試使用 Redis 時拋出錯誤（create 方法）', () => {
+        it('should throw error when attempting to use Redis (create method)', () => {
             expect(() => {
                 CacheFactory.create({
                     provider: 'redis',
@@ -330,7 +330,7 @@ describe('快取抽象層測試', () => {
             }).toThrow('Redis cache provider is not yet implemented')
         })
 
-        it('應該處理 cleanupIntervalMs 環境變數', () => {
+        it('should handle cleanupIntervalMs environment variable', () => {
             process.env.CACHE_PROVIDER = 'local'
             process.env.CACHE_CLEANUP_INTERVAL = '30000'
 
@@ -341,7 +341,7 @@ describe('快取抽象層測試', () => {
             delete process.env.CACHE_CLEANUP_INTERVAL
         })
 
-        it('應該使用預設 cleanupIntervalMs 當未設定時', () => {
+        it('should use default cleanupIntervalMs when not set', () => {
             process.env.CACHE_PROVIDER = 'local'
             delete process.env.CACHE_CLEANUP_INTERVAL
 
@@ -351,7 +351,7 @@ describe('快取抽象層測試', () => {
             delete process.env.CACHE_PROVIDER
         })
 
-        it('應該處理 Redis fallback 時保留 TTL', () => {
+        it('should retain TTL when falling back from Redis', () => {
             process.env.CACHE_PROVIDER = 'redis'
             process.env.CACHE_MAX_SIZE = '500'
             process.env.CACHE_TTL = '10000'
@@ -364,7 +364,7 @@ describe('快取抽象層測試', () => {
             delete process.env.CACHE_TTL
         })
 
-        it('應該處理 Redis fallback 時沒有 TTL', () => {
+        it('should handle missing TTL when falling back from Redis', () => {
             process.env.CACHE_PROVIDER = 'redis'
             process.env.CACHE_MAX_SIZE = '500'
             delete process.env.CACHE_TTL
@@ -376,8 +376,8 @@ describe('快取抽象層測試', () => {
             delete process.env.CACHE_MAX_SIZE
         })
 
-        it('應該處理 createFromEnv 的 fallback 路徑', () => {
-            // 設定一個不為 'local' 或 'redis' 的值，但會被轉換為 'local'
+        it('should handle fallback path in createFromEnv', () => {
+            // Set a value that is not 'local' or 'redis', but will be converted to 'local'
             process.env.CACHE_PROVIDER = 'local'
             process.env.CACHE_MAX_SIZE = '500'
             process.env.CACHE_TTL = '10000'
@@ -390,9 +390,9 @@ describe('快取抽象層測試', () => {
             delete process.env.CACHE_TTL
         })
 
-        it('應該處理 createFromEnv 的 fallback 到 create 方法', () => {
-            // 測試 provider 不是 'local' 也不是 'redis' 的情況
-            // 這會觸發 line 74 的 fallback 路徑
+        it('should handle fallback from createFromEnv to create method', () => {
+            // Test case where provider is neither 'local' nor 'redis'
+            // This triggers the fallback path at line 74
             process.env.CACHE_PROVIDER = 'local'
             process.env.CACHE_MAX_SIZE = '500'
             delete process.env.CACHE_TTL

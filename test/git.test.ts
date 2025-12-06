@@ -62,7 +62,7 @@ describe('git.ts', () => {
         vi.clearAllMocks()
         vi.spyOn(env, 'getRepoUrl').mockReturnValue('')
         vi.spyOn(env, 'getGitBranch').mockReturnValue('main')
-        
+
         // Override STORAGE_DIR for this test
         Object.defineProperty(env, 'STORAGE_DIR', {
             value: testStorageDir,
@@ -83,8 +83,8 @@ describe('git.ts', () => {
         }
     })
 
-    describe('syncRepo - 錯誤處理', () => {
-        it('應該在缺少 PROMPT_REPO_URL 時拋出錯誤', async () => {
+    describe('syncRepo - Error Handling', () => {
+        it('should throw error when PROMPT_REPO_URL is missing', async () => {
             vi.spyOn(env, 'getRepoUrl').mockReturnValue('')
 
             await expect(syncRepo()).rejects.toThrow(
@@ -93,7 +93,7 @@ describe('git.ts', () => {
         })
     })
 
-    describe('syncRepo - 本地路徑同步', () => {
+    describe('syncRepo - Local Path Sync', () => {
         beforeEach(async () => {
             // Create test files in source directory
             await fs.writeFile(
@@ -109,7 +109,7 @@ describe('git.ts', () => {
             )
         })
 
-        it('應該從本地路徑複製檔案', async () => {
+        it('should copy files from local path', async () => {
             vi.spyOn(env, 'getRepoUrl').mockReturnValue(testSourceDir)
             vi.spyOn(fs, 'stat')
                 .mockResolvedValueOnce({} as any) // Source exists
@@ -136,7 +136,7 @@ describe('git.ts', () => {
             )
         })
 
-        it('應該排除 .git 目錄', async () => {
+        it('should exclude .git directory', async () => {
             vi.spyOn(env, 'getRepoUrl').mockReturnValue(testSourceDir)
             await fs.mkdir(path.join(testSourceDir, '.git'), {
                 recursive: true,
@@ -166,7 +166,7 @@ describe('git.ts', () => {
             await expect(
                 fs.stat(path.join(testStorageDir, '.git'))
             ).rejects.toThrow()
-            
+
             // But other files should be copied
             const copiedFile = await fs.readFile(
                 path.join(testStorageDir, 'test-file.txt'),
@@ -175,7 +175,7 @@ describe('git.ts', () => {
             expect(copiedFile).toBe('content')
         })
 
-        it('應該排除 node_modules 目錄', async () => {
+        it('should exclude node_modules directory', async () => {
             vi.spyOn(env, 'getRepoUrl').mockReturnValue(testSourceDir)
             await fs.mkdir(path.join(testSourceDir, 'node_modules'), {
                 recursive: true,
@@ -208,7 +208,7 @@ describe('git.ts', () => {
             await expect(
                 fs.stat(path.join(testStorageDir, 'node_modules'))
             ).rejects.toThrow()
-            
+
             // But other files should be copied
             const copiedFile = await fs.readFile(
                 path.join(testStorageDir, 'test-file.txt'),
@@ -217,10 +217,10 @@ describe('git.ts', () => {
             expect(copiedFile).toBe('content')
         })
 
-        it('應該在來源目錄不存在時拋出錯誤', async () => {
+        it('should throw error when source directory does not exist', async () => {
             const nonExistentPath = path.join(os.tmpdir(), 'non-existent')
             vi.spyOn(env, 'getRepoUrl').mockReturnValue(nonExistentPath)
-            
+
             // Mock fs.stat to fail for the source directory check
             vi.spyOn(fs, 'stat').mockImplementation(async (pathArg: any) => {
                 if (String(pathArg) === nonExistentPath) {
@@ -237,9 +237,9 @@ describe('git.ts', () => {
             )
         })
 
-        it('應該在複製失敗時記錄警告但繼續處理', async () => {
+        it('should log warning but continue when copy fails', async () => {
             vi.spyOn(env, 'getRepoUrl').mockReturnValue(testSourceDir)
-            
+
             // Create test files
             await fs.writeFile(
                 path.join(testSourceDir, 'file1.txt'),
@@ -279,7 +279,7 @@ describe('git.ts', () => {
 
             // Should have logged warning
             expect(logger.warn).toHaveBeenCalled()
-            
+
             // Other files should still be copied
             const file2 = await fs.readFile(
                 path.join(testStorageDir, 'file2.txt'),
@@ -289,14 +289,14 @@ describe('git.ts', () => {
         })
     })
 
-    describe('syncRepo - 遠端 Git 同步', () => {
+    describe('syncRepo - Remote Git Sync', () => {
         beforeEach(() => {
             vi.spyOn(env, 'getRepoUrl').mockReturnValue(
                 'https://github.com/user/repo.git'
             )
         })
 
-        it('應該在目錄不存在時執行首次 clone', async () => {
+        it('should perform initial clone when directory does not exist', async () => {
             vi.spyOn(fs, 'stat')
                 .mockRejectedValueOnce(new Error('Not found')) // Storage doesn't exist
                 .mockResolvedValueOnce({} as any) // mkdir succeeds
@@ -315,7 +315,7 @@ describe('git.ts', () => {
             )
         })
 
-        it('應該在目錄存在但不是 Git 倉庫時重新 clone', async () => {
+        it('should re-clone when directory exists but is not a git repo', async () => {
             // Storage exists but is not a git repo
             vi.spyOn(fs, 'stat')
                 .mockResolvedValueOnce({} as any) // Storage exists
@@ -329,7 +329,7 @@ describe('git.ts', () => {
             expect(fileSystem.clearFileCache).toHaveBeenCalled()
         })
 
-        it('應該在現有 Git 倉庫中執行 fetch 和 pull', async () => {
+        it('should fetch and pull on existing git repo', async () => {
             // Storage exists and is a git repo
             vi.spyOn(fs, 'stat')
                 .mockResolvedValueOnce({} as any) // Storage exists
@@ -346,7 +346,7 @@ describe('git.ts', () => {
             expect(fileSystem.clearFileCache).toHaveBeenCalled()
         })
 
-        it('應該在 pull rebase 失敗時使用 reset', async () => {
+        it('should reset when pull rebase fails', async () => {
             vi.spyOn(fs, 'stat')
                 .mockResolvedValueOnce({} as any)
                 .mockResolvedValueOnce({} as any)
@@ -366,7 +366,7 @@ describe('git.ts', () => {
             expect(logger.warn).toHaveBeenCalled()
         })
 
-        it('應該使用當前分支名稱或預設分支', async () => {
+        it('should use current branch name or default branch', async () => {
             vi.spyOn(env, 'getGitBranch').mockReturnValue('develop')
             vi.spyOn(fs, 'stat')
                 .mockResolvedValueOnce({} as any)
@@ -384,7 +384,7 @@ describe('git.ts', () => {
             ])
         })
 
-        it('應該在分支名稱為空時使用預設分支', async () => {
+        it('should use default branch when branch name is empty', async () => {
             vi.spyOn(env, 'getGitBranch').mockReturnValue('main')
             vi.spyOn(fs, 'stat')
                 .mockResolvedValueOnce({} as any)
@@ -401,14 +401,14 @@ describe('git.ts', () => {
         })
     })
 
-    describe('syncRepo - 重試機制', () => {
+    describe('syncRepo - Retry Mechanism', () => {
         beforeEach(() => {
             vi.spyOn(env, 'getRepoUrl').mockReturnValue(
                 'https://github.com/user/repo.git'
             )
         })
 
-        it('應該在失敗時重試', async () => {
+        it('should retry on failure', async () => {
             // Mock fs.stat: storage doesn't exist
             vi.spyOn(fs, 'stat').mockImplementation(async (pathArg: any) => {
                 if (String(pathArg) === testStorageDir) {
@@ -432,7 +432,7 @@ describe('git.ts', () => {
             expect(logger.warn).toHaveBeenCalled()
         })
 
-        it('應該在所有重試失敗後拋出錯誤', async () => {
+        it('should throw error after all retries failed', async () => {
             // Mock fs.stat: storage doesn't exist
             vi.spyOn(fs, 'stat').mockImplementation(async (pathArg: any) => {
                 if (String(pathArg) === testStorageDir) {
@@ -451,7 +451,7 @@ describe('git.ts', () => {
             expect(logger.error).toHaveBeenCalled()
         })
 
-        it('應該使用指數退避延遲', async () => {
+        it('should use exponential backoff delay', async () => {
             vi.spyOn(fs, 'stat')
                 .mockRejectedValueOnce(new Error('Not found'))
                 .mockResolvedValueOnce({} as any)
@@ -470,12 +470,12 @@ describe('git.ts', () => {
         })
     })
 
-    describe('syncRepo - 邊界情況', () => {
-        it('應該處理自訂 maxRetries 參數', async () => {
+    describe('syncRepo - Edge Cases', () => {
+        it('should handle custom maxRetries parameter', async () => {
             vi.spyOn(env, 'getRepoUrl').mockReturnValue(
                 'https://github.com/user/repo.git'
             )
-            
+
             // Mock fs.stat: storage doesn't exist (always fail for storage dir)
             vi.spyOn(fs, 'stat').mockImplementation(async (pathArg: any) => {
                 const pathStr = String(pathArg)
@@ -486,7 +486,7 @@ describe('git.ts', () => {
             })
 
             mockGit.clone.mockRejectedValue(new Error('Clone failed'))
-            
+
             // Mock setTimeout to resolve immediately
             const originalSetTimeout = global.setTimeout
             vi.spyOn(global, 'setTimeout').mockImplementation((fn: any, delay: any) => {
@@ -494,27 +494,27 @@ describe('git.ts', () => {
                 Promise.resolve().then(() => fn())
                 return {} as any
             })
-            
+
             await expect(syncRepo(5)).rejects.toThrow(
                 'Git sync failed after 5 attempts'
             )
 
             expect(mockGit.clone).toHaveBeenCalledTimes(5)
-            
+
             // Restore original setTimeout
             global.setTimeout = originalSetTimeout
         }, 10000) // Increase timeout for this test
 
-        it('應該正確識別本地路徑（絕對路徑）', async () => {
+        it('should correctly identify local path (absolute path)', async () => {
             // Use actual test source directory
             vi.spyOn(env, 'getRepoUrl').mockReturnValue(testSourceDir)
-            
+
             // Create a test file in source
             await fs.writeFile(
                 path.join(testSourceDir, 'test.txt'),
                 'test content'
             )
-            
+
             // Mock fs.stat only for the initial source check, let real fs handle the rest
             let statCallCount = 0
             vi.spyOn(fs, 'stat').mockImplementation(async (pathArg: any) => {
@@ -532,7 +532,7 @@ describe('git.ts', () => {
 
             // Should use copyLocalRepository, not git clone
             expect(mockGit.clone).not.toHaveBeenCalled()
-            
+
             // Verify file was copied
             const copiedFile = await fs.readFile(
                 path.join(testStorageDir, 'test.txt'),
@@ -542,14 +542,14 @@ describe('git.ts', () => {
         })
     })
 
-    describe('syncRepo - 日誌記錄', () => {
+    describe('syncRepo - Logging', () => {
         beforeEach(() => {
             vi.spyOn(env, 'getRepoUrl').mockReturnValue(
                 'https://github.com/user/repo.git'
             )
         })
 
-        it('應該記錄同步開始', async () => {
+        it('should log sync start', async () => {
             vi.spyOn(fs, 'stat')
                 .mockRejectedValueOnce(new Error('Not found'))
                 .mockResolvedValueOnce({} as any)
@@ -564,7 +564,7 @@ describe('git.ts', () => {
             )
         })
 
-        it('應該記錄成功訊息', async () => {
+        it('should log success message', async () => {
             vi.spyOn(fs, 'stat')
                 .mockRejectedValueOnce(new Error('Not found'))
                 .mockResolvedValueOnce({} as any)
@@ -586,7 +586,7 @@ describe('git.ts', () => {
             expect(hasSuccessMessage).toBe(true)
         })
 
-        it('應該記錄錯誤訊息', async () => {
+        it('should log error message', async () => {
             vi.spyOn(fs, 'stat')
                 .mockRejectedValueOnce(new Error('Not found'))
                 .mockResolvedValueOnce({} as any)

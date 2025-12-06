@@ -16,7 +16,7 @@ import {
 // Note: We now use the actual getFilesRecursively from fileSystem.ts
 // The cache-related tests use the imported function directly
 
-// 群組過濾邏輯測試
+// Group filtering logic tests
 function shouldLoadPrompt(
     filePath: string,
     storageDir: string,
@@ -54,7 +54,7 @@ describe('File system utilities', () => {
             await fs.writeFile(path.join(testDir, 'file1.txt'), 'content1')
             await fs.writeFile(
                 path.join(testDir, 'subdir', 'file2.txt'),
-                'content2'
+                'You are a senior engineer.'
             )
             await fs.writeFile(
                 path.join(testDir, 'subdir', 'file3.txt'),
@@ -90,28 +90,28 @@ describe('File system utilities', () => {
         })
     })
 
-    describe('群組過濾邏輯', () => {
-        it('應該永遠載入根目錄的檔案', () => {
+    describe('Group Filtering Logic', () => {
+        it('should always load files from root directory', () => {
             const filePath = path.join(testDir, 'root-prompt.yaml')
             expect(shouldLoadPrompt(filePath, testDir, [])).toBe(true)
             expect(shouldLoadPrompt(filePath, testDir, ['laravel'])).toBe(true)
         })
 
-        it('應該永遠載入 common 群組的檔案', () => {
+        it('should always load files from common group', () => {
             const commonDir = path.join(testDir, 'common')
             const filePath = path.join(commonDir, 'prompt.yaml')
             expect(shouldLoadPrompt(filePath, testDir, [])).toBe(true)
             expect(shouldLoadPrompt(filePath, testDir, ['laravel'])).toBe(true)
         })
 
-        it('應該載入在 activeGroups 中的群組', () => {
+        it('should load groups in activeGroups', () => {
             const laravelDir = path.join(testDir, 'laravel')
             const filePath = path.join(laravelDir, 'prompt.yaml')
             expect(shouldLoadPrompt(filePath, testDir, ['laravel'])).toBe(true)
             expect(shouldLoadPrompt(filePath, testDir, ['vue'])).toBe(false)
         })
 
-        it('應該支援多個群組', () => {
+        it('should support multiple groups', () => {
             const vueDir = path.join(testDir, 'vue')
             const filePath = path.join(vueDir, 'prompt.yaml')
             expect(
@@ -122,41 +122,52 @@ describe('File system utilities', () => {
     })
 })
 
-describe('YAML 解析測試', () => {
-    it('應該正確解析有效的 YAML', () => {
+describe('YAML Parsing Tests', () => {
+    it('should correctly parse valid YAML', () => {
         const yamlContent = `
 id: 'test-prompt'
-title: '測試 Prompt'
-description: '這是一個測試'
+title: 'Test Prompt'
+description: 'This is a test'
+version: '1.0.0'
+status: 'stable'
+tags:
+  - 'test'
+  - 'example'
+use_cases:
+  - 'testing'
 args:
   code:
     type: 'string'
-    description: '程式碼'
-template: '請審查 {{code}}'
+    description: 'Code'
+template: 'Please review {{code}}'
 `
 
         const parsed = yaml.load(yamlContent) as any
 
         expect(parsed.id).toBe('test-prompt')
-        expect(parsed.title).toBe('測試 Prompt')
+        expect(parsed.title).toBe('Test Prompt')
         expect(parsed.args.code.type).toBe('string')
-        expect(parsed.template).toBe('請審查 {{code}}')
+        expect(parsed.template).toBe('Please review {{code}}')
+        expect(parsed.version).toBe('1.0.0')
+        expect(parsed.status).toBe('stable')
+        expect(parsed.tags).toEqual(['test', 'example'])
+        expect(parsed.use_cases).toEqual(['testing'])
     })
 
-    it('應該處理缺少欄位的 YAML', () => {
+    it('should handle YAML with missing fields', () => {
         const yamlContent = `
 id: 'test'
-template: '簡單模板'
+template: 'Simple template'
 `
 
         const parsed = yaml.load(yamlContent) as any
 
         expect(parsed.id).toBe('test')
-        expect(parsed.template).toBe('簡單模板')
+        expect(parsed.template).toBe('Simple template')
         expect(parsed.args).toBeUndefined()
     })
 
-    it('應該處理多種參數類型', () => {
+    it('should handle multiple argument types', () => {
         const yamlContent = `
 id: 'multi-args'
 args:
@@ -177,20 +188,20 @@ template: '{{name}} is {{age}} years old'
     })
 })
 
-describe('Handlebars 模板測試', () => {
+describe('Handlebars Template Tests', () => {
     beforeEach(() => {
-        // 清除之前的 partials
+        // Clear previous partials
         Handlebars.unregisterPartial('test-partial')
     })
 
-    it('應該正確渲染簡單模板', () => {
+    it('should correctly render simple template', () => {
         const template = Handlebars.compile('Hello {{name}}')
         const result = template({ name: 'World' })
 
         expect(result).toBe('Hello World')
     })
 
-    it('應該支援條件語法', () => {
+    it('should support conditional syntax', () => {
         const template = Handlebars.compile(
             '{{#if active}}Active{{else}}Inactive{{/if}}'
         )
@@ -199,7 +210,7 @@ describe('Handlebars 模板測試', () => {
         expect(template({ active: false })).toBe('Inactive')
     })
 
-    it('應該支援 Partials', () => {
+    it('should support Partials', () => {
         Handlebars.registerPartial('greeting', 'Hello {{name}}!')
         const template = Handlebars.compile('{{> greeting}}')
 
@@ -208,7 +219,7 @@ describe('Handlebars 模板測試', () => {
         expect(result).toBe('Hello Carl!')
     })
 
-    it('應該自動注入系統變數', () => {
+    it('should automatically inject system variables', () => {
         const template = Handlebars.compile(
             '{{output_lang_rule}} - {{sys_lang}}'
         )
@@ -222,11 +233,11 @@ describe('Handlebars 模板測試', () => {
         expect(result).toBe('Please reply in English. - en')
     })
 
-    it('應該處理複雜模板', () => {
+    it('should handle complex templates', () => {
         const template = Handlebars.compile(
             `
-你是一位 {{language}} 工程師。
-請審查以下程式碼：
+You are a {{language}} engineer.
+Please review the following code:
 
 \`\`\`
 {{code}}

@@ -16,13 +16,13 @@ import { getHealthStatus } from '../src/services/health.js'
 import { PromptMetadataSchema } from '../src/types/promptMetadata.js'
 import type { PromptRuntime } from '../src/types/promptRuntime.js'
 
-describe('Prompt Metadata 測試', () => {
+describe('Prompt Metadata Tests', () => {
     let testDir: string
     let server: McpServer
     const originalEnv = process.env
 
     beforeEach(async () => {
-        // 設定測試環境變數
+        // Set test environment variables
         process.env.PROMPT_REPO_URL = '/tmp/test-repo'
         process.env.MCP_GROUPS = 'common'
         testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcp-metadata-test-'))
@@ -33,7 +33,7 @@ describe('Prompt Metadata 測試', () => {
     })
 
     afterEach(() => {
-        // 還原環境變數
+        // Restore environment variables
         process.env = originalEnv
         clearAllPrompts()
     })
@@ -42,12 +42,12 @@ describe('Prompt Metadata 測試', () => {
         await fs.rm(testDir, { recursive: true, force: true })
     })
 
-    describe('Metadata 合法 → active', () => {
-        it('應該正確解析並標記為 active', async () => {
+    describe('Valid Metadata -> active', () => {
+        it('should correctly parse and mark as active', async () => {
             const yamlContent = `
 id: 'test-prompt'
-title: '測試 Prompt'
-description: '這是一個測試'
+title: 'Test Prompt'
+description: 'This is a test'
 version: '1.0.0'
 status: 'stable'
 tags:
@@ -58,8 +58,8 @@ use_cases:
 args:
   code:
     type: 'string'
-    description: '程式碼'
-template: '請審查 {{code}}'
+    description: 'Code'
+template: 'Please review {{code}}'
 `
 
             await fs.writeFile(
@@ -80,17 +80,17 @@ template: '請審查 {{code}}'
         })
     })
 
-    describe('Metadata 驗證失敗 → warning', () => {
-        it('應該標記為 warning 當 version 格式錯誤', async () => {
+    describe('Metadata Validation Failure -> warning', () => {
+        it('should mark as warning when version format is incorrect', async () => {
             const yamlContent = `
 id: 'test-prompt'
-title: '測試 Prompt'
+title: 'Test Prompt'
 version: 'invalid-version'
 status: 'stable'
 args:
   code:
     type: 'string'
-template: '請審查 {{code}}'
+template: 'Please review {{code}}'
 `
 
             await fs.writeFile(
@@ -106,15 +106,15 @@ template: '請審查 {{code}}'
         })
     })
 
-    describe('無 metadata → legacy', () => {
-        it('應該標記為 legacy 當沒有 version 和 status', async () => {
+    describe('No Metadata -> legacy', () => {
+        it('should mark as legacy when missing version and status', async () => {
             const yamlContent = `
 id: 'legacy-prompt'
 title: 'Legacy Prompt'
 args:
   code:
     type: 'string'
-template: '請審查 {{code}}'
+template: 'Please review {{code}}'
 `
 
             await fs.writeFile(
@@ -135,18 +135,18 @@ template: '請審查 {{code}}'
         })
     })
 
-    describe('registry deprecated → disabled', () => {
-        it('應該標記為 disabled 當 registry 標記為 deprecated', async () => {
-            // 建立 metadata prompt
+    describe('registry deprecated -> disabled', () => {
+        it('should mark as disabled when registry mark as deprecated', async () => {
+            // Create metadata prompt
             const yamlContent = `
 id: 'test-prompt'
-title: '測試 Prompt'
+title: 'Test Prompt'
 version: '1.0.0'
 status: 'stable'
 args:
   code:
     type: 'string'
-template: '請審查 {{code}}'
+template: 'Please review {{code}}'
 `
 
             await fs.writeFile(
@@ -154,7 +154,7 @@ template: '請審查 {{code}}'
                 yamlContent
             )
 
-            // 建立 registry.yaml
+            // Create registry.yaml
             const registryContent = `
 prompts:
   - id: 'test-prompt'
@@ -174,15 +174,15 @@ prompts:
             expect(runtime?.source).toBe('registry')
         })
 
-        it('應該標記為 disabled 當 legacy prompt 在 registry 中標記為 deprecated', async () => {
-            // 建立 legacy prompt
+        it('should mark as disabled when legacy prompt is marked as deprecated in registry', async () => {
+            // Create legacy prompt
             const yamlContent = `
 id: 'legacy-prompt'
 title: 'Legacy Prompt'
 args:
   code:
     type: 'string'
-template: '請審查 {{code}}'
+template: 'Please review {{code}}'
 `
 
             await fs.writeFile(
@@ -190,7 +190,7 @@ template: '請審查 {{code}}'
                 yamlContent
             )
 
-            // 建立 registry.yaml
+            // Create registry.yaml
             const registryContent = `
 prompts:
   - id: 'legacy-prompt'
@@ -211,22 +211,22 @@ prompts:
         })
     })
 
-    describe('reload 後狀態正確更新', () => {
-        it('應該在 reload 後正確更新狀態', async () => {
-            // 建立新的 server 實例以避免重複註冊問題
+    describe('Status correctly updated after reload', () => {
+        it('should correctly update status after reload', async () => {
+            // Create new server instance to avoid duplicate registration issues
             const server1 = new McpServer({
                 name: 'test-server-1',
                 version: '1.0.0',
             })
 
-            // 初始：legacy prompt
+            // Initial: legacy prompt
             const yamlContent = `
 id: 'test-prompt'
-title: '測試 Prompt'
+title: 'Test Prompt'
 args:
   code:
     type: 'string'
-template: '請審查 {{code}}'
+template: 'Please review {{code}}'
 `
 
             await fs.writeFile(
@@ -239,16 +239,16 @@ template: '請審查 {{code}}'
             let runtime = getPromptRuntime('test-prompt')
             expect(runtime?.runtime_state).toBe('legacy')
 
-            // 更新：加入 metadata
+            // Update: add metadata
             const updatedYamlContent = `
 id: 'test-prompt'
-title: '測試 Prompt'
+title: 'Test Prompt'
 version: '1.0.0'
 status: 'stable'
 args:
   code:
     type: 'string'
-template: '請審查 {{code}}'
+template: 'Please review {{code}}'
 `
 
             await fs.writeFile(
@@ -256,13 +256,13 @@ template: '請審查 {{code}}'
                 updatedYamlContent
             )
 
-            // 建立新的 server 實例來測試重新載入
+            // Create new server instance to test reload
             const server2 = new McpServer({
                 name: 'test-server-2',
                 version: '1.0.0',
             })
 
-            // 直接重新載入 prompts
+            // Directly reload prompts
             await loadPrompts(server2, testDir)
 
             runtime = getPromptRuntime('test-prompt')
@@ -272,9 +272,9 @@ template: '請審查 {{code}}'
         })
     })
 
-    describe('system.health 統計正確', () => {
-        it('應該正確統計各種狀態的 prompt', async () => {
-            // 建立多個不同狀態的 prompts
+    describe('system.health statistics are correct', () => {
+        it('should correctly count prompts in various states', async () => {
+            // Create multiple prompts with different states
             const activePrompt = `
 id: 'active-prompt'
 title: 'Active Prompt'
@@ -331,7 +331,7 @@ template: '{{code}}'
             expect(stats.disabled).toBe(0)
         })
 
-        it('應該在 health status 中正確顯示統計', async () => {
+        it('should correctly show statistics in health status', async () => {
             const activePrompt = `
 id: 'active-prompt'
 title: 'Active Prompt'
@@ -359,7 +359,7 @@ template: '{{code}}'
             expect(health.registry.source).toBe('none')
         })
 
-        it('應該正確偵測 registry.yaml 存在', async () => {
+        it('should correctly detect registry.yaml existence', async () => {
             const activePrompt = `
 id: 'active-prompt'
 title: 'Active Prompt'
@@ -398,11 +398,11 @@ prompts:
         })
     })
 
-    describe('registry override 功能', () => {
-        it('應該正確套用 registry 的 group 和 visibility', async () => {
+    describe('registry override functionality', () => {
+        it('should correctly apply group and visibility from registry', async () => {
             const yamlContent = `
 id: 'test-prompt'
-title: '測試 Prompt'
+title: 'Test Prompt'
 version: '1.0.0'
 status: 'stable'
 args:
@@ -438,15 +438,15 @@ prompts:
         })
     })
 
-    describe('向後相容性', () => {
-        it('應該仍然可以正常使用 legacy prompt', async () => {
+    describe('Backward Compatibility', () => {
+        it('should still work normally with legacy prompt', async () => {
             const yamlContent = `
 id: 'legacy-prompt'
 title: 'Legacy Prompt'
 args:
   code:
     type: 'string'
-template: '請審查 {{code}}'
+template: 'Please review {{code}}'
 `
 
             await fs.writeFile(
@@ -464,10 +464,10 @@ template: '請審查 {{code}}'
             expect(runtime?.runtime_state).toBe('legacy')
         })
 
-        it('應該在沒有 registry.yaml 時正常運作', async () => {
+        it('should work normally without registry.yaml', async () => {
             const yamlContent = `
 id: 'test-prompt'
-title: '測試 Prompt'
+title: 'Test Prompt'
 version: '1.0.0'
 status: 'stable'
 args:

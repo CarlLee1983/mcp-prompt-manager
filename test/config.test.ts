@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
-describe('環境變數配置測試', () => {
+describe('Environment Variable Configuration Tests', () => {
     const originalEnv = process.env
 
     beforeEach(() => {
-        // 清除環境變數
+        // Clear environment variables
         process.env = { ...originalEnv }
     })
 
@@ -25,7 +25,7 @@ describe('環境變數配置測試', () => {
             expect(lang).toBe('zh')
         })
 
-        it('應該支援自訂語言設定', () => {
+        it('should support custom language setting', () => {
             process.env.MCP_LANGUAGE = 'ja'
             const lang = process.env.MCP_LANGUAGE || 'en'
             expect(lang).toBe('ja')
@@ -36,12 +36,12 @@ describe('環境變數配置測試', () => {
         it('should default to [common]', () => {
             delete process.env.MCP_GROUPS
             const groups = process.env.MCP_GROUPS
-                ? process.env.MCP_GROUPS.split(',').map((g) => g.trim())
+                ? (process.env.MCP_GROUPS as string).split(',').map((g) => g.trim())
                 : ['common']
             expect(groups).toEqual(['common'])
         })
 
-        it('應該解析單一群組', () => {
+        it('should parse single group', () => {
             process.env.MCP_GROUPS = 'laravel'
             const groups = process.env.MCP_GROUPS.split(',').map((g) =>
                 g.trim()
@@ -49,7 +49,7 @@ describe('環境變數配置測試', () => {
             expect(groups).toEqual(['laravel'])
         })
 
-        it('應該解析多個群組', () => {
+        it('should parse multiple groups', () => {
             process.env.MCP_GROUPS = 'laravel,vue,react'
             const groups = process.env.MCP_GROUPS.split(',').map((g) =>
                 g.trim()
@@ -57,7 +57,7 @@ describe('環境變數配置測試', () => {
             expect(groups).toEqual(['laravel', 'vue', 'react'])
         })
 
-        it('應該處理帶空格的群組名稱', () => {
+        it('should handle group names with whitespace', () => {
             process.env.MCP_GROUPS = 'laravel, vue , react'
             const groups = process.env.MCP_GROUPS.split(',').map((g) =>
                 g.trim()
@@ -65,38 +65,38 @@ describe('環境變數配置測試', () => {
             expect(groups).toEqual(['laravel', 'vue', 'react'])
         })
 
-        it('應該處理空字串', () => {
+        it('should handle empty string', () => {
             process.env.MCP_GROUPS = ''
-            // 空字串在 JavaScript 中是 falsy，所以會回退到預設值
+            // Empty string is falsy in JavaScript, so it falls back to default
             const groups = process.env.MCP_GROUPS
                 ? process.env.MCP_GROUPS.split(',').map((g) => g.trim())
                 : ['common']
-            // 空字串是 falsy，所以會使用預設值
+            // Empty string is falsy, so it uses default value
             expect(groups).toEqual(['common'])
         })
     })
 
     describe('PROMPT_REPO_URL', () => {
-        it('應該可以設定本地路徑', () => {
+        it('should allow local path', () => {
             process.env.PROMPT_REPO_URL = '/path/to/repo'
             expect(process.env.PROMPT_REPO_URL).toBe('/path/to/repo')
         })
 
-        it('應該可以設定 Git URL', () => {
+        it('should allow Git URL', () => {
             process.env.PROMPT_REPO_URL = 'https://github.com/user/repo.git'
             expect(process.env.PROMPT_REPO_URL).toBe(
                 'https://github.com/user/repo.git'
             )
         })
 
-        it('應該可以設定 SSH URL', () => {
+        it('should allow SSH URL', () => {
             process.env.PROMPT_REPO_URL = 'git@github.com:user/repo.git'
             expect(process.env.PROMPT_REPO_URL).toBe(
                 'git@github.com:user/repo.git'
             )
         })
 
-        it('缺失時應該為 undefined', () => {
+        it('should be undefined when missing', () => {
             delete process.env.PROMPT_REPO_URL
             expect(process.env.PROMPT_REPO_URL).toBeUndefined()
         })
@@ -104,17 +104,17 @@ describe('環境變數配置測試', () => {
 
     describe('Language instruction generation', () => {
         it('should generate Traditional Chinese instruction for zh', () => {
-            const lang = 'zh'
+            const lang: string = 'zh'
             const instruction =
                 lang === 'zh'
                     ? 'Please reply in Traditional Chinese (繁體中文). Keep technical terms in English.'
                     : 'Please reply in English.'
             expect(instruction).toContain('Traditional Chinese')
-            expect(instruction).toContain('繁體中文')
+            expect(instruction).toContain('繁體中文') // "Traditional Chinese" in Chinese characters
         })
 
-        it('應該為其他語言生成英文指令', () => {
-            const lang = 'en'
+        it('should generate English instruction for other languages', () => {
+            const lang: string = 'en'
             const instruction =
                 lang === 'zh'
                     ? 'Please reply in Traditional Chinese (繁體中文). Keep technical terms in English.'
@@ -123,7 +123,7 @@ describe('環境變數配置測試', () => {
         })
 
         it('should generate English instruction for ja', () => {
-            const lang = 'ja'
+            const lang: string = 'ja'
             const instruction =
                 lang === 'zh'
                     ? 'Please reply in Traditional Chinese (繁體中文). Keep technical terms in English.'

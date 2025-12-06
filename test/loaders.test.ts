@@ -6,7 +6,7 @@ import yaml from 'js-yaml'
 import Handlebars from 'handlebars'
 import { z } from 'zod'
 
-// 模擬 index.ts 中的函數
+// Simulate functions from index.ts
 async function getFilesRecursively(dir: string): Promise<string[]> {
     let results: string[] = []
     const list = await fs.readdir(dir)
@@ -67,12 +67,12 @@ function buildZodSchema(args: Record<string, PromptArgDefinition>) {
     return zodShape
 }
 
-describe('載入器測試', () => {
+describe('Loader Tests', () => {
     let testDir: string
 
     beforeEach(async () => {
         testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcp-loader-test-'))
-        // 清除所有 partials
+        // Clear all partials
         Handlebars.unregisterPartial('test-partial')
         Handlebars.unregisterPartial('greeting')
     })
@@ -82,7 +82,7 @@ describe('載入器測試', () => {
     })
 
     describe('loadPartials', () => {
-        it('應該載入 .hbs 檔案作為 Handlebars partials', async () => {
+        it('should load .hbs files as Handlebars partials', async () => {
             await fs.writeFile(
                 path.join(testDir, 'greeting.hbs'),
                 'Hello {{name}}!'
@@ -98,7 +98,7 @@ describe('載入器測試', () => {
             expect(template({ name: 'Carl' })).toBe('Hello Carl!')
         })
 
-        it('應該忽略非 .hbs 檔案', async () => {
+        it('should ignore non-.hbs files', async () => {
             await fs.writeFile(path.join(testDir, 'not-partial.txt'), 'content')
             await fs.writeFile(
                 path.join(testDir, 'partial.hbs'),
@@ -111,7 +111,7 @@ describe('載入器測試', () => {
             expect(Handlebars.partials['partial']).toBe('Partial content')
         })
 
-        it('應該從子目錄載入 partials', async () => {
+        it('should load partials from subdirectories', async () => {
             await fs.mkdir(path.join(testDir, 'partials'))
             await fs.writeFile(
                 path.join(testDir, 'partials', 'header.hbs'),
@@ -123,17 +123,17 @@ describe('載入器測試', () => {
             expect(Handlebars.partials['header']).toBe('Header')
         })
 
-        it('應該處理空目錄', async () => {
+        it('should handle empty directory', async () => {
             await loadPartials(testDir)
-            // 不應該拋出錯誤
+            // Should not throw error
             expect(true).toBe(true)
         })
     })
 
-    describe('Zod Schema 建構', () => {
-        it('應該為 string 類型建立正確的 schema', () => {
+    describe('Zod Schema Construction', () => {
+        it('should create correct schema for string type', () => {
             const args = {
-                name: { type: 'string' as const, description: '名稱' },
+                name: { type: 'string' as const, description: 'Name' },
             }
             const schema = buildZodSchema(args)
 
@@ -142,7 +142,7 @@ describe('載入器測試', () => {
             expect(() => schema.name.parse(123)).toThrow()
         })
 
-        it('應該為 number 類型建立正確的 schema', () => {
+        it('should create correct schema for number type', () => {
             const args = {
                 age: { type: 'number' as const },
             }
@@ -153,7 +153,7 @@ describe('載入器測試', () => {
             expect(() => schema.age.parse('25')).toThrow()
         })
 
-        it('應該為 boolean 類型建立正確的 schema', () => {
+        it('should create correct schema for boolean type', () => {
             const args = {
                 active: { type: 'boolean' as const },
             }
@@ -164,20 +164,20 @@ describe('載入器測試', () => {
             expect(() => schema.active.parse('true')).toThrow()
         })
 
-        it('應該包含 description', () => {
+        it('should include description', () => {
             const args = {
                 code: {
                     type: 'string' as const,
-                    description: '程式碼內容',
+                    description: 'Code content',
                 },
             }
             const schema = buildZodSchema(args)
 
-            // Zod 的 describe 會設定 description
+            // Zod describe sets the description
             expect(schema.code).toBeInstanceOf(z.ZodString)
         })
 
-        it('應該處理多個參數', () => {
+        it('should handle multiple arguments', () => {
             const args = {
                 name: { type: 'string' as const },
                 age: { type: 'number' as const },
@@ -191,22 +191,24 @@ describe('載入器測試', () => {
             expect(schema.active).toBeInstanceOf(z.ZodBoolean)
         })
 
-        it('應該處理空的 args', () => {
+        it('should handle empty args', () => {
             const schema = buildZodSchema({})
             expect(Object.keys(schema)).toHaveLength(0)
         })
     })
 
-    describe('Prompt 載入流程', () => {
-        it('應該正確解析並編譯完整的 prompt', async () => {
+    describe('Prompt Loading Flow', () => {
+        it('should correctly parse and compile full prompt', async () => {
             const yamlContent = `
 id: 'test-prompt'
-title: '測試 Prompt'
+title: 'Test Prompt'
+description: 'This is a test'
+version: '1.0.0'
 args:
   code:
     type: 'string'
-    description: '程式碼'
-template: '請審查 {{code}}'
+    description: 'Code'
+template: 'Please review {{code}}'
 `
 
             await fs.writeFile(
@@ -221,7 +223,7 @@ template: '請審查 {{code}}'
             const promptDef = yaml.load(content) as PromptDefinition
 
             expect(promptDef.id).toBe('test-prompt')
-            expect(promptDef.template).toBe('請審查 {{code}}')
+            expect(promptDef.template).toBe('Please review {{code}}')
 
             const zodShape = buildZodSchema(promptDef.args)
             const template = Handlebars.compile(promptDef.template, {
@@ -229,35 +231,35 @@ template: '請審查 {{code}}'
             })
 
             const result = template({ code: 'const x = 1' })
-            expect(result).toBe('請審查 const x = 1')
+            expect(result).toBe('Please review const x = 1')
         })
 
-        it('應該跳過缺少 id 的 prompt', () => {
+        it('should skip prompt missing id', () => {
             const yamlContent = `
-title: '無 ID Prompt'
-template: '內容'
+title: 'No ID Prompt'
+template: 'Content'
 `
 
             const promptDef = yaml.load(yamlContent) as PromptDefinition
             expect(promptDef.id).toBeUndefined()
-            // 在實際代碼中會 continue
+            // Should continue in actual code
         })
 
-        it('應該跳過缺少 template 的 prompt', () => {
+        it('should skip prompt missing template', () => {
             const yamlContent = `
 id: 'no-template'
-title: '無模板'
+title: 'No Template'
 `
 
             const promptDef = yaml.load(yamlContent) as PromptDefinition
             expect(promptDef.template).toBeUndefined()
-            // 在實際代碼中會 continue
+            // Should continue in actual code
         })
 
-        it('應該處理包含 partials 的模板', async () => {
+        it('should handle template with partials', async () => {
             await fs.writeFile(
                 path.join(testDir, 'role-expert.hbs'),
-                '你是一位資深工程師。'
+                'You are a senior engineer.'
             )
             await loadPartials(testDir)
 
@@ -266,10 +268,10 @@ title: '無模板'
             })
             const result = template({})
 
-            expect(result).toBe('你是一位資深工程師。')
+            expect(result).toBe('You are a senior engineer.')
         })
 
-        it('應該處理系統變數注入', () => {
+        it('should handle system variable injection', () => {
             const template = Handlebars.compile(
                 '{{output_lang_rule}} - {{sys_lang}}',
                 { noEscape: true }
@@ -285,22 +287,22 @@ title: '無模板'
         })
     })
 
-    describe('錯誤處理', () => {
-        it('應該處理無效的 YAML 格式', () => {
+    describe('Error Handling', () => {
+        it('should handle invalid YAML format', () => {
             const invalidYaml = `
 id: 'test'
-title: '測試'
-args:
-  - invalid: list
-template: '內容'
+title: 'Test'
+description: 'This is a test'
+version: '1.0.0'
+template: 'Content'
 `
 
             expect(() => {
                 yaml.load(invalidYaml)
-            }).not.toThrow() // YAML 解析器通常不會拋出錯誤，但會返回奇怪的結果
+            }).not.toThrow() // YAML parser usually doesn't throw, but returns strange result
         })
 
-        it('應該處理檔案讀取錯誤', async () => {
+        it('should handle file read error', async () => {
             const nonExistentFile = path.join(testDir, 'not-exist.yaml')
 
             await expect(
@@ -308,29 +310,29 @@ template: '內容'
             ).rejects.toThrow()
         })
 
-        it('應該處理空的 YAML 檔案', () => {
+        it('should handle empty YAML file', () => {
             const emptyYaml = ''
 
             const result = yaml.load(emptyYaml)
             expect(result).toBeUndefined()
         })
 
-        it('應該處理只有註解的 YAML', () => {
+        it('should handle comment-only YAML', () => {
             const commentOnlyYaml = `
-# 這只是註解
-# 沒有實際內容
+# This is just a comment
+# No actual content
 `
 
             const result = yaml.load(commentOnlyYaml)
-            expect(result).toBeNull() // 或 undefined，取決於 YAML 解析器
+            expect(result).toBeNull() // or undefined, depending on YAML parser
         })
     })
 
-    describe('邊界情況', () => {
-        it('應該處理空的 args', () => {
+    describe('Edge Cases', () => {
+        it('should handle empty args', () => {
             const yamlContent = `
 id: 'no-args'
-template: '簡單模板'
+template: 'Simple template'
 `
 
             const promptDef = yaml.load(yamlContent) as PromptDefinition
@@ -339,14 +341,14 @@ template: '簡單模板'
             expect(Object.keys(zodShape)).toHaveLength(0)
         })
 
-        it('應該處理非常長的模板', () => {
+        it('should handle very long template', () => {
             const longTemplate = '{{text}}'.repeat(1000)
             const template = Handlebars.compile(longTemplate, {
                 noEscape: true,
             })
 
             const result = template({ text: 'a' })
-            // 1000 個 '{{text}}' 會渲染成 1000 個 'a'
+            // 1000 '{{text}}' will render to 1000 'a's
             expect(result.length).toBeGreaterThanOrEqual(1000)
         })
 
@@ -359,7 +361,7 @@ template: '簡單模板'
             expect(result).toBe(specialChars)
         })
 
-        it('應該處理多層嵌套的參數', () => {
+        it('should handle nested arguments', () => {
             const yamlContent = `
 id: 'nested'
 args:

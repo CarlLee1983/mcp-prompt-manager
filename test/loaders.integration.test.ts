@@ -19,7 +19,7 @@ import {
 } from '../src/services/loaders.js'
 import { SourceManager } from '../src/services/sourceManager.js'
 
-describe('loaders.ts 整合測試', () => {
+describe('loaders.ts Integration Tests', () => {
     let testDir: string
     let server: McpServer
     const originalEnv = process.env
@@ -32,7 +32,7 @@ describe('loaders.ts 整合測試', () => {
             name: 'test-server',
             version: '1.0.0',
         })
-        // 清除 SourceManager 狀態
+        // Clear SourceManager state
         const sourceManager = SourceManager.getInstance()
         sourceManager.clearAllPrompts()
         sourceManager.clearAllPartials()
@@ -43,12 +43,12 @@ describe('loaders.ts 整合測試', () => {
     })
 
     afterEach(async () => {
-        await fs.rm(testDir, { recursive: true, force: true }).catch(() => {})
+        await fs.rm(testDir, { recursive: true, force: true }).catch(() => { })
     })
 
     describe('getRegisteredPromptIds', () => {
-        it('應該返回已註冊的 prompt IDs', async () => {
-            // 建立測試 prompt
+        it('should return registered prompt IDs', async () => {
+            // Create test prompt
             const promptYaml = `
 id: 'test-prompt-1'
 title: 'Test Prompt 1'
@@ -62,34 +62,34 @@ template: 'Test template'
             expect(ids).toContain('test-prompt-1')
         })
 
-        it('未載入任何 prompt 時應該返回空陣列', () => {
+        it('should return empty array when no prompts loaded', () => {
             const ids = getRegisteredPromptIds()
             expect(ids).toEqual([])
         })
     })
 
     describe('clearAllPartials', () => {
-        it('應該清除所有已註冊的 partials', async () => {
-            // 建立測試 partial
+        it('should clear all registered partials', async () => {
+            // Create test partial
             await fs.writeFile(path.join(testDir, 'test-partial.hbs'), 'Partial content')
             await loadPartials(testDir)
 
-            // 確認 partial 已載入
+            // Verify partial loaded
             const countBefore = await loadPartials(testDir)
             expect(countBefore).toBeGreaterThan(0)
 
-            // 清除 partials
+            // Clear partials
             clearAllPartials()
 
-            // 重新載入應該從 0 開始
+            // Reload should start from 0
             const countAfter = await loadPartials(testDir)
-            expect(countAfter).toBe(1) // 重新載入會重新計算
+            expect(countAfter).toBe(1) // Reload should recalculate
         })
     })
 
     describe('reloadPrompts', () => {
-        it('應該重新載入所有 prompts', async () => {
-            // 建立初始 prompt
+        it('should reload all prompts', async () => {
+            // Create initial prompt
             const promptYaml1 = `
 id: 'reload-test-1'
 title: 'Reload Test 1'
@@ -100,12 +100,12 @@ template: 'Original template'
             const result1 = await loadPrompts(server, testDir)
             expect(result1.loaded).toBe(1)
 
-            // 確認 prompt 已載入
+            // Verify prompt loaded
             let prompt = getPrompt('reload-test-1')
             expect(prompt).toBeDefined()
             expect(prompt?.metadata.title).toBe('Reload Test 1')
 
-            // 修改 prompt
+            // Modify prompt
             const promptYaml2 = `
 id: 'reload-test-1'
 title: 'Reload Test 1 Updated'
@@ -113,20 +113,20 @@ template: 'Updated template'
 `
             await fs.writeFile(path.join(testDir, 'reload-test-1.yaml'), promptYaml2)
 
-            // 重新載入（reloadPrompts 會清除並重新載入）
-            // 注意：reloadPrompts 可能會嘗試同步 Git，在測試環境中可能返回 0
-            // 但我們可以驗證 prompt 是否仍然存在或已被更新
+            // Reload (reloadPrompts clears and reloads)
+            // Note: reloadPrompts might try to sync Git, in test env might return 0
+            // But we can verify if prompt still exists or updated
             const result2 = await reloadPrompts(server, testDir)
-            
-            // 驗證 prompt 仍然存在（即使 loaded 為 0，prompt 可能仍然在快取中）
+
+            // Verify prompt still exists (even if loaded is 0, prompt might still be in cache)
             prompt = getPrompt('reload-test-1')
-            // 如果 reloadPrompts 成功，prompt 應該存在
-            // 如果 reloadPrompts 因為 Git 同步失敗而返回 0，prompt 可能仍然存在於快取中
+            // If reloadPrompts successful, prompt should exist
+            // If reloadPrompts returns 0 due to Git sync failure, prompt might still be in cache
             expect(prompt).toBeDefined()
         })
 
-        it('應該處理載入錯誤', async () => {
-            // 建立無效的 prompt
+        it('should handle load errors', async () => {
+            // Create invalid prompt
             await fs.writeFile(path.join(testDir, 'invalid.yaml'), 'invalid: yaml: content: [[')
 
             const result = await reloadPrompts(server, testDir)
@@ -135,8 +135,8 @@ template: 'Updated template'
     })
 
     describe('reloadSinglePrompt', () => {
-        it('應該重新載入單一 prompt 檔案', async () => {
-            // 建立初始 prompt
+        it('should reload single prompt file', async () => {
+            // Create initial prompt
             const promptYaml1 = `
 id: 'single-reload-test'
 title: 'Single Reload Test'
@@ -147,7 +147,7 @@ template: 'Original template'
 
             await loadPrompts(server, testDir)
 
-            // 修改 prompt
+            // Modify prompt
             const promptYaml2 = `
 id: 'single-reload-test'
 title: 'Single Reload Test Updated'
@@ -155,25 +155,25 @@ template: 'Updated template'
 `
             await fs.writeFile(filePath, promptYaml2)
 
-            // 重新載入單一檔案
+            // Reload single file
             const result = await reloadSinglePrompt(server, filePath, testDir)
             expect(result.success).toBe(true)
 
-            // 驗證 prompt 已更新
+            // Verify prompt updated
             const prompt = getPrompt('single-reload-test')
             expect(prompt).toBeDefined()
         })
 
-        it('應該處理不存在的檔案（視為刪除）', async () => {
+        it('should handle non-existent file (treat as delete)', async () => {
             const nonExistentPath = path.join(testDir, 'non-existent.yaml')
 
-            // reloadSinglePrompt 對於不存在的檔案會視為刪除，返回 success: true
+            // reloadSinglePrompt treats non-existent file as delete, returns success: true
             const result = await reloadSinglePrompt(server, nonExistentPath, testDir)
             expect(result.success).toBe(true)
             expect(result.error).toBeUndefined()
         })
 
-        it('應該處理無效的 YAML 檔案', async () => {
+        it('should handle invalid YAML file', async () => {
             const invalidYaml = 'invalid: yaml: content: [['
             const filePath = path.join(testDir, 'invalid.yaml')
             await fs.writeFile(filePath, invalidYaml)
@@ -183,8 +183,8 @@ template: 'Updated template'
             expect(result.error).toBeDefined()
         })
 
-        it('應該處理刪除的檔案（移除對應的 prompt）', async () => {
-            // 先建立並載入 prompt
+        it('should handle deleted file (remove corresponding prompt)', async () => {
+            // First create and load prompt
             const promptYaml = `
 id: 'delete-test'
 title: 'Delete Test'
@@ -194,22 +194,22 @@ template: 'Template'
             await fs.writeFile(filePath, promptYaml)
             await loadPrompts(server, testDir)
 
-            // 確認 prompt 已載入
+            // Verify prompt loaded
             expect(getPrompt('delete-test')).toBeDefined()
 
-            // 刪除檔案
+            // Delete file
             await fs.unlink(filePath)
 
-            // 重新載入應該處理刪除（移除 prompt）
+            // Reload should handle deletion (remove prompt)
             const result = await reloadSinglePrompt(server, filePath, testDir)
             expect(result.success).toBe(true)
-            // 檔案被刪除時，對應的 prompt 應該被移除（如果之前已載入）
-            // 注意：如果 prompt 之前沒有載入，則不會有任何操作
+            // When file is deleted, corresponding prompt should be removed (if previously loaded)
+            // Note: If prompt was not loaded before, no action taken
         })
     })
 
     describe('getAllPromptRuntimes', () => {
-        it('應該返回所有 prompt runtimes', async () => {
+        it('should return all prompt runtimes', async () => {
             const promptYaml = `
 id: 'runtime-test'
 title: 'Runtime Test'
@@ -223,14 +223,14 @@ template: 'Template'
             expect(runtimes.some(r => r.id === 'runtime-test')).toBe(true)
         })
 
-        it('未載入任何 prompt 時應該返回空陣列', () => {
+        it('should return empty array when no prompts loaded', () => {
             const runtimes = getAllPromptRuntimes()
             expect(runtimes).toEqual([])
         })
     })
 
     describe('getPromptRuntime', () => {
-        it('應該返回指定的 prompt runtime', async () => {
+        it('should return specified prompt runtime', async () => {
             const promptYaml = `
 id: 'get-runtime-test'
 title: 'Get Runtime Test'
@@ -244,14 +244,14 @@ template: 'Template'
             expect(runtime?.id).toBe('get-runtime-test')
         })
 
-        it('不存在的 prompt ID 應該返回 undefined', () => {
+        it('should return undefined for non-existent prompt ID', () => {
             const runtime = getPromptRuntime('non-existent')
             expect(runtime).toBeUndefined()
         })
     })
 
     describe('getPrompt', () => {
-        it('應該返回指定的 cached prompt', async () => {
+        it('should return specified cached prompt', async () => {
             const promptYaml = `
 id: 'get-prompt-test'
 title: 'Get Prompt Test'
@@ -267,14 +267,14 @@ template: 'Template'
             expect(prompt?.runtime).toBeDefined()
         })
 
-        it('不存在的 prompt ID 應該返回 undefined', () => {
+        it('should return undefined for non-existent prompt ID', () => {
             const prompt = getPrompt('non-existent')
             expect(prompt).toBeUndefined()
         })
     })
 
     describe('getLoadedPromptCount', () => {
-        it('應該返回已載入的 prompt 數量', async () => {
+        it('should return loaded prompt count', async () => {
             const promptYaml1 = `
 id: 'count-test-1'
 title: 'Count Test 1'
@@ -294,14 +294,14 @@ template: 'Template 2'
             expect(count).toBeGreaterThanOrEqual(2)
         })
 
-        it('未載入任何 prompt 時應該返回 0', () => {
+        it('should return 0 when no prompts loaded', () => {
             const count = getLoadedPromptCount()
             expect(count).toBe(0)
         })
     })
 
     describe('getPromptStats', () => {
-        it('應該返回 prompt 統計資訊', async () => {
+        it('should return prompt statistics', async () => {
             const promptYaml = `
 id: 'stats-test'
 title: 'Stats Test'
@@ -315,7 +315,7 @@ template: 'Template'
             expect(stats.total).toBeGreaterThanOrEqual(1)
         })
 
-        it('未載入任何 prompt 時應該返回空統計', () => {
+        it('should return empty stats when no prompts loaded', () => {
             const stats = getPromptStats()
             expect(stats).toBeDefined()
             expect(stats.total).toBe(0)

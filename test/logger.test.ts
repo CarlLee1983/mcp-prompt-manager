@@ -17,7 +17,7 @@ const mockPinoDestination = vi.fn(() => ({}))
 const mockPinoMultistream = vi.fn(() => ({}))
 const mockPinoTransport = vi.fn(() => ({}))
 
-const mockPino = vi.fn(() => mockPinoLogger)
+const mockPino = vi.fn(() => mockPinoLogger) as any
 // Attach static methods to the mock function
 mockPino.destination = mockPinoDestination
 mockPino.multistream = mockPinoMultistream
@@ -60,22 +60,22 @@ describe('logger.ts', () => {
     beforeEach(() => {
         // Reset mocks
         vi.clearAllMocks()
-        
+
         // Create temporary directory for log files
         testLogDir = path.join(os.tmpdir(), `mcp-logger-test-${Date.now()}`)
         fs.mkdirSync(testLogDir, { recursive: true })
-        
+
         // Mock fs.createWriteStream to avoid actual file operations
         // This prevents ENOENT errors when pino.transport tries to create file streams
         vi.spyOn(fs, 'createWriteStream').mockImplementation(() => mockWriteStream as any)
-        
+
         // Reset environment
         process.env = { ...originalEnv }
         delete process.env.LOG_FILE
         delete process.env.LOG_LEVEL
         delete process.env.PRETTY_LOG
         delete process.env.NODE_ENV
-        
+
         // Clear module cache to allow re-importing
         vi.resetModules()
     })
@@ -83,7 +83,7 @@ describe('logger.ts', () => {
     afterEach(() => {
         // Restore environment
         process.env = originalEnv
-        
+
         // Clean up test directory
         try {
             fs.rmSync(testLogDir, { recursive: true, force: true })
@@ -92,225 +92,225 @@ describe('logger.ts', () => {
         }
     })
 
-    describe('基本 logger 初始化', () => {
-        it('應該在沒有 LOG_FILE 時建立基本 logger', async () => {
+    describe('Basic Logger Initialization', () => {
+        it('should create basic logger when LOG_FILE is undefined', async () => {
             process.env.NODE_ENV = 'production'
-            
+
             // Re-import logger to trigger initialization
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPino).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
 
-        it('應該在開發環境使用 pretty format', async () => {
+        it('should use pretty format in development environment', async () => {
             process.env.NODE_ENV = 'development'
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPino).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
 
-        it('應該在 PRETTY_LOG=true 時使用 pretty format', async () => {
+        it('should use pretty format when PRETTY_LOG=true', async () => {
             process.env.PRETTY_LOG = 'true'
             process.env.NODE_ENV = 'production'
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPino).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
 
-        it('應該在 PRETTY_LOG=1 時使用 pretty format', async () => {
+        it('should use pretty format when PRETTY_LOG=1', async () => {
             process.env.PRETTY_LOG = '1'
             process.env.NODE_ENV = 'production'
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPino).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
     })
 
-    describe('LOG_FILE 設定', () => {
-        it('應該在設定 LOG_FILE 時建立檔案 logger', async () => {
+    describe('LOG_FILE Settings', () => {
+        it('should create file logger when LOG_FILE is set', async () => {
             const logFile = path.join(testLogDir, 'test.log')
             // Ensure directory exists before setting LOG_FILE
             fs.mkdirSync(path.dirname(logFile), { recursive: true })
             process.env.LOG_FILE = logFile
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPinoMultistream).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
 
-        it('應該在 LOG_FILE 為絕對路徑時使用該路徑', async () => {
+        it('should use absolute path when LOG_FILE is absolute', async () => {
             const logFile = path.join(testLogDir, 'absolute.log')
             // Ensure directory exists before setting LOG_FILE
             fs.mkdirSync(path.dirname(logFile), { recursive: true })
             process.env.LOG_FILE = logFile
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPinoMultistream).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
 
-        it('應該在 LOG_FILE 為相對路徑時解析為絕對路徑', async () => {
+        it('should resolve to absolute path when LOG_FILE is relative', async () => {
             // For relative paths, ensure the directory exists in cwd
             const relativeLogFile = 'relative.log'
             const absoluteLogFile = path.resolve(process.cwd(), relativeLogFile)
             fs.mkdirSync(path.dirname(absoluteLogFile), { recursive: true })
             process.env.LOG_FILE = relativeLogFile
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPinoMultistream).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
 
-        it('應該在日誌目錄不存在時自動建立', async () => {
+        it('should create log directory if it does not exist', async () => {
             const newDir = path.join(testLogDir, 'new', 'nested', 'dir')
             const logFile = path.join(newDir, 'test.log')
             // Don't create directory - let logger.ts create it
             process.env.LOG_FILE = logFile
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             // Directory should be created by logger.ts
             expect(fs.existsSync(newDir)).toBe(true)
             expect(logger).toBeDefined()
         })
     })
 
-    describe('LOG_LEVEL 設定', () => {
-        it('應該使用設定的 LOG_LEVEL', async () => {
+    describe('LOG_LEVEL Settings', () => {
+        it('should use configured LOG_LEVEL', async () => {
             process.env.LOG_LEVEL = 'debug'
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPino).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
 
-        it('應該在未設定 LOG_LEVEL 時使用預設值（production）', async () => {
+        it('should use default value (production) when LOG_LEVEL is not set', async () => {
             process.env.NODE_ENV = 'production'
             delete process.env.LOG_LEVEL
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPino).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
 
-        it('應該在未設定 LOG_LEVEL 時使用預設值（development）', async () => {
+        it('should use default value (development) when LOG_LEVEL is not set', async () => {
             process.env.NODE_ENV = 'development'
             delete process.env.LOG_LEVEL
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPino).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
     })
 
-    describe('多種配置組合', () => {
-        it('應該處理 LOG_FILE + PRETTY_LOG 組合', async () => {
+    describe('Combined Configurations', () => {
+        it('should handle LOG_FILE + PRETTY_LOG combination', async () => {
             const logFile = path.join(testLogDir, 'pretty.log')
             // Ensure directory exists before setting LOG_FILE
             fs.mkdirSync(path.dirname(logFile), { recursive: true })
             process.env.LOG_FILE = logFile
             process.env.PRETTY_LOG = 'true'
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPinoMultistream).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
 
-        it('應該處理 LOG_FILE + LOG_LEVEL 組合', async () => {
+        it('should handle LOG_FILE + LOG_LEVEL combination', async () => {
             const logFile = path.join(testLogDir, 'leveled.log')
             // Ensure directory exists before setting LOG_FILE
             fs.mkdirSync(path.dirname(logFile), { recursive: true })
             process.env.LOG_FILE = logFile
             process.env.LOG_LEVEL = 'error'
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPinoMultistream).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
 
-        it('應該處理開發環境 + LOG_FILE 組合', async () => {
+        it('should handle development env + LOG_FILE combination', async () => {
             const logFile = path.join(testLogDir, 'dev.log')
             // Ensure directory exists before setting LOG_FILE
             fs.mkdirSync(path.dirname(logFile), { recursive: true })
             process.env.LOG_FILE = logFile
             process.env.NODE_ENV = 'development'
-            
+
             const { logger } = await import('../src/utils/logger.js')
-            
+
             expect(mockPinoMultistream).toHaveBeenCalled()
             expect(logger).toBeDefined()
         })
     })
 
-    describe('logger 方法', () => {
-        it('應該提供 info 方法', async () => {
+    describe('Logger Methods', () => {
+        it('should provide info method', async () => {
             const { logger } = await import('../src/utils/logger.js')
-            
+
             logger.info('test message')
-            
+
             expect(mockPinoLogger.info).toHaveBeenCalledWith('test message')
         })
 
-        it('應該提供 warn 方法', async () => {
+        it('should provide warn method', async () => {
             const { logger } = await import('../src/utils/logger.js')
-            
+
             logger.warn('warning message')
-            
+
             expect(mockPinoLogger.warn).toHaveBeenCalledWith('warning message')
         })
 
-        it('應該提供 error 方法', async () => {
+        it('should provide error method', async () => {
             const { logger } = await import('../src/utils/logger.js')
-            
+
             logger.error('error message')
-            
+
             expect(mockPinoLogger.error).toHaveBeenCalledWith('error message')
         })
 
-        it('應該提供 debug 方法', async () => {
+        it('should provide debug method', async () => {
             const { logger } = await import('../src/utils/logger.js')
-            
+
             logger.debug('debug message')
-            
+
             expect(mockPinoLogger.debug).toHaveBeenCalledWith('debug message')
         })
 
-        it('應該提供 trace 方法', async () => {
+        it('should provide trace method', async () => {
             const { logger } = await import('../src/utils/logger.js')
-            
+
             logger.trace('trace message')
-            
+
             expect(mockPinoLogger.trace).toHaveBeenCalledWith('trace message')
         })
 
-        it('應該提供 fatal 方法', async () => {
+        it('should provide fatal method', async () => {
             const { logger } = await import('../src/utils/logger.js')
-            
+
             logger.fatal('fatal message')
-            
+
             expect(mockPinoLogger.fatal).toHaveBeenCalledWith('fatal message')
         })
 
-        it('應該支援結構化日誌', async () => {
+        it('should support structured logging', async () => {
             const { logger } = await import('../src/utils/logger.js')
-            
+
             logger.info({ key: 'value' }, 'structured message')
-            
+
             expect(mockPinoLogger.info).toHaveBeenCalledWith(
                 { key: 'value' },
                 'structured message'

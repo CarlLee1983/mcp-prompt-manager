@@ -7,66 +7,66 @@ import { loadPartials, loadPrompts } from '../src/services/loaders.js'
 import { getFilesRecursively, clearFileCache } from '../src/utils/fileSystem.js'
 import { SourceManager } from '../src/services/sourceManager.js'
 
-describe('整合測試', () => {
+describe('Integration Tests', () => {
     let testDir: string
     let server: McpServer
     const originalEnv = process.env
 
     beforeEach(async () => {
-        // 設定測試環境變數
+        // Set test environment variables
         process.env.PROMPT_REPO_URL = '/tmp/test-repo'
         process.env.MCP_GROUPS = 'common'
-        // 建立臨時測試目錄
+        // Create temporary test directory
         testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcp-integration-test-'))
         server = new McpServer({
             name: 'test-server',
             version: '1.0.0',
         })
-        // 清除 SourceManager 狀態
+        // Clear SourceManager state
         SourceManager.getInstance().clearAllPrompts()
         SourceManager.getInstance().clearAllPartials()
-        // 清除緩存
+        // Clear cache
         clearFileCache()
     })
 
     afterEach(() => {
-        // 還原環境變數
+        // Restore environment variables
         process.env = originalEnv
     })
 
     afterEach(async () => {
-        // 清理臨時目錄
-        await fs.rm(testDir, { recursive: true, force: true }).catch(() => {})
+        // Clean up temporary directory
+        await fs.rm(testDir, { recursive: true, force: true }).catch(() => { })
         clearFileCache()
     })
 
-    describe('完整載入流程', () => {
-        it('應該能夠載入完整的 prompt 和 partials', async () => {
-            // 建立測試檔案結構
-            // 將 prompt 放在根目錄，這樣無論 ACTIVE_GROUPS 如何設定都會被載入
+    describe('Full Load Flow', () => {
+        it('should load prompts and partials correctly', async () => {
+            // Create test file structure
+            // Place prompt in root, so it is loaded regardless of ACTIVE_GROUPS
             await fs.mkdir(path.join(testDir, 'partials'), {
                 recursive: true,
             })
 
-            // 建立 partial
+            // Create partial
             await fs.writeFile(
                 path.join(testDir, 'partials', 'role-expert.hbs'),
-                '你是一位資深工程師。'
+                'You are a senior engineer.'
             )
 
-            // 建立 prompt（放在根目錄）
+            // Create prompt (in root)
             const promptYaml = `
 id: 'test-prompt'
-title: '測試 Prompt'
-description: '這是一個測試'
+title: 'Test Prompt'
+description: 'This is a test'
 args:
   code:
     type: 'string'
-    description: '程式碼'
+    description: 'Code'
 template: |
   {{> role-expert }}
   
-  請審查以下程式碼：
+  Please review the following code:
   
   \`\`\`
   {{code}}
@@ -78,20 +78,20 @@ template: |
                 promptYaml
             )
 
-            // 載入 partials
+            // Load partials
             const partialsCount = await loadPartials(testDir)
             expect(partialsCount).toBe(1)
 
-            // 載入 prompts
+            // Load prompts
             const { loaded, errors } = await loadPrompts(server, testDir)
 
             expect(loaded).toBe(1)
             expect(errors).toHaveLength(0)
         })
 
-        it('應該處理多個 prompts 和 partials', async () => {
-            // 建立多個檔案（放在根目錄）
-            // 建立多個 partials
+        it('should handle multiple prompts and partials', async () => {
+            // Create multiple files (in root)
+            // Create multiple partials
             await fs.writeFile(
                 path.join(testDir, 'header.hbs'),
                 '=== Header ==='
@@ -101,7 +101,7 @@ template: |
                 '=== Footer ==='
             )
 
-            // 建立多個 prompts（放在根目錄）
+            // Create multiple prompts (in root)
             const prompt1 = `
 id: 'prompt-1'
 title: 'Prompt 1'
@@ -126,7 +126,7 @@ template: 'Hello {{name}}'
                 prompt2
             )
 
-            // 載入
+            // Load
             const partialsCount = await loadPartials(testDir)
             expect(partialsCount).toBe(2)
 
@@ -135,13 +135,13 @@ template: 'Hello {{name}}'
             expect(errors).toHaveLength(0)
         })
 
-        it('應該正確處理群組過濾', async () => {
-            // 建立不同群組的檔案
+        it('should handle group filtering correctly', async () => {
+            // Create files in different groups
             await fs.mkdir(path.join(testDir, 'laravel'), { recursive: true })
             await fs.mkdir(path.join(testDir, 'vue'), { recursive: true })
             await fs.mkdir(path.join(testDir, 'common'), { recursive: true })
 
-            // 建立 prompts
+            // Create prompts
             await fs.writeFile(
                 path.join(testDir, 'common', 'common-prompt.yaml'),
                 "id: 'common-prompt'\ntitle: 'Common'\ntemplate: 'Common template'"
@@ -157,24 +157,24 @@ template: 'Hello {{name}}'
                 "id: 'vue-prompt'\ntitle: 'Vue'\ntemplate: 'Vue template'"
             )
 
-            // 測試只載入 common 和 laravel
-            // 注意：這裡我們需要模擬 ACTIVE_GROUPS，但由於它是從環境變數讀取的
-            // 我們直接測試 shouldLoadPrompt 邏輯
+            // Test loading only common and laravel
+            // Note: We need to mock ACTIVE_GROUPS here, but since it's read from env
+            // We test the logic of shouldLoadPrompt directly by implication
             const { loaded } = await loadPrompts(server, testDir)
 
-            // common 應該永遠載入，laravel 和 vue 取決於 ACTIVE_GROUPS
-            // 預設 ACTIVE_GROUPS 是 ['common']，所以應該只載入 common
+            // common should always load, laravel and vue depends on ACTIVE_GROUPS
+            // Default ACTIVE_GROUPS is ['common'], so only common should load
             expect(loaded).toBeGreaterThanOrEqual(1)
         })
 
-        it('應該處理無效的 YAML 檔案', async () => {
-            // 建立無效的 YAML（放在根目錄）
+        it('should handle invalid YAML files', async () => {
+            // Create invalid YAML (in root)
             await fs.writeFile(
                 path.join(testDir, 'invalid.yaml'),
                 'invalid: yaml: content: ['
             )
 
-            // 建立有效的 prompt（放在根目錄）
+            // Create valid prompt (in root)
             await fs.writeFile(
                 path.join(testDir, 'valid.yaml'),
                 "id: 'valid'\ntitle: 'Valid'\ntemplate: 'Valid template'"
@@ -182,20 +182,20 @@ template: 'Hello {{name}}'
 
             const { loaded, errors } = await loadPrompts(server, testDir)
 
-            // 應該至少載入一個有效的
+            // Should load at least one valid
             expect(loaded).toBeGreaterThanOrEqual(1)
-            // 應該有錯誤記錄
-            expect(errors.length).toBeGreaterThanOrEqual(0) // YAML 解析可能不會拋出錯誤
+            // Should have error log
+            expect(errors.length).toBeGreaterThanOrEqual(0) // YAML parse might not throw error?
         })
 
-        it('應該處理缺少必要欄位的 prompt', async () => {
-            // 缺少 id（放在根目錄）
+        it('should handle prompts missing required fields', async () => {
+            // Missing ID (in root)
             await fs.writeFile(
                 path.join(testDir, 'no-id.yaml'),
                 "title: 'No ID'\ntemplate: 'Template'"
             )
 
-            // 缺少 template（放在根目錄）
+            // Missing template (in root)
             await fs.writeFile(
                 path.join(testDir, 'no-template.yaml'),
                 "id: 'no-template'\ntitle: 'No Template'"
@@ -203,24 +203,24 @@ template: 'Hello {{name}}'
 
             const { loaded, errors } = await loadPrompts(server, testDir)
 
-            // 這些應該被跳過，不會載入
+            // These should be skipped, not loaded
             expect(loaded).toBe(0)
-            // 應該有驗證錯誤
+            // Should have validation errors
             expect(errors.length).toBeGreaterThan(0)
         })
     })
 
-    describe('檔案列表緩存', () => {
-        it('應該使用緩存避免重複掃描', async () => {
-            // 建立測試檔案
+    describe('File List Cache', () => {
+        it('should use cache to avoid duplicate scans', async () => {
+            // Create test files
             await fs.writeFile(path.join(testDir, 'file1.txt'), 'content1')
             await fs.writeFile(path.join(testDir, 'file2.txt'), 'content2')
 
-            // 第一次掃描
+            // First scan
             const files1 = await getFilesRecursively(testDir, true)
             const count1 = files1.length
 
-            // 第二次掃描（應該使用緩存）
+            // Second scan (should use cache)
             const files2 = await getFilesRecursively(testDir, true)
             const count2 = files2.length
 
@@ -228,35 +228,35 @@ template: 'Hello {{name}}'
             expect(files1).toEqual(files2)
         })
 
-        it('應該在清除緩存後重新掃描', async () => {
+        it('should rescan after clearing cache', async () => {
             await fs.writeFile(path.join(testDir, 'file1.txt'), 'content1')
 
-            // 第一次掃描
+            // First scan
             const files1 = await getFilesRecursively(testDir, true)
 
-            // 添加新檔案
+            // Add new file
             await fs.writeFile(path.join(testDir, 'file2.txt'), 'content2')
 
-            // 不清除緩存，應該還是舊的結果
+            // Without clearing cache, should be old result
             const files2BeforeClear = await getFilesRecursively(testDir, true)
             expect(files2BeforeClear.length).toBe(files1.length)
 
-            // 清除緩存後重新掃描
+            // Clear cache and rescan
             clearFileCache(testDir)
             const files2AfterClear = await getFilesRecursively(testDir, true)
             expect(files2AfterClear.length).toBe(files1.length + 1)
         })
     })
 
-    describe('錯誤處理', () => {
-        it('應該正確統計載入錯誤', async () => {
-            // 建立一個有效的 prompt（放在根目錄）
+    describe('Error Handling', () => {
+        it('should correctly count load errors', async () => {
+            // Create a valid prompt (in root)
             await fs.writeFile(
                 path.join(testDir, 'valid.yaml'),
                 "id: 'valid'\ntitle: 'Valid'\ntemplate: 'Valid'"
             )
 
-            // 建立一個無效的 prompt（缺少 template，放在根目錄）
+            // Create an invalid prompt (missing template, in root)
             await fs.writeFile(
                 path.join(testDir, 'invalid.yaml'),
                 "id: 'invalid'\ntitle: 'Invalid'"
@@ -264,14 +264,14 @@ template: 'Hello {{name}}'
 
             const { loaded, errors } = await loadPrompts(server, testDir)
 
-            // 應該載入一個，有一個錯誤
+            // Should load one, have one error
             expect(loaded).toBe(1)
             expect(errors.length).toBeGreaterThan(0)
             expect(errors[0].file).toContain('invalid.yaml')
         })
 
-        it('應該在部分失敗時繼續載入其他 prompts', async () => {
-            // 建立多個 prompts，其中一個無效（放在根目錄）
+        it('should continue loading other prompts on partial failure', async () => {
+            // Create multiple prompts, one invalid (in root)
             await fs.writeFile(
                 path.join(testDir, 'prompt1.yaml'),
                 "id: 'prompt1'\ntitle: 'Prompt 1'\ntemplate: 'Template 1'"
@@ -289,9 +289,9 @@ template: 'Hello {{name}}'
 
             const { loaded, errors } = await loadPrompts(server, testDir)
 
-            // 應該載入 2 個有效的
+            // Should load 2 valid ones
             expect(loaded).toBe(2)
-            // 應該有 1 個錯誤
+            // Should have 1 error
             expect(errors.length).toBeGreaterThan(0)
         })
     })
