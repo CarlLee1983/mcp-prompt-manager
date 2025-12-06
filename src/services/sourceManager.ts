@@ -580,14 +580,6 @@ export class SourceManager {
                 const loadError =
                     error instanceof Error ? error : new Error(String(error))
 
-                if (loadError.message.includes("already registered")) {
-                    logger.debug(
-                        { filePath },
-                        "Prompt already registered (expected during reload), skipping error"
-                    )
-                    continue
-                }
-
                 errors.push({ file: relativePath, error: loadError })
                 logger.warn(
                     { filePath, error: loadError },
@@ -838,10 +830,15 @@ export class SourceManager {
                     error instanceof Error ? error : new Error(String(error))
 
                 if (loadError.message.includes("already registered")) {
+                    // If prompt is already registered, we still count it as loaded
+                    // because it exists and is functional (this can happen during reload)
                     logger.debug(
                         { filePath, promptId: promptDef.id },
-                        "Prompt already registered (expected during reload), skipping error"
+                        "Prompt already registered (expected during reload), counting as loaded"
                     )
+                    // Still count as loaded since the prompt exists and is registered
+                    loadedCount++
+                    newToolIds.add(promptDef.id)
                     continue
                 }
 
@@ -1338,6 +1335,8 @@ export class SourceManager {
                         { filePath: relativePath, promptId: promptDef.id },
                         "Prompt already registered (expected during reload), skipping error"
                     )
+                    existingToolIds.add(promptDef.id)
+                    loadedCount++
                     continue
                 }
 
@@ -1392,6 +1391,8 @@ export class SourceManager {
                 logger.info({ count: partialsCount }, "Partials reloaded")
 
                 // 5. Load and register all new prompts/tools (dual registry swap - step 1)
+                // Note: loadPrompts will use getFilesRecursively which respects the cleared cache
+                // and will re-scan the directory to find all prompt files
                 const result = await this.loadPrompts(
                     server,
                     storageDir,
