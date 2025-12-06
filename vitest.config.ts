@@ -17,9 +17,9 @@ export default defineConfig({
                 '**/index.ts', // Entry point files
             ],
             thresholds: {
-                lines: 75,
-                functions: 75,
-                branches: 70,
+                lines: 80,
+                functions: 80,
+                branches: 75,
                 statements: 80,
             },
         },
