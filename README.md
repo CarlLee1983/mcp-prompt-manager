@@ -68,6 +68,22 @@ For detailed Docker deployment instructions, see [DOCKER.md](DOCKER.md).
 
 ### Option 2: Local Installation
 
+## Quick Start (Development)
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start development server
+pnpm dev
+
+# Run tests
+pnpm test:run
+
+# Lint code
+pnpm lint
+```
+
 ### 1. Installation
 
 First, clone this project and install dependencies:
