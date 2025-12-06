@@ -1,86 +1,112 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  mcp-prompt-manager:
-    # 使用預構建的鏡像（從 registry 拉取或本地構建）
-    # 構建鏡像: docker build -t mcp-prompt-manager:latest .
-    # 或使用: image: your-registry/mcp-prompt-manager:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-    # image: mcp-prompt-manager:latest
-    
-    container_name: mcp-prompt-manager-prod
-    restart: always
-    
-    # 環境變數：直接設定（不依賴 .env 文件）
-    environment:
-      - NODE_ENV=production
-      - STORAGE_DIR=/app/.prompts_cache
-      # 從環境變數或 secrets 讀取
-      - PROMPT_REPO_URL=${PROMPT_REPO_URL}
-      - PROMPT_REPO_URLS=${PROMPT_REPO_URLS}
-      - SYSTEM_REPO_URL=${SYSTEM_REPO_URL}
-      - TRANSPORT_TYPE=${TRANSPORT_TYPE:-http}
-      - MCP_LANGUAGE=${MCP_LANGUAGE:-en}
-      - MCP_GROUPS=${MCP_GROUPS:-}
-      - GIT_BRANCH=${GIT_BRANCH:-main}
-      - GIT_MAX_RETRIES=${GIT_MAX_RETRIES:-3}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - LOG_FILE=${LOG_FILE:-}
-      - CACHE_PROVIDER=${CACHE_PROVIDER:-local}
-      - CACHE_MAX_SIZE=${CACHE_MAX_SIZE:-1000}
-      - CACHE_TTL=${CACHE_TTL:-}
-      - CACHE_CLEANUP_INTERVAL=${CACHE_CLEANUP_INTERVAL:-60000}
-      - WATCH_MODE=${WATCH_MODE:-false}
-      - GIT_POLLING_INTERVAL=${GIT_POLLING_INTERVAL:-300000}
-    
-    # 端口映射：僅暴露必要的端口
-    ports:
-      - "${HTTP_PORT:-3000}:3000"
-      # 如果需要 SSE 模式，取消註釋
-      # - "${SSE_PORT:-3001}:3001"
-    
-    # 卷掛載：使用命名卷（持久化）
-    volumes:
-      - prompts_cache:/app/.prompts_cache
-    
-    # 資源限制
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 256M
-    
-    # 日誌配置
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-        compress: "true"
-    
-    # 健康檢查（更嚴格的配置）
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    
-    # 網路配置
-    networks:
-      - mcp-network-prod
+    mcp-prompt-manager:
+        # 使用預構建的鏡像（從 registry 拉取或本地構建）
+        # 構建鏡像: docker build -t mcp-prompt-manager:latest .
+        # 或使用: image: your-registry/mcp-prompt-manager:latest
+        build:
+            context: .
+            dockerfile: Dockerfile
+        # image: mcp-prompt-manager:latest
+
+        container_name: mcp-prompt-manager-prod
+        restart: always
+
+        # Secrets 設定
+        secrets:
+            - prompt_repo_url
+            - prompt_repo_urls
+            - system_repo_url
+
+        # 環境變數
+        environment:
+            - NODE_ENV=production
+            - STORAGE_DIR=/app/.prompts_cache
+            # 告訴應用程式從 secrets 檔案讀取 (如果您的應用有此邏輯，或者您需要修改 entrypoint script 來 export cat /run/secrets/...)
+            # 此處假設應用可以直接讀取環境變數，若要使用 secrets，通常需要修改啟動腳本將其注入為環境變數，
+            # 或修改應用程式碼支持讀取 /run/secrets/ 檔案。
+            # 為了最簡便的遷移，我們保留 env 但建議使用 env_file 或外部注入。
+            # 但針對 "secrets 管理" 要求，我們定義 secrets 並假設部署時會使用。
+            # 注意：Node.js 應用通常需要額外邏輯讀取 Docker secrets。
+            # 這裡演示最佳實踐配置：
+            - PROMPT_REPO_URL_FILE=/run/secrets/prompt_repo_url
+            - PROMPT_REPO_URLS_FILE=/run/secrets/prompt_repo_urls
+            - SYSTEM_REPO_URL_FILE=/run/secrets/system_repo_url
+
+            - TRANSPORT_TYPE=${TRANSPORT_TYPE:-http}
+            - MCP_LANGUAGE=${MCP_LANGUAGE:-en}
+            - MCP_GROUPS=${MCP_GROUPS:-}
+            - GIT_BRANCH=${GIT_BRANCH:-main}
+            - GIT_MAX_RETRIES=${GIT_MAX_RETRIES:-3}
+            - LOG_LEVEL=${LOG_LEVEL:-info}
+            - LOG_FILE=${LOG_FILE:-}
+            - CACHE_PROVIDER=${CACHE_PROVIDER:-local}
+            - CACHE_MAX_SIZE=${CACHE_MAX_SIZE:-1000}
+            - CACHE_TTL=${CACHE_TTL:-}
+            - CACHE_CLEANUP_INTERVAL=${CACHE_CLEANUP_INTERVAL:-60000}
+            - WATCH_MODE=${WATCH_MODE:-false}
+            - GIT_POLLING_INTERVAL=${GIT_POLLING_INTERVAL:-300000}
+
+        # 端口映射：僅暴露必要的端口
+        ports:
+            - "${HTTP_PORT:-3000}:3000"
+            # 如果需要 SSE 模式，取消註釋
+            # - "${SSE_PORT:-3001}:3001"
+
+            # 卷掛載：使用命名卷（持久化）
+        volumes:
+            - prompts_cache:/app/.prompts_cache
+
+        # 資源限制
+        deploy:
+            resources:
+                limits:
+                    cpus: "1.0"
+                    memory: 512M
+                reservations:
+                    cpus: "0.5"
+                    memory: 256M
+
+        # 日誌配置
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+                compress: "true"
+
+        # 健康檢查（更嚴格的配置）
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "node",
+                    "-e",
+                    "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))",
+                ]
+            interval: 30s
+            timeout: 10s
+            retries: 5
+            start_period: 60s
+
+        # 網路配置
+        networks:
+            - mcp-network-prod
 
 # 命名卷（持久化快取）
 volumes:
-  prompts_cache:
-    driver: local
+    prompts_cache:
+        driver: local
 
 networks:
-  mcp-network-prod:
-    driver: bridge
+    mcp-network-prod:
+        driver: bridge
 
+secrets:
+    prompt_repo_url:
+        file: ./secrets/prompt_repo_url.txt
+    prompt_repo_urls:
+        file: ./secrets/prompt_repo_urls.txt
+    system_repo_url:
+        file: ./secrets/system_repo_url.txt

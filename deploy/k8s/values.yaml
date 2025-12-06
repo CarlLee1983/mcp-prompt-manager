@@ -1,0 +1,71 @@
+image:
+    repository: mcp-prompt-manager
+    pullPolicy: IfNotPresent
+    tag: "1.0.0"
+
+replicaCount: 1
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+    create: true
+    name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+    fsGroup: 1001
+
+securityContext:
+    capabilities:
+        drop:
+            - ALL
+    readOnlyRootFilesystem: false # Since we write to .prompts_cache, we might need writable fs or volume
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
+
+service:
+    type: ClusterIP
+    port: 3000
+
+ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+        - host: chart-example.local
+          paths:
+              - path: /
+                pathType: ImplementationSpecific
+    tls: []
+
+resources:
+    limits:
+        cpu: 1000m
+        memory: 512Mi
+    requests:
+        cpu: 500m
+        memory: 256Mi
+
+autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+env:
+    NODE_ENV: production
+    LOG_LEVEL: info
+    TRANSPORT_TYPE: http
+
+# Only for standard env vars. For secrets, use ExternalSecret or existing Secret
+secretEnv:
+    PROMPT_REPO_URL: ""
