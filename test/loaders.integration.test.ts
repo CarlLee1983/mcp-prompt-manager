@@ -19,6 +19,16 @@ import {
 } from '../src/services/loaders.js'
 import { SourceManager } from '../src/services/sourceManager.js'
 
+// Mock syncRepo to avoid Git operations in tests
+// Use async mock factory to ensure it works with dynamic imports
+vi.mock('../src/services/git.js', async () => {
+    const actual = await vi.importActual('../src/services/git.js')
+    return {
+        ...actual,
+        syncRepo: vi.fn().mockResolvedValue(undefined),
+    }
+})
+
 describe('loaders.ts Integration Tests', () => {
     let testDir: string
     let server: McpServer

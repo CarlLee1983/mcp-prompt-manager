@@ -136,6 +136,16 @@ template: 'Hello {{name}}'
         })
 
         it('should handle group filtering correctly', async () => {
+            // Ensure MCP_GROUPS is set before module import
+            // Reset modules to ensure ACTIVE_GROUPS is re-evaluated
+            vi.resetModules()
+            
+            // Set environment variable before importing
+            process.env.MCP_GROUPS = 'common'
+            
+            // Re-import to get fresh ACTIVE_GROUPS
+            await import('../src/config/env.js')
+            
             // Create files in different groups
             await fs.mkdir(path.join(testDir, 'laravel'), { recursive: true })
             await fs.mkdir(path.join(testDir, 'vue'), { recursive: true })
@@ -157,13 +167,13 @@ template: 'Hello {{name}}'
                 "id: 'vue-prompt'\ntitle: 'Vue'\ntemplate: 'Vue template'"
             )
 
-            // Test loading only common and laravel
-            // Note: We need to mock ACTIVE_GROUPS here, but since it's read from env
-            // We test the logic of shouldLoadPrompt directly by implication
-            const { loaded } = await loadPrompts(server, testDir)
+            // Test loading only common (MCP_GROUPS='common')
+            // Re-import loaders to use fresh ACTIVE_GROUPS
+            const { loadPrompts: loadPromptsFresh } = await import('../src/services/loaders.js')
+            const { loaded } = await loadPromptsFresh(server, testDir)
 
-            // common should always load, laravel and vue depends on ACTIVE_GROUPS
-            // Default ACTIVE_GROUPS is ['common'], so only common should load
+            // common should load because it's in ACTIVE_GROUPS
+            // laravel and vue should not load because they're not in ACTIVE_GROUPS
             expect(loaded).toBeGreaterThanOrEqual(1)
         })
 
