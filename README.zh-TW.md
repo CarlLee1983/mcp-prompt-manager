@@ -1175,6 +1175,112 @@ pnpm format:check
 > -   修改源碼後必須先執行 `build` 才能看到最新變更
 > -   使用 `inspector:dev` 可以自動編譯並啟動，適合開發時使用
 
+### Prompt 倉庫驗證
+
+我們建議使用 [`@carllee1983/prompt-toolkit`](https://github.com/CarlLee1983/prompts-tooling-sdk) 在部署到 MCP Prompt Manager 之前驗證您的 prompt 倉庫。這可以確保 prompt 品質，並在開發過程中及早發現錯誤。
+
+#### 安裝
+
+```bash
+# 全域安裝
+npm install -g @carllee1983/prompt-toolkit
+# 或
+pnpm add -g @carllee1983/prompt-toolkit
+```
+
+#### 使用驗證的開發流程
+
+1. **開發 Prompts**：在倉庫中建立和編輯 prompts
+2. **本地驗證**：在提交前使用 toolkit 進行驗證
+    ```bash
+    prompt-toolkit validate repo
+    ```
+3. **CI/CD 驗證**：在 CI/CD 流程中自動驗證
+    ```bash
+    prompt-toolkit validate repo --exit-code --severity error
+    ```
+4. **部署到 MCP Prompt Manager**：MCP Prompt Manager 載入已驗證的 prompts
+
+#### 快速驗證指令
+
+```bash
+# 驗證整個倉庫
+prompt-toolkit validate repo
+
+# 使用特定嚴重性等級驗證（顯示警告和錯誤）
+prompt-toolkit validate repo --severity warning
+
+# 驗證並在錯誤時退出（用於 CI/CD）
+prompt-toolkit validate repo --exit-code
+
+# 驗證單個 prompt 檔案
+prompt-toolkit validate file path/to/prompt.yaml
+
+# 驗證 registry 檔案
+prompt-toolkit validate registry --repo-root /path/to/repo
+
+# 驗證 partials 目錄
+prompt-toolkit validate partials --partials-path partials
+```
+
+#### CI/CD 整合
+
+在 CI/CD 流程中加入驗證，在部署前發現錯誤：
+
+```yaml
+# .github/workflows/validate-prompts.yml
+name: Validate Prompts
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+jobs:
+    validate:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+
+            - name: Install prompt-toolkit
+              run: npm install -g @carllee1983/prompt-toolkit
+
+            - name: Validate repository
+              run: prompt-toolkit validate repo --exit-code --severity error
+```
+
+#### 最佳實踐
+
+-   ✅ **提交前驗證**：在推送變更前本地執行驗證
+-   ✅ **使用 CI/CD**：在 CI/CD 流程中自動驗證以發現錯誤
+-   ✅ **監控結果**：追蹤驗證結果以維持倉庫健康
+-   ✅ **嚴重性過濾**：使用 `--severity` 選項專注於關鍵問題
+-   ✅ **JSON 輸出**：在 CI/CD 中使用 `--format json` 取得機器可讀的輸出
+
+#### 程式化使用
+
+您也可以在腳本中以程式化方式使用 toolkit：
+
+```typescript
+import { validatePromptRepo } from "@carllee1983/prompt-toolkit"
+
+const result = validatePromptRepo("/path/to/prompt-repo")
+
+if (result.success) {
+    console.log("倉庫驗證通過！")
+} else {
+    console.error("驗證錯誤：", result.errors)
+}
+```
+
+更多資訊，請參閱 [prompt-toolkit 文檔](https://github.com/CarlLee1983/prompts-tooling-sdk)。
+
 ## 🧪 測試
 
 專案包含完整的測試套件：
@@ -1441,6 +1547,7 @@ docker-compose logs -f
 -   [Zod 文檔](https://zod.dev/)
 -   [Simple Git 文檔](https://github.com/steveukx/git-js)
 -   [Pino 文檔](https://getpino.io/)
+-   [@carllee1983/prompt-toolkit](https://github.com/CarlLee1983/prompts-tooling-sdk) - 用於 MCP 的 Prompt 倉庫驗證工具集
 
 ## 📄 授權
 

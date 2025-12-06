@@ -1204,6 +1204,112 @@ pnpm format:check
 > -   After modifying source code, you must run `build` first to see the latest changes
 > -   Using `inspector:dev` can auto-compile and start, suitable for development
 
+### Prompt Repository Validation
+
+We recommend using [`@carllee1983/prompt-toolkit`](https://github.com/CarlLee1983/prompts-tooling-sdk) to validate your prompt repository before deploying to MCP Prompt Manager. This ensures prompt quality and catches errors early in the development process.
+
+#### Installation
+
+```bash
+# Install globally
+npm install -g @carllee1983/prompt-toolkit
+# or
+pnpm add -g @carllee1983/prompt-toolkit
+```
+
+#### Development Workflow with Validation
+
+1. **Develop Prompts**: Create and edit prompts in your repository
+2. **Validate Locally**: Use the toolkit to validate before committing
+    ```bash
+    prompt-toolkit validate repo
+    ```
+3. **CI/CD Validation**: Automatically validate in CI/CD pipelines
+    ```bash
+    prompt-toolkit validate repo --exit-code --severity error
+    ```
+4. **Deploy to MCP Prompt Manager**: MCP Prompt Manager loads validated prompts
+
+#### Quick Validation Commands
+
+```bash
+# Validate entire repository
+prompt-toolkit validate repo
+
+# Validate with specific severity (show warnings and errors)
+prompt-toolkit validate repo --severity warning
+
+# Validate and exit with error code (for CI/CD)
+prompt-toolkit validate repo --exit-code
+
+# Validate single prompt file
+prompt-toolkit validate file path/to/prompt.yaml
+
+# Validate registry file
+prompt-toolkit validate registry --repo-root /path/to/repo
+
+# Validate partials directory
+prompt-toolkit validate partials --partials-path partials
+```
+
+#### CI/CD Integration
+
+Add validation to your CI/CD pipeline to catch errors before deployment:
+
+```yaml
+# .github/workflows/validate-prompts.yml
+name: Validate Prompts
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+jobs:
+    validate:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+
+            - name: Install prompt-toolkit
+              run: npm install -g @carllee1983/prompt-toolkit
+
+            - name: Validate repository
+              run: prompt-toolkit validate repo --exit-code --severity error
+```
+
+#### Best Practices
+
+-   ✅ **Validate before committing**: Run validation locally before pushing changes
+-   ✅ **Use CI/CD**: Automatically validate in CI/CD pipelines to catch errors
+-   ✅ **Monitor results**: Track validation results to maintain repository health
+-   ✅ **Severity filtering**: Use `--severity` option to focus on critical issues
+-   ✅ **JSON output**: Use `--format json` for machine-readable output in CI/CD
+
+#### Programmatic Usage
+
+You can also use the toolkit programmatically in your scripts:
+
+```typescript
+import { validatePromptRepo } from "@carllee1983/prompt-toolkit"
+
+const result = validatePromptRepo("/path/to/prompt-repo")
+
+if (result.success) {
+    console.log("Repository validation passed!")
+} else {
+    console.error("Validation errors:", result.errors)
+}
+```
+
+For more information, see the [prompt-toolkit documentation](https://github.com/CarlLee1983/prompts-tooling-sdk).
+
 ## 🧪 Testing
 
 The project includes a complete test suite:
@@ -1452,6 +1558,7 @@ export LOG_LEVEL=debug
 -   [Zod Documentation](https://zod.dev/)
 -   [Simple Git Documentation](https://github.com/steveukx/git-js)
 -   [Pino Documentation](https://getpino.io/)
+-   [@carllee1983/prompt-toolkit](https://github.com/CarlLee1983/prompts-tooling-sdk) - Prompt repository validation toolkit for MCP
 
 ## 📄 License
 
