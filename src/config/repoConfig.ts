@@ -1,5 +1,5 @@
-import { z } from 'zod'
-import path from 'path'
+import { z } from "zod"
+import path from "path"
 
 /**
  * Repo configuration item
@@ -20,14 +20,14 @@ const RepoConfigSchema = z.object({
         .refine(
             (url) => {
                 // Validate URL format or local path
-                if (url.includes('..') || url.includes('\0')) {
+                if (url.includes("..") || url.includes("\0")) {
                     return false
                 }
                 try {
                     if (
-                        url.startsWith('http://') ||
-                        url.startsWith('https://') ||
-                        url.startsWith('git@')
+                        url.startsWith("http://") ||
+                        url.startsWith("https://") ||
+                        url.startsWith("git@")
                     ) {
                         return true
                     }
@@ -39,7 +39,7 @@ const RepoConfigSchema = z.object({
             },
             {
                 message:
-                    'Invalid repo URL: must be a valid URL or absolute path',
+                    "Invalid repo URL: must be a valid URL or absolute path",
             }
         ),
     branch: z.string().optional(),
@@ -57,7 +57,7 @@ export function parseRepoUrls(repoUrls: string): RepoConfig[] {
     }
 
     const urls = repoUrls
-        .split(',')
+        .split(",")
         .map((url) => url.trim())
         .filter(Boolean)
 
@@ -106,4 +106,3 @@ export function sortReposByPriority(configs: RepoConfig[]): RepoConfig[] {
         return priorityA - priorityB
     })
 }
-

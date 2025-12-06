@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from "zod"
 
 /**
  * Registry Schema
@@ -10,8 +10,8 @@ export const RegistrySchema = z.object({
             id: z.string(),
             group: z.string().optional(),
             visibility: z
-                .enum(['public', 'private', 'internal'])
-                .default('public'),
+                .enum(["public", "private", "internal"])
+                .default("public"),
             deprecated: z.boolean().default(false),
         })
     ),
@@ -22,4 +22,3 @@ export const RegistrySchema = z.object({
  * Type inferred from Zod Schema
  */
 export type Registry = z.infer<typeof RegistrySchema>
-

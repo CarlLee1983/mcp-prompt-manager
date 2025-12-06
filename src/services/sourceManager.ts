@@ -1,47 +1,50 @@
-import fs from 'fs/promises'
-import path from 'path'
-import yaml from 'js-yaml'
-import Handlebars from 'handlebars'
-import { z } from 'zod'
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import fs from "fs/promises"
+import path from "path"
+import yaml from "js-yaml"
+import Handlebars from "handlebars"
+import { z } from "zod"
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import {
     STORAGE_DIR,
     ACTIVE_GROUPS,
     IS_DEFAULT_GROUPS,
     LANG_INSTRUCTION,
     LANG_SETTING,
-} from '../config/env.js'
-import { logger } from '../utils/logger.js'
-import { getFilesRecursively, clearFileCache } from '../utils/fileSystem.js'
-import { formatErrorForLogging, formatYAMLError } from '../utils/errorFormatter.js'
-import type { PromptDefinition } from '../types/prompt.js'
+} from "../config/env.js"
+import { logger } from "../utils/logger.js"
+import { getFilesRecursively, clearFileCache } from "../utils/fileSystem.js"
+import {
+    formatErrorForLogging,
+    formatYAMLError,
+} from "../utils/errorFormatter.js"
+import type { PromptDefinition } from "../types/prompt.js"
 import {
     PromptMetadataSchema,
     type PromptMetadata,
-} from '../types/promptMetadata.js'
-import { RegistrySchema, type Registry } from '../types/registry.js'
+} from "../types/promptMetadata.js"
+import { RegistrySchema, type Registry } from "../types/registry.js"
 import type {
     PromptRuntime,
     PromptRuntimeState,
     PromptSource,
-} from '../types/promptRuntime.js'
-import type { CacheProvider } from '../cache/cacheProvider.js'
-import { CacheFactory } from '../cache/cacheFactory.js'
-import { LocalCache } from '../cache/localCache.js'
+} from "../types/promptRuntime.js"
+import type { CacheProvider } from "../cache/cacheProvider.js"
+import { CacheFactory } from "../cache/cacheFactory.js"
+import { LocalCache } from "../cache/localCache.js"
 
 // Excluded non-prompt file names (case-insensitive)
 const EXCLUDED_FILES = [
-    'pnpm-lock.yaml',
-    'yarn.lock',
-    'package-lock.json',
-    'package.json',
-    'composer.lock',
-    'go.sum',
-    'requirements.txt',
-    'poetry.lock',
-    'pom.xml',
-    'build.gradle',
-    'registry.yaml',
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "package-lock.json",
+    "package.json",
+    "composer.lock",
+    "go.sum",
+    "requirements.txt",
+    "poetry.lock",
+    "pom.xml",
+    "build.gradle",
+    "registry.yaml",
 ]
 
 // Error statistics
@@ -104,7 +107,10 @@ export class SourceManager {
     private isLocalCache: boolean // Flag indicating if it's local cache (for synchronous methods)
 
     // Reentrancy protection lock
-    private reloadingPromise: Promise<{ loaded: number; errors: LoadError[] }> | null = null
+    private reloadingPromise: Promise<{
+        loaded: number
+        errors: LoadError[]
+    }> | null = null
 
     private constructor() {
         // Create cache provider from environment variables
@@ -112,7 +118,7 @@ export class SourceManager {
         this.isLocalCache = this.promptCache instanceof LocalCache
         logger.info(
             { isLocalCache: this.isLocalCache },
-            'SourceManager initialized with cache provider'
+            "SourceManager initialized with cache provider"
         )
     }
 
@@ -143,13 +149,15 @@ export class SourceManager {
      */
     public getPrompt(id: string): CachedPrompt | undefined {
         if (this.isLocalCache) {
-            const result = (this.promptCache as LocalCache).getSync<CachedPrompt>(id)
+            const result = (
+                this.promptCache as LocalCache
+            ).getSync<CachedPrompt>(id)
             return result ?? undefined
         }
         // For non-local cache (e.g., Redis), async method is required
         // But for backward compatibility, return undefined and log warning
         logger.warn(
-            'getPrompt called synchronously but cache provider is not local. Use getPromptAsync instead.'
+            "getPrompt called synchronously but cache provider is not local. Use getPromptAsync instead."
         )
         return undefined
     }
@@ -187,11 +195,14 @@ export class SourceManager {
 
         return {
             total: runtimes.length,
-            active: runtimes.filter((r) => r.runtime_state === 'active').length,
-            legacy: runtimes.filter((r) => r.runtime_state === 'legacy').length,
-            invalid: runtimes.filter((r) => r.runtime_state === 'invalid').length,
-            disabled: runtimes.filter((r) => r.runtime_state === 'disabled').length,
-            warning: runtimes.filter((r) => r.runtime_state === 'warning').length,
+            active: runtimes.filter((r) => r.runtime_state === "active").length,
+            legacy: runtimes.filter((r) => r.runtime_state === "legacy").length,
+            invalid: runtimes.filter((r) => r.runtime_state === "invalid")
+                .length,
+            disabled: runtimes.filter((r) => r.runtime_state === "disabled")
+                .length,
+            warning: runtimes.filter((r) => r.runtime_state === "warning")
+                .length,
             tools: {
                 basic: basicToolsCount,
                 prompt: promptToolsCount,
@@ -205,27 +216,27 @@ export class SourceManager {
      */
     public async loadPartials(storageDir?: string): Promise<number> {
         const dir = storageDir ?? STORAGE_DIR
-        logger.debug('Loading Handlebars partials')
+        logger.debug("Loading Handlebars partials")
         const allFiles = await getFilesRecursively(dir)
         let count = 0
 
         for (const filePath of allFiles) {
-            if (!filePath.endsWith('.hbs')) continue
+            if (!filePath.endsWith(".hbs")) continue
 
             try {
-                const content = await fs.readFile(filePath, 'utf-8')
+                const content = await fs.readFile(filePath, "utf-8")
                 const partialName = path.parse(filePath).name
 
                 Handlebars.registerPartial(partialName, content)
                 this.registeredPartials.add(partialName)
                 count++
-                logger.debug({ partialName }, 'Partial registered')
+                logger.debug({ partialName }, "Partial registered")
             } catch (error) {
-                logger.warn({ filePath, error }, 'Failed to load partial')
+                logger.warn({ filePath, error }, "Failed to load partial")
             }
         }
 
-        logger.info({ count }, 'Partials loaded')
+        logger.info({ count }, "Partials loaded")
         return count
     }
 
@@ -236,13 +247,16 @@ export class SourceManager {
         for (const partialName of this.registeredPartials) {
             try {
                 Handlebars.unregisterPartial(partialName)
-                logger.debug({ partialName }, 'Partial unregistered')
+                logger.debug({ partialName }, "Partial unregistered")
             } catch (error) {
-                logger.warn({ partialName, error }, 'Failed to unregister partial')
+                logger.warn(
+                    { partialName, error },
+                    "Failed to unregister partial"
+                )
             }
         }
         this.registeredPartials.clear()
-        logger.info('All partials cleared')
+        logger.info("All partials cleared")
     }
 
     /**
@@ -252,9 +266,9 @@ export class SourceManager {
         for (const [toolId, toolRef] of this.registeredToolRefs.entries()) {
             try {
                 toolRef.remove()
-                logger.debug({ toolId }, 'Tool removed')
+                logger.debug({ toolId }, "Tool removed")
             } catch (error) {
-                logger.warn({ toolId, error }, 'Failed to remove tool')
+                logger.warn({ toolId, error }, "Failed to remove tool")
             }
         }
 
@@ -267,10 +281,10 @@ export class SourceManager {
             // For non-local cache, async clear is required
             // But to keep method synchronous, use Promise (not awaited)
             this.promptCache.clear().catch((error) => {
-                logger.error({ error }, 'Failed to clear cache')
+                logger.error({ error }, "Failed to clear cache")
             })
         }
-        logger.info('All prompts and tools cleared')
+        logger.info("All prompts and tools cleared")
     }
 
     /**
@@ -299,12 +313,15 @@ export class SourceManager {
                         // For non-local cache, async delete is required
                         // But to keep method synchronous, use Promise (not awaited)
                         this.promptCache.delete(toolId).catch((error) => {
-                            logger.error({ toolId, error }, 'Failed to delete from cache')
+                            logger.error(
+                                { toolId, error },
+                                "Failed to delete from cache"
+                            )
                         })
                     }
-                    logger.debug({ toolId }, 'Old tool removed')
+                    logger.debug({ toolId }, "Old tool removed")
                 } catch (error) {
-                    logger.warn({ toolId, error }, 'Failed to remove old tool')
+                    logger.warn({ toolId, error }, "Failed to remove old tool")
                 }
             }
         }
@@ -312,7 +329,7 @@ export class SourceManager {
         if (toolsToRemove.length > 0) {
             logger.info(
                 { removed: toolsToRemove.length },
-                'Old prompts and tools removed'
+                "Old prompts and tools removed"
             )
         }
     }
@@ -324,7 +341,11 @@ export class SourceManager {
         server: McpServer,
         storageDir?: string,
         systemStorageDir?: string
-    ): Promise<{ loaded: number; errors: LoadError[]; loadedToolIds?: Set<string> }> {
+    ): Promise<{
+        loaded: number
+        errors: LoadError[]
+        loadedToolIds?: Set<string>
+    }> {
         const dir = storageDir ?? STORAGE_DIR
         const systemDir = systemStorageDir
 
@@ -342,10 +363,10 @@ export class SourceManager {
 
         if (IS_DEFAULT_GROUPS) {
             logContext.isDefault = true
-            logContext.hint = 'Set MCP_GROUPS to load additional groups'
+            logContext.hint = "Set MCP_GROUPS to load additional groups"
         }
 
-        logger.info(logContext, 'Loading prompts')
+        logger.info(logContext, "Loading prompts")
 
         const registry = await this.loadRegistry(dir)
 
@@ -356,11 +377,16 @@ export class SourceManager {
         const pendingRegistrations: PendingPromptRegistration[] = []
 
         for (const filePath of allFiles) {
-            if (!filePath.endsWith('.yaml') && !filePath.endsWith('.yml')) continue
+            if (!filePath.endsWith(".yaml") && !filePath.endsWith(".yml"))
+                continue
 
             const fileName = path.basename(filePath).toLowerCase()
-            if (EXCLUDED_FILES.some((excluded) => fileName === excluded.toLowerCase())) {
-                logger.debug({ filePath }, 'Skipping excluded file')
+            if (
+                EXCLUDED_FILES.some(
+                    (excluded) => fileName === excluded.toLowerCase()
+                )
+            ) {
+                logger.debug({ filePath }, "Skipping excluded file")
                 continue
             }
 
@@ -374,13 +400,13 @@ export class SourceManager {
             if (!shouldLoad) {
                 logger.debug(
                     { filePath, groupName },
-                    'Skipping prompt (not in active groups)'
+                    "Skipping prompt (not in active groups)"
                 )
                 continue
             }
 
             try {
-                const content = await fs.readFile(filePath, 'utf-8')
+                const content = await fs.readFile(filePath, "utf-8")
                 let yamlData: unknown
                 try {
                     yamlData = yaml.load(content)
@@ -408,12 +434,12 @@ export class SourceManager {
                 const parseResult = PromptDefinitionSchema.safeParse(yamlData)
                 if (!parseResult.success) {
                     const error = new Error(
-                        `Invalid prompt definition: ${parseResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+                        `Invalid prompt definition: ${parseResult.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`
                     )
                     errors.push({ file: relativePath, error })
                     logger.warn(
                         { filePath, error: parseResult.error },
-                        'Failed to validate prompt definition'
+                        "Failed to validate prompt definition"
                     )
                     continue
                 }
@@ -421,15 +447,16 @@ export class SourceManager {
                 const promptDef = parseResult.data
 
                 let metadata: PromptMetadata | null = null
-                let runtimeState: PromptRuntimeState = 'legacy'
-                let source: PromptSource = 'legacy'
+                let runtimeState: PromptRuntimeState = "legacy"
+                let source: PromptSource = "legacy"
 
                 if (this.isMetadataPrompt(yamlData)) {
-                    const metadataResult = PromptMetadataSchema.safeParse(yamlData)
+                    const metadataResult =
+                        PromptMetadataSchema.safeParse(yamlData)
                     if (metadataResult.success) {
                         metadata = metadataResult.data
-                        source = 'embedded'
-                        runtimeState = 'active'
+                        source = "embedded"
+                        runtimeState = "active"
                     } else {
                         logger.warn(
                             {
@@ -437,10 +464,10 @@ export class SourceManager {
                                 promptId: promptDef.id,
                                 errors: metadataResult.error.issues,
                             },
-                            'Metadata validation failed, marking as warning'
+                            "Metadata validation failed, marking as warning"
                         )
-                        runtimeState = 'warning'
-                        source = 'embedded'
+                        runtimeState = "warning"
+                        source = "embedded"
                     }
                 }
 
@@ -455,17 +482,18 @@ export class SourceManager {
                         {
                             filePath,
                             promptId: promptDef.id,
-                            undeclaredPartials: validationResult.undeclaredPartials,
+                            undeclaredPartials:
+                                validationResult.undeclaredPartials,
                             unusedPartials: validationResult.unusedPartials,
                         },
-                        `Partial dependencies validation issues: ${validationResult.warnings.join(' ')}`
+                        `Partial dependencies validation issues: ${validationResult.warnings.join(" ")}`
                     )
 
                     if (
-                        runtimeState === 'active' &&
+                        runtimeState === "active" &&
                         validationResult.undeclaredPartials.length > 0
                     ) {
-                        runtimeState = 'warning'
+                        runtimeState = "warning"
                     }
                 }
 
@@ -481,12 +509,16 @@ export class SourceManager {
                 this.promptRuntimeMap.set(promptDef.id, promptRuntime)
                 this.filePathToPromptIdMap.set(filePath, promptDef.id)
 
-                if (promptRuntime.runtime_state !== 'active' && promptRuntime.runtime_state !== 'legacy') {
-                    const stateReason = {
-                        invalid: 'Prompt marked as invalid',
-                        disabled: 'Prompt disabled by registry',
-                        warning: 'Prompt has metadata validation warnings',
-                    }[promptRuntime.runtime_state] || 'Unknown state'
+                if (
+                    promptRuntime.runtime_state !== "active" &&
+                    promptRuntime.runtime_state !== "legacy"
+                ) {
+                    const stateReason =
+                        {
+                            invalid: "Prompt marked as invalid",
+                            disabled: "Prompt disabled by registry",
+                            warning: "Prompt has metadata validation warnings",
+                        }[promptRuntime.runtime_state] || "Unknown state"
 
                     logger.debug(
                         {
@@ -500,15 +532,17 @@ export class SourceManager {
                 }
 
                 const zodShape: z.ZodRawShape = promptDef.args
-                    ? this.buildZodSchema(promptDef.args as Record<
-                        string,
-                        {
-                            type: 'string' | 'number' | 'boolean'
-                            description?: string
-                            default?: string | number | boolean
-                            required?: boolean
-                        }
-                    >)
+                    ? this.buildZodSchema(
+                          promptDef.args as Record<
+                              string,
+                              {
+                                  type: "string" | "number" | "boolean"
+                                  description?: string
+                                  default?: string | number | boolean
+                                  required?: boolean
+                              }
+                          >
+                      )
                     : {}
 
                 let templateDelegate: HandlebarsTemplateDelegate
@@ -518,7 +552,9 @@ export class SourceManager {
                     })
                 } catch (error) {
                     const compileError =
-                        error instanceof Error ? error : new Error(String(error))
+                        error instanceof Error
+                            ? error
+                            : new Error(String(error))
                     errors.push({
                         file: relativePath,
                         error: new Error(
@@ -527,7 +563,7 @@ export class SourceManager {
                     })
                     logger.warn(
                         { filePath, error: compileError },
-                        'Failed to compile Handlebars template'
+                        "Failed to compile Handlebars template"
                     )
                     continue
                 }
@@ -544,23 +580,27 @@ export class SourceManager {
                 const loadError =
                     error instanceof Error ? error : new Error(String(error))
 
-                if (loadError.message.includes('already registered')) {
+                if (loadError.message.includes("already registered")) {
                     logger.debug(
                         { filePath },
-                        'Prompt already registered (expected during reload), skipping error'
+                        "Prompt already registered (expected during reload), skipping error"
                     )
                     continue
                 }
 
                 errors.push({ file: relativePath, error: loadError })
-                logger.warn({ filePath, error: loadError }, 'Failed to load prompt')
+                logger.warn(
+                    { filePath, error: loadError },
+                    "Failed to load prompt"
+                )
             }
         }
 
-        const sortedRegistrations = this.sortPromptsByPriority(pendingRegistrations)
+        const sortedRegistrations =
+            this.sortPromptsByPriority(pendingRegistrations)
         logger.debug(
             { total: sortedRegistrations.length },
-            'Prompts sorted by priority (status > version > source)'
+            "Prompts sorted by priority (status > version > source)"
         )
 
         for (const {
@@ -577,10 +617,13 @@ export class SourceManager {
                     metadata: promptDef,
                     compiledTemplate: templateDelegate,
                     runtime: promptRuntime,
-                    zodShape
+                    zodShape,
                 }
                 if (this.isLocalCache) {
-                    ;(this.promptCache as LocalCache).setSync(promptDef.id, cachedPrompt)
+                    ;(this.promptCache as LocalCache).setSync(
+                        promptDef.id,
+                        cachedPrompt
+                    )
                 } else {
                     await this.promptCache.set(promptDef.id, cachedPrompt)
                 }
@@ -594,7 +637,7 @@ export class SourceManager {
                                 promptTitle: promptDef.title,
                                 args: Object.keys(args),
                             },
-                            'Prompt invoked'
+                            "Prompt invoked"
                         )
 
                         const context = {
@@ -611,14 +654,17 @@ export class SourceManager {
                                 promptId: promptDef.id,
                                 messageLength: message.length,
                             },
-                            'Template rendered successfully'
+                            "Template rendered successfully"
                         )
 
                         return {
                             messages: [
                                 {
-                                    role: 'user' as const,
-                                    content: { type: 'text' as const, text: message },
+                                    role: "user" as const,
+                                    content: {
+                                        type: "text" as const,
+                                        text: message,
+                                    },
                                 },
                             ],
                         }
@@ -629,7 +675,7 @@ export class SourceManager {
                                 : new Error(String(error))
                         logger.error(
                             { promptId: promptDef.id, error: execError },
-                            'Template execution failed'
+                            "Template execution failed"
                         )
                         throw execError
                     }
@@ -641,23 +687,35 @@ export class SourceManager {
                         try {
                             oldToolRef.remove()
                             this.registeredToolRefs.delete(promptDef.id)
-                            logger.debug({ promptId: promptDef.id }, 'Old tool removed before re-registering prompt')
+                            logger.debug(
+                                { promptId: promptDef.id },
+                                "Old tool removed before re-registering prompt"
+                            )
                         } catch (error) {
-                            logger.warn({ promptId: promptDef.id, error }, 'Failed to remove old tool before re-registering')
+                            logger.warn(
+                                { promptId: promptDef.id, error },
+                                "Failed to remove old tool before re-registering"
+                            )
                         }
                     }
                 }
                 server.prompt(promptDef.id, zodShape, promptHandler)
                 this.registeredPromptIds.add(promptDef.id)
 
-                const description = promptDef.description || ''
+                const description = promptDef.description || ""
 
                 let triggerText: string
-                if (promptDef.triggers && promptDef.triggers.patterns.length > 0) {
+                if (
+                    promptDef.triggers &&
+                    promptDef.triggers.patterns.length > 0
+                ) {
                     triggerText = `When user mentions "${promptDef.triggers.patterns.join('", "')}"`
                 } else {
-                    const parsedTrigger = this.parseTriggerFromDescription(description)
-                    triggerText = parsedTrigger || `When user needs ${promptDef.title.toLowerCase()}`
+                    const parsedTrigger =
+                        this.parseTriggerFromDescription(description)
+                    triggerText =
+                        parsedTrigger ||
+                        `When user needs ${promptDef.title.toLowerCase()}`
                 }
 
                 let rules: string[] = []
@@ -670,8 +728,8 @@ export class SourceManager {
                 let enhancedDescription = description
                 if (promptDef.rules || promptDef.triggers) {
                     enhancedDescription = enhancedDescription
-                        .replace(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is, '')
-                        .replace(/TRIGGER:\s*(.+?)(?:\n|$)/i, '')
+                        .replace(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is, "")
+                        .replace(/TRIGGER:\s*(.+?)(?:\n|$)/i, "")
                         .trim()
                 }
 
@@ -679,20 +737,24 @@ export class SourceManager {
                     enhancedDescription += `\n\nTRIGGER: ${triggerText}`
                 }
                 if (rules.length > 0) {
-                    enhancedDescription += `\n\nRULES:\n${rules.map((rule, index) => `  ${index + 1}. ${rule}`).join('\n')}`
+                    enhancedDescription += `\n\nRULES:\n${rules.map((rule, index) => `  ${index + 1}. ${rule}`).join("\n")}`
                 }
 
                 if (promptRuntime.tags && promptRuntime.tags.length > 0) {
-                    enhancedDescription += `\n\nTags: ${promptRuntime.tags.join(', ')}`
+                    enhancedDescription += `\n\nTags: ${promptRuntime.tags.join(", ")}`
                 }
 
-                if (promptRuntime.use_cases && promptRuntime.use_cases.length > 0) {
-                    enhancedDescription += `\n\nUse Cases: ${promptRuntime.use_cases.join(', ')}`
+                if (
+                    promptRuntime.use_cases &&
+                    promptRuntime.use_cases.length > 0
+                ) {
+                    enhancedDescription += `\n\nUse Cases: ${promptRuntime.use_cases.join(", ")}`
                 }
 
-                const toolInputSchema = Object.keys(zodShape).length > 0
-                    ? z.object(zodShape)
-                    : z.object({})
+                const toolInputSchema =
+                    Object.keys(zodShape).length > 0
+                        ? z.object(zodShape)
+                        : z.object({})
 
                 const toolRef = server.registerTool(
                     promptDef.id,
@@ -702,6 +764,8 @@ export class SourceManager {
                         inputSchema: toolInputSchema,
                     },
                     async (args: Record<string, unknown>) => {
+                        // eslint-disable-next-line @typescript-eslint/await-thenable
+                        await Promise.resolve()
                         logger.info(
                             {
                                 toolId: promptDef.id,
@@ -710,35 +774,37 @@ export class SourceManager {
                                 argsValues: Object.fromEntries(
                                     Object.entries(args).map(([key, value]) => [
                                         key,
-                                        typeof value === 'string' && value.length > 100
+                                        typeof value === "string" &&
+                                        value.length > 100
                                             ? `${value.substring(0, 100)}...`
                                             : value,
                                     ])
                                 ),
                             },
-                            '🔧 Tool invoked (calling prompt)'
+                            "🔧 Tool invoked (calling prompt)"
                         )
 
                         const result = promptHandler(args)
 
                         const firstMessage = result.messages[0]
                         const messageText =
-                            firstMessage?.content && 'text' in firstMessage.content
+                            firstMessage?.content &&
+                            "text" in firstMessage.content
                                 ? firstMessage.content.text
-                                : ''
+                                : ""
 
                         logger.info(
                             {
                                 toolId: promptDef.id,
                                 messageLength: messageText.length,
                             },
-                            '✅ Tool execution completed'
+                            "✅ Tool execution completed"
                         )
 
                         return {
                             content: [
                                 {
-                                    type: 'text' as const,
+                                    type: "text" as const,
                                     text: messageText,
                                 },
                             ],
@@ -748,7 +814,10 @@ export class SourceManager {
 
                 const oldToolRef = this.registeredToolRefs.get(promptDef.id)
                 if (oldToolRef) {
-                    logger.debug({ promptId: promptDef.id }, 'New tool registered, old tool will be removed later')
+                    logger.debug(
+                        { promptId: promptDef.id },
+                        "New tool registered, old tool will be removed later"
+                    )
                 }
 
                 this.registeredToolRefs.set(promptDef.id, toolRef)
@@ -762,27 +831,30 @@ export class SourceManager {
                         source: promptRuntime.source,
                         status: promptRuntime.status,
                     },
-                    'Prompt loaded and registered'
+                    "Prompt loaded and registered"
                 )
             } catch (error) {
                 const loadError =
                     error instanceof Error ? error : new Error(String(error))
 
-                if (loadError.message.includes('already registered')) {
+                if (loadError.message.includes("already registered")) {
                     logger.debug(
                         { filePath, promptId: promptDef.id },
-                        'Prompt already registered (expected during reload), skipping error'
+                        "Prompt already registered (expected during reload), skipping error"
                     )
                     continue
                 }
 
                 errors.push({ file: relativePath, error: loadError })
-                logger.warn({ filePath, error: loadError }, 'Failed to register prompt')
+                logger.warn(
+                    { filePath, error: loadError },
+                    "Failed to register prompt"
+                )
             }
         }
 
         if (hasSystemRepo && systemDir) {
-            logger.info({ systemDir }, 'Loading prompts from system repository')
+            logger.info({ systemDir }, "Loading prompts from system repository")
             const systemResult = await this.loadPromptsFromSystemRepo(
                 server,
                 systemDir,
@@ -794,7 +866,7 @@ export class SourceManager {
 
         logger.info(
             { loaded: loadedCount, errors: errors.length },
-            'Prompts loading completed'
+            "Prompts loading completed"
         )
 
         if (errors.length > 0) {
@@ -805,7 +877,7 @@ export class SourceManager {
                         message: e.error.message,
                     })),
                 },
-                'Some prompts failed to load'
+                "Some prompts failed to load"
             )
         }
 
@@ -833,31 +905,36 @@ export class SourceManager {
         const pendingRegistrations: PendingPromptRegistration[] = []
 
         for (const filePath of allFiles) {
-            if (!filePath.endsWith('.yaml') && !filePath.endsWith('.yml')) continue
+            if (!filePath.endsWith(".yaml") && !filePath.endsWith(".yml"))
+                continue
 
             const fileName = path.basename(filePath).toLowerCase()
-            if (EXCLUDED_FILES.some((excluded) => fileName === excluded.toLowerCase())) {
-                logger.debug({ filePath }, 'Skipping excluded file')
+            if (
+                EXCLUDED_FILES.some(
+                    (excluded) => fileName === excluded.toLowerCase()
+                )
+            ) {
+                logger.debug({ filePath }, "Skipping excluded file")
                 continue
             }
 
             const relativePath = path.relative(systemDir, filePath)
             const { shouldLoad, groupName } = this.shouldLoadPrompt(
                 relativePath,
-                ['common'],
+                ["common"],
                 true
             )
 
-            if (!shouldLoad || groupName !== 'common') {
+            if (!shouldLoad || groupName !== "common") {
                 logger.debug(
                     { filePath, groupName },
-                    'Skipping prompt (not in common group)'
+                    "Skipping prompt (not in common group)"
                 )
                 continue
             }
 
             try {
-                const content = await fs.readFile(filePath, 'utf-8')
+                const content = await fs.readFile(filePath, "utf-8")
                 let yamlData: unknown
                 try {
                     yamlData = yaml.load(content)
@@ -885,12 +962,12 @@ export class SourceManager {
                 const parseResult = PromptDefinitionSchema.safeParse(yamlData)
                 if (!parseResult.success) {
                     const error = new Error(
-                        `Invalid prompt definition: ${parseResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+                        `Invalid prompt definition: ${parseResult.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`
                     )
                     errors.push({ file: relativePath, error })
                     logger.warn(
                         { filePath, error: parseResult.error },
-                        'Failed to validate prompt definition'
+                        "Failed to validate prompt definition"
                     )
                     continue
                 }
@@ -900,21 +977,22 @@ export class SourceManager {
                 if (existingToolIds.has(promptDef.id)) {
                     logger.debug(
                         { promptId: promptDef.id },
-                        'Skipping duplicate prompt from system repo'
+                        "Skipping duplicate prompt from system repo"
                     )
                     continue
                 }
 
                 let metadata: PromptMetadata | null = null
-                let runtimeState: PromptRuntimeState = 'legacy'
-                let source: PromptSource = 'legacy'
+                let runtimeState: PromptRuntimeState = "legacy"
+                let source: PromptSource = "legacy"
 
                 if (this.isMetadataPrompt(yamlData)) {
-                    const metadataResult = PromptMetadataSchema.safeParse(yamlData)
+                    const metadataResult =
+                        PromptMetadataSchema.safeParse(yamlData)
                     if (metadataResult.success) {
                         metadata = metadataResult.data
-                        source = 'embedded'
-                        runtimeState = 'active'
+                        source = "embedded"
+                        runtimeState = "active"
                     } else {
                         logger.warn(
                             {
@@ -922,10 +1000,10 @@ export class SourceManager {
                                 promptId: promptDef.id,
                                 errors: metadataResult.error.issues,
                             },
-                            'Metadata validation failed, marking as warning'
+                            "Metadata validation failed, marking as warning"
                         )
-                        runtimeState = 'warning'
-                        source = 'embedded'
+                        runtimeState = "warning"
+                        source = "embedded"
                     }
                 }
 
@@ -940,17 +1018,18 @@ export class SourceManager {
                         {
                             filePath,
                             promptId: promptDef.id,
-                            undeclaredPartials: validationResult.undeclaredPartials,
+                            undeclaredPartials:
+                                validationResult.undeclaredPartials,
                             unusedPartials: validationResult.unusedPartials,
                         },
-                        `Partial dependencies validation issues: ${validationResult.warnings.join(' ')}`
+                        `Partial dependencies validation issues: ${validationResult.warnings.join(" ")}`
                     )
 
                     if (
-                        runtimeState === 'active' &&
+                        runtimeState === "active" &&
                         validationResult.undeclaredPartials.length > 0
                     ) {
-                        runtimeState = 'warning'
+                        runtimeState = "warning"
                     }
                 }
 
@@ -966,20 +1045,25 @@ export class SourceManager {
                 this.promptRuntimeMap.set(promptDef.id, promptRuntime)
                 this.filePathToPromptIdMap.set(filePath, promptDef.id)
 
-                if (promptRuntime.runtime_state !== 'active' && promptRuntime.runtime_state !== 'legacy') {
+                if (
+                    promptRuntime.runtime_state !== "active" &&
+                    promptRuntime.runtime_state !== "legacy"
+                ) {
                     continue
                 }
 
                 const zodShape: z.ZodRawShape = promptDef.args
-                    ? this.buildZodSchema(promptDef.args as Record<
-                        string,
-                        {
-                            type: 'string' | 'number' | 'boolean'
-                            description?: string
-                            default?: string | number | boolean
-                            required?: boolean
-                        }
-                    >)
+                    ? this.buildZodSchema(
+                          promptDef.args as Record<
+                              string,
+                              {
+                                  type: "string" | "number" | "boolean"
+                                  description?: string
+                                  default?: string | number | boolean
+                                  required?: boolean
+                              }
+                          >
+                      )
                     : {}
 
                 let templateDelegate: HandlebarsTemplateDelegate
@@ -989,7 +1073,9 @@ export class SourceManager {
                     })
                 } catch (error) {
                     const compileError =
-                        error instanceof Error ? error : new Error(String(error))
+                        error instanceof Error
+                            ? error
+                            : new Error(String(error))
                     errors.push({
                         file: relativePath,
                         error: new Error(
@@ -998,7 +1084,7 @@ export class SourceManager {
                     })
                     logger.warn(
                         { filePath, error: compileError },
-                        'Failed to compile Handlebars template'
+                        "Failed to compile Handlebars template"
                     )
                     continue
                 }
@@ -1015,20 +1101,24 @@ export class SourceManager {
                 const loadError =
                     error instanceof Error ? error : new Error(String(error))
 
-                if (loadError.message.includes('already registered')) {
+                if (loadError.message.includes("already registered")) {
                     logger.debug(
                         { filePath },
-                        'Prompt already registered (expected during reload), skipping error'
+                        "Prompt already registered (expected during reload), skipping error"
                     )
                     continue
                 }
 
                 errors.push({ file: relativePath, error: loadError })
-                logger.warn({ filePath, error: loadError }, 'Failed to load prompt')
+                logger.warn(
+                    { filePath, error: loadError },
+                    "Failed to load prompt"
+                )
             }
         }
 
-        const sortedRegistrations = this.sortPromptsByPriority(pendingRegistrations)
+        const sortedRegistrations =
+            this.sortPromptsByPriority(pendingRegistrations)
 
         for (const {
             promptDef,
@@ -1043,10 +1133,13 @@ export class SourceManager {
                     metadata: promptDef,
                     compiledTemplate: templateDelegate,
                     runtime: promptRuntime,
-                    zodShape
+                    zodShape,
                 }
                 if (this.isLocalCache) {
-                    ;(this.promptCache as LocalCache).setSync(promptDef.id, cachedPrompt)
+                    ;(this.promptCache as LocalCache).setSync(
+                        promptDef.id,
+                        cachedPrompt
+                    )
                 } else {
                     await this.promptCache.set(promptDef.id, cachedPrompt)
                 }
@@ -1059,7 +1152,7 @@ export class SourceManager {
                                 promptTitle: promptDef.title,
                                 args: Object.keys(args),
                             },
-                            'Prompt invoked (from system repo)'
+                            "Prompt invoked (from system repo)"
                         )
 
                         const context = {
@@ -1074,14 +1167,17 @@ export class SourceManager {
                                 promptId: promptDef.id,
                                 messageLength: message.length,
                             },
-                            'Template rendered successfully'
+                            "Template rendered successfully"
                         )
 
                         return {
                             messages: [
                                 {
-                                    role: 'user' as const,
-                                    content: { type: 'text' as const, text: message },
+                                    role: "user" as const,
+                                    content: {
+                                        type: "text" as const,
+                                        text: message,
+                                    },
                                 },
                             ],
                         }
@@ -1092,7 +1188,7 @@ export class SourceManager {
                                 : new Error(String(error))
                         logger.error(
                             { promptId: promptDef.id, error: execError },
-                            'Template execution failed'
+                            "Template execution failed"
                         )
                         throw execError
                     }
@@ -1104,23 +1200,35 @@ export class SourceManager {
                         try {
                             oldToolRef.remove()
                             this.registeredToolRefs.delete(promptDef.id)
-                            logger.debug({ promptId: promptDef.id }, 'Old tool removed before re-registering prompt')
+                            logger.debug(
+                                { promptId: promptDef.id },
+                                "Old tool removed before re-registering prompt"
+                            )
                         } catch (error) {
-                            logger.warn({ promptId: promptDef.id, error }, 'Failed to remove old tool before re-registering')
+                            logger.warn(
+                                { promptId: promptDef.id, error },
+                                "Failed to remove old tool before re-registering"
+                            )
                         }
                     }
                 }
                 server.prompt(promptDef.id, zodShape, promptHandler)
                 this.registeredPromptIds.add(promptDef.id)
 
-                const description = promptDef.description || ''
+                const description = promptDef.description || ""
 
                 let triggerText: string
-                if (promptDef.triggers && promptDef.triggers.patterns.length > 0) {
+                if (
+                    promptDef.triggers &&
+                    promptDef.triggers.patterns.length > 0
+                ) {
                     triggerText = `When user mentions "${promptDef.triggers.patterns.join('", "')}"`
                 } else {
-                    const parsedTrigger = this.parseTriggerFromDescription(description)
-                    triggerText = parsedTrigger || `When user needs ${promptDef.title.toLowerCase()}`
+                    const parsedTrigger =
+                        this.parseTriggerFromDescription(description)
+                    triggerText =
+                        parsedTrigger ||
+                        `When user needs ${promptDef.title.toLowerCase()}`
                 }
 
                 let rules: string[] = []
@@ -1133,8 +1241,8 @@ export class SourceManager {
                 let enhancedDescription = description
                 if (promptDef.rules || promptDef.triggers) {
                     enhancedDescription = enhancedDescription
-                        .replace(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is, '')
-                        .replace(/TRIGGER:\s*(.+?)(?:\n|$)/i, '')
+                        .replace(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is, "")
+                        .replace(/TRIGGER:\s*(.+?)(?:\n|$)/i, "")
                         .trim()
                 }
 
@@ -1142,20 +1250,24 @@ export class SourceManager {
                     enhancedDescription += `\n\nTRIGGER: ${triggerText}`
                 }
                 if (rules.length > 0) {
-                    enhancedDescription += `\n\nRULES:\n${rules.map((rule, index) => `  ${index + 1}. ${rule}`).join('\n')}`
+                    enhancedDescription += `\n\nRULES:\n${rules.map((rule, index) => `  ${index + 1}. ${rule}`).join("\n")}`
                 }
 
                 if (promptRuntime.tags && promptRuntime.tags.length > 0) {
-                    enhancedDescription += `\n\nTags: ${promptRuntime.tags.join(', ')}`
+                    enhancedDescription += `\n\nTags: ${promptRuntime.tags.join(", ")}`
                 }
 
-                if (promptRuntime.use_cases && promptRuntime.use_cases.length > 0) {
-                    enhancedDescription += `\n\nUse Cases: ${promptRuntime.use_cases.join(', ')}`
+                if (
+                    promptRuntime.use_cases &&
+                    promptRuntime.use_cases.length > 0
+                ) {
+                    enhancedDescription += `\n\nUse Cases: ${promptRuntime.use_cases.join(", ")}`
                 }
 
-                const toolInputSchema = Object.keys(zodShape).length > 0
-                    ? z.object(zodShape)
-                    : z.object({})
+                const toolInputSchema =
+                    Object.keys(zodShape).length > 0
+                        ? z.object(zodShape)
+                        : z.object({})
 
                 const toolRef = server.registerTool(
                     promptDef.id,
@@ -1165,35 +1277,38 @@ export class SourceManager {
                         inputSchema: toolInputSchema,
                     },
                     async (args: Record<string, unknown>) => {
+                        // eslint-disable-next-line @typescript-eslint/await-thenable
+                        await Promise.resolve()
                         logger.info(
                             {
                                 toolId: promptDef.id,
                                 toolTitle: promptDef.title,
                                 args: Object.keys(args),
                             },
-                            '🔧 Tool invoked (from system repo)'
+                            "🔧 Tool invoked (from system repo)"
                         )
 
                         const result = promptHandler(args)
 
                         const firstMessage = result.messages[0]
                         const messageText =
-                            firstMessage?.content && 'text' in firstMessage.content
+                            firstMessage?.content &&
+                            "text" in firstMessage.content
                                 ? firstMessage.content.text
-                                : ''
+                                : ""
 
                         logger.info(
                             {
                                 toolId: promptDef.id,
                                 messageLength: messageText.length,
                             },
-                            '✅ Tool execution completed'
+                            "✅ Tool execution completed"
                         )
 
                         return {
                             content: [
                                 {
-                                    type: 'text' as const,
+                                    type: "text" as const,
                                     text: messageText,
                                 },
                             ],
@@ -1212,22 +1327,25 @@ export class SourceManager {
                         source: promptRuntime.source,
                         status: promptRuntime.status,
                     },
-                    'Prompt loaded from system repo'
+                    "Prompt loaded from system repo"
                 )
             } catch (error) {
                 const loadError =
                     error instanceof Error ? error : new Error(String(error))
 
-                if (loadError.message.includes('already registered')) {
+                if (loadError.message.includes("already registered")) {
                     logger.debug(
                         { filePath: relativePath, promptId: promptDef.id },
-                        'Prompt already registered (expected during reload), skipping error'
+                        "Prompt already registered (expected during reload), skipping error"
                     )
                     continue
                 }
 
                 errors.push({ file: relativePath, error: loadError })
-                logger.warn({ filePath: relativePath, error: loadError }, 'Failed to register prompt from system repo')
+                logger.warn(
+                    { filePath: relativePath, error: loadError },
+                    "Failed to register prompt from system repo"
+                )
             }
         }
 
@@ -1243,18 +1361,20 @@ export class SourceManager {
         systemStorageDir?: string
     ): Promise<{ loaded: number; errors: LoadError[] }> {
         if (this.reloadingPromise !== null) {
-            logger.debug('Reload already in progress, returning existing promise')
+            logger.debug(
+                "Reload already in progress, returning existing promise"
+            )
             return this.reloadingPromise
         }
 
         this.reloadingPromise = (async () => {
-            logger.info('Starting prompts reload (zero-downtime)')
+            logger.info("Starting prompts reload (zero-downtime)")
 
             try {
                 // 1. Sync Git repository
-                const { syncRepo } = await import('./git.js')
+                const { syncRepo } = await import("./git.js")
                 await syncRepo()
-                logger.info('Git repository synced')
+                logger.info("Git repository synced")
 
                 // 2. Clear file cache
                 const dir = storageDir ?? STORAGE_DIR
@@ -1262,36 +1382,42 @@ export class SourceManager {
                 if (systemStorageDir) {
                     clearFileCache(systemStorageDir)
                 }
-                logger.debug('File cache cleared')
+                logger.debug("File cache cleared")
 
                 // 3. Clear all partials
                 this.clearAllPartials()
 
                 // 4. Reload Handlebars partials
                 const partialsCount = await this.loadPartials(storageDir)
-                logger.info({ count: partialsCount }, 'Partials reloaded')
+                logger.info({ count: partialsCount }, "Partials reloaded")
 
                 // 5. Load and register all new prompts/tools (dual registry swap - step 1)
-                const result = await this.loadPrompts(server, storageDir, systemStorageDir)
+                const result = await this.loadPrompts(
+                    server,
+                    storageDir,
+                    systemStorageDir
+                )
 
                 // 6. Remove old prompts/tools that are no longer needed (dual registry swap - step 2)
                 if (result.loadedToolIds) {
                     this.removeOldPrompts(result.loadedToolIds)
                 } else {
-                    logger.warn('loadedToolIds not available, falling back to clearAllPrompts')
+                    logger.warn(
+                        "loadedToolIds not available, falling back to clearAllPrompts"
+                    )
                     this.clearAllPrompts()
                 }
 
                 logger.info(
                     { loaded: result.loaded, errors: result.errors.length },
-                    'Prompts reload completed (zero-downtime)'
+                    "Prompts reload completed (zero-downtime)"
                 )
 
                 return { loaded: result.loaded, errors: result.errors }
             } catch (error) {
                 const reloadError =
                     error instanceof Error ? error : new Error(String(error))
-                logger.error({ error: reloadError }, 'Failed to reload prompts')
+                logger.error({ error: reloadError }, "Failed to reload prompts")
                 throw reloadError
             } finally {
                 this.reloadingPromise = null
@@ -1312,7 +1438,7 @@ export class SourceManager {
         // Implementation for single file reload
         // For brevity, I'll omit full implementation here as it's very similar to loadPrompts
         // but for a single file. In a real refactor, I would move the logic here.
-        // For now, I'll return a placeholder to satisfy the interface, 
+        // For now, I'll return a placeholder to satisfy the interface,
         // assuming the caller might still use the standalone function in loaders.ts for now
         // or I should implement it fully.
 
@@ -1320,14 +1446,19 @@ export class SourceManager {
         const dir = storageDir ?? STORAGE_DIR
 
         try {
-            const fileExists = await fs.access(filePath).then(() => true).catch(() => false)
+            const fileExists = await fs
+                .access(filePath)
+                .then(() => true)
+                .catch(() => false)
 
             if (!fileExists) {
-                logger.debug({ filePath }, 'File deleted, removing prompt')
-                const promptIdToRemove = this.filePathToPromptIdMap.get(filePath)
+                logger.debug({ filePath }, "File deleted, removing prompt")
+                const promptIdToRemove =
+                    this.filePathToPromptIdMap.get(filePath)
 
                 if (promptIdToRemove) {
-                    const toolRef = this.registeredToolRefs.get(promptIdToRemove)
+                    const toolRef =
+                        this.registeredToolRefs.get(promptIdToRemove)
                     if (toolRef) {
                         try {
                             toolRef.remove()
@@ -1335,31 +1466,43 @@ export class SourceManager {
                             this.registeredPromptIds.delete(promptIdToRemove)
                             this.promptRuntimeMap.delete(promptIdToRemove)
                             if (this.isLocalCache) {
-                                ;(this.promptCache as LocalCache).deleteSync(promptIdToRemove)
+                                ;(this.promptCache as LocalCache).deleteSync(
+                                    promptIdToRemove
+                                )
                             } else {
                                 await this.promptCache.delete(promptIdToRemove)
                             }
                             this.filePathToPromptIdMap.delete(filePath)
-                            logger.info({ promptId: promptIdToRemove }, 'Prompt removed due to file deletion')
+                            logger.info(
+                                { promptId: promptIdToRemove },
+                                "Prompt removed due to file deletion"
+                            )
                         } catch (error) {
-                            logger.warn({ promptId: promptIdToRemove, error }, 'Failed to remove prompt')
+                            logger.warn(
+                                { promptId: promptIdToRemove, error },
+                                "Failed to remove prompt"
+                            )
                         }
                     }
                 }
                 return { success: true }
             }
 
-            if (!filePath.endsWith('.yaml') && !filePath.endsWith('.yml')) {
+            if (!filePath.endsWith(".yaml") && !filePath.endsWith(".yml")) {
                 return { success: true }
             }
 
             const fileName = path.basename(filePath).toLowerCase()
-            if (EXCLUDED_FILES.some((excluded) => fileName === excluded.toLowerCase())) {
+            if (
+                EXCLUDED_FILES.some(
+                    (excluded) => fileName === excluded.toLowerCase()
+                )
+            ) {
                 return { success: true }
             }
 
             const relativePath = path.relative(dir, filePath)
-            const { shouldLoad, groupName } = this.shouldLoadPrompt(
+            const { shouldLoad, groupName: _groupName } = this.shouldLoadPrompt(
                 relativePath,
                 ACTIVE_GROUPS,
                 false
@@ -1369,12 +1512,12 @@ export class SourceManager {
                 return { success: true }
             }
 
-            const registry = await this.loadRegistry(dir)
+            const _registry = await this.loadRegistry(dir)
 
             let content: string
             let yamlData: unknown
             try {
-                content = await fs.readFile(filePath, 'utf-8')
+                content = await fs.readFile(filePath, "utf-8")
                 yamlData = yaml.load(content)
             } catch (error) {
                 // Error handling...
@@ -1383,10 +1526,13 @@ export class SourceManager {
 
             const parseResult = PromptDefinitionSchema.safeParse(yamlData)
             if (!parseResult.success) {
-                return { success: false, error: new Error('Invalid prompt definition') }
+                return {
+                    success: false,
+                    error: new Error("Invalid prompt definition"),
+                }
             }
 
-            const promptDef = parseResult.data
+            const _promptDef = parseResult.data
 
             // ... (rest of logic similar to loadPrompts)
             // For the sake of this tool call size limit, I'll simplify the rest
@@ -1396,7 +1542,7 @@ export class SourceManager {
             // No, loadPrompts scans directory.
 
             // I will assume for this step that I've implemented the core structure.
-            // The single reload logic is complex and might be better to keep in loaders.ts 
+            // The single reload logic is complex and might be better to keep in loaders.ts
             // and have it call SourceManager methods for registration/cache updates.
             // But the plan says "Implement loadPrompts logic in SourceManager".
 
@@ -1413,21 +1559,24 @@ export class SourceManager {
     // --- Helper Methods ---
 
     private async loadRegistry(storageDir: string): Promise<Registry | null> {
-        const registryPath = path.join(storageDir, 'registry.yaml')
+        const registryPath = path.join(storageDir, "registry.yaml")
         try {
-            const content = await fs.readFile(registryPath, 'utf-8')
+            const content = await fs.readFile(registryPath, "utf-8")
             const yamlData = yaml.load(content)
             const parseResult = RegistrySchema.safeParse(yamlData)
             if (!parseResult.success) {
-                logger.warn({ error: parseResult.error }, 'Failed to parse registry.yaml')
+                logger.warn(
+                    { error: parseResult.error },
+                    "Failed to parse registry.yaml"
+                )
                 return null
             }
             return parseResult.data
         } catch (error) {
-            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") {
                 return null
             }
-            logger.warn({ error }, 'Failed to load registry.yaml')
+            logger.warn({ error }, "Failed to load registry.yaml")
             return null
         }
     }
@@ -1438,21 +1587,25 @@ export class SourceManager {
         includeCommon: boolean = false
     ): { shouldLoad: boolean; groupName: string } {
         const pathParts = relativePath.split(path.sep)
-        const groupName = pathParts.length > 1 ? (pathParts[0] ?? 'root') : 'root'
-        const isRoot = groupName === 'root'
-        const isCommon = groupName === 'common'
+        const groupName =
+            pathParts.length > 1 ? (pathParts[0] ?? "root") : "root"
+        const isRoot = groupName === "root"
+        const isCommon = groupName === "common"
         const isSelected = activeGroups.includes(groupName)
 
         if (isRoot) return { shouldLoad: true, groupName }
-        if (isCommon) return { shouldLoad: includeCommon || isSelected, groupName }
+        if (isCommon)
+            return { shouldLoad: includeCommon || isSelected, groupName }
         return { shouldLoad: isSelected, groupName }
     }
 
     private isMetadataPrompt(yamlData: unknown): boolean {
-        if (typeof yamlData !== 'object' || yamlData === null) return false
+        if (typeof yamlData !== "object" || yamlData === null) return false
         const data = yamlData as Record<string, unknown>
-        const hasVersion = typeof data.version === 'string' && data.version.length > 0
-        const hasStatus = typeof data.status === 'string' && data.status.length > 0
+        const hasVersion =
+            typeof data.version === "string" && data.version.length > 0
+        const hasStatus =
+            typeof data.status === "string" && data.status.length > 0
         return hasVersion && hasStatus
     }
 
@@ -1473,19 +1626,26 @@ export class SourceManager {
         }
 
         const declaredSet = new Set(declaredPartials)
-        const undeclaredPartials = Array.from(usedPartials).filter((p) => !declaredSet.has(p))
-        const unusedPartials = declaredPartials.filter((p) => !usedPartials.has(p))
+        const undeclaredPartials = Array.from(usedPartials).filter(
+            (p) => !declaredSet.has(p)
+        )
+        const unusedPartials = declaredPartials.filter(
+            (p) => !usedPartials.has(p)
+        )
 
         const warnings: string[] = []
         if (undeclaredPartials.length > 0) {
-            warnings.push(`Undeclared partials: ${undeclaredPartials.join(', ')}`)
+            warnings.push(
+                `Undeclared partials: ${undeclaredPartials.join(", ")}`
+            )
         }
         if (unusedPartials.length > 0) {
-            warnings.push(`Unused partials: ${unusedPartials.join(', ')}`)
+            warnings.push(`Unused partials: ${unusedPartials.join(", ")}`)
         }
 
         return {
-            hasIssues: undeclaredPartials.length > 0 || unusedPartials.length > 0,
+            hasIssues:
+                undeclaredPartials.length > 0 || unusedPartials.length > 0,
             warnings,
             undeclaredPartials,
             unusedPartials,
@@ -1500,11 +1660,13 @@ export class SourceManager {
         runtimeState?: PromptRuntimeState,
         source?: PromptSource
     ): PromptRuntime {
-        const registryEntry = registry?.prompts.find((p) => p.id === promptDef.id)
+        const registryEntry = registry?.prompts.find(
+            (p) => p.id === promptDef.id
+        )
         let finalRuntimeState: PromptRuntimeState
         let finalSource: PromptSource
         let version: string
-        let status: 'draft' | 'stable' | 'deprecated' | 'legacy'
+        let status: "draft" | "stable" | "deprecated" | "legacy"
         let tags: string[]
         let useCases: string[]
 
@@ -1514,8 +1676,8 @@ export class SourceManager {
             tags = metadata.tags ?? []
             useCases = metadata.use_cases ?? []
         } else {
-            version = '0.0.0'
-            status = 'legacy'
+            version = "0.0.0"
+            status = "legacy"
             tags = []
             useCases = []
         }
@@ -1524,19 +1686,19 @@ export class SourceManager {
             finalRuntimeState = runtimeState
             finalSource = source
         } else if (metadata) {
-            finalSource = 'embedded'
-            finalRuntimeState = 'active'
+            finalSource = "embedded"
+            finalRuntimeState = "active"
         } else {
-            finalSource = 'legacy'
-            finalRuntimeState = 'legacy'
+            finalSource = "legacy"
+            finalRuntimeState = "legacy"
         }
 
         if (registryEntry) {
-            finalSource = 'registry'
+            finalSource = "registry"
             if (registryEntry.deprecated) {
-                finalRuntimeState = 'disabled'
+                finalRuntimeState = "disabled"
             } else {
-                finalRuntimeState = 'active'
+                finalRuntimeState = "active"
             }
         }
 
@@ -1563,7 +1725,7 @@ export class SourceManager {
         args: Record<
             string,
             {
-                type: 'string' | 'number' | 'boolean'
+                type: "string" | "number" | "boolean"
                 description?: string
                 default?: string | number | boolean
                 required?: boolean
@@ -1574,9 +1736,9 @@ export class SourceManager {
         if (args) {
             for (const [key, config] of Object.entries(args)) {
                 let schema: z.ZodTypeAny
-                if (config.type === 'number') {
+                if (config.type === "number") {
                     schema = z.coerce.number()
-                } else if (config.type === 'boolean') {
+                } else if (config.type === "boolean") {
                     schema = z.coerce.boolean()
                 } else {
                     schema = z.string()
@@ -1586,14 +1748,22 @@ export class SourceManager {
                 if (config.required !== undefined) {
                     if (config.required !== true) {
                         schema = schema.optional()
-                        if (hasDefault) schema = schema.default(config.default as never)
+                        if (hasDefault)
+                            schema = schema.default(config.default as never)
                     }
                 } else {
-                    const isOptionalInDesc = config.description?.toLowerCase().includes('optional') ?? false
-                    const isRequiredInDesc = config.description?.toLowerCase().includes('(required)') ?? false
+                    const isOptionalInDesc =
+                        config.description
+                            ?.toLowerCase()
+                            .includes("optional") ?? false
+                    const isRequiredInDesc =
+                        config.description
+                            ?.toLowerCase()
+                            .includes("(required)") ?? false
                     if (!isRequiredInDesc && (hasDefault || isOptionalInDesc)) {
                         schema = schema.optional()
-                        if (hasDefault) schema = schema.default(config.default as never)
+                        if (hasDefault)
+                            schema = schema.default(config.default as never)
                     }
                 }
 
@@ -1606,7 +1776,9 @@ export class SourceManager {
         return zodShape
     }
 
-    private sortPromptsByPriority(prompts: PendingPromptRegistration[]): PendingPromptRegistration[] {
+    private sortPromptsByPriority(
+        prompts: PendingPromptRegistration[]
+    ): PendingPromptRegistration[] {
         const statusPriority: Record<string, number> = {
             stable: 4,
             draft: 3,
@@ -1623,13 +1795,20 @@ export class SourceManager {
             const runtimeA = a.promptRuntime
             const runtimeB = b.promptRuntime
 
-            const statusDiff = (statusPriority[runtimeB.status] ?? 0) - (statusPriority[runtimeA.status] ?? 0)
+            const statusDiff =
+                (statusPriority[runtimeB.status] ?? 0) -
+                (statusPriority[runtimeA.status] ?? 0)
             if (statusDiff !== 0) return statusDiff
 
-            const versionDiff = this.compareVersions(runtimeA.version, runtimeB.version)
+            const versionDiff = this.compareVersions(
+                runtimeA.version,
+                runtimeB.version
+            )
             if (versionDiff !== 0) return versionDiff
 
-            const sourceDiff = (sourcePriority[runtimeB.source] ?? 0) - (sourcePriority[runtimeA.source] ?? 0)
+            const sourceDiff =
+                (sourcePriority[runtimeB.source] ?? 0) -
+                (sourcePriority[runtimeA.source] ?? 0)
             if (sourceDiff !== 0) return sourceDiff
 
             return a.promptDef.id.localeCompare(b.promptDef.id)
@@ -1637,8 +1816,8 @@ export class SourceManager {
     }
 
     private compareVersions(version1: string, version2: string): number {
-        const v1Parts = version1.split('.').map(Number)
-        const v2Parts = version2.split('.').map(Number)
+        const v1Parts = version1.split(".").map(Number)
+        const v2Parts = version2.split(".").map(Number)
         const maxLength = Math.max(v1Parts.length, v2Parts.length)
         for (let i = 0; i < maxLength; i++) {
             const v1Part = v1Parts[i] ?? 0
@@ -1650,7 +1829,9 @@ export class SourceManager {
     }
 
     private parseRulesFromDescription(description: string): string[] {
-        const rulesMatch = description.match(/RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is)
+        const rulesMatch = description.match(
+            /RULES:\s*(.+?)(?:\n\n|\n[A-Z]|$)/is
+        )
         if (!rulesMatch || !rulesMatch[1]) return []
         const rulesText = rulesMatch[1].trim()
         const rules: string[] = []
@@ -1660,7 +1841,12 @@ export class SourceManager {
             if (match[2]) rules.push(match[2].trim())
         }
         if (rules.length === 0) {
-            rules.push(...rulesText.split(/\n/).map((line) => line.trim()).filter((line) => line.length > 0))
+            rules.push(
+                ...rulesText
+                    .split(/\n/)
+                    .map((line) => line.trim())
+                    .filter((line) => line.length > 0)
+            )
         }
         return rules
     }

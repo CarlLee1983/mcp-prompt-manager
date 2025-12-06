@@ -9,8 +9,8 @@ import {
     LANG_SETTING,
     getRepoConfigs,
     getSystemRepoConfig,
-} from './config/env.js'
-import { logger } from './utils/logger.js'
+} from "./config/env.js"
+import { logger } from "./utils/logger.js"
 import {
     loadPartials,
     loadPrompts,
@@ -19,22 +19,22 @@ import {
     getPromptStats,
     getPromptRuntime,
     getPrompt,
-} from './services/loaders.js'
-import { startCacheCleanup, stopCacheCleanup } from './utils/fileSystem.js'
-import { getHealthStatus } from './services/health.js'
+} from "./services/loaders.js"
+import { startCacheCleanup, stopCacheCleanup } from "./utils/fileSystem.js"
+import { getHealthStatus } from "./services/health.js"
 import {
     handleReload,
     handlePromptStats,
     handlePromptList,
     handleRepoSwitch,
-} from './services/control.js'
-import { TransportFactory } from './transports/factory.js'
-import type { TransportAdapter } from './transports/adapter.js'
-import { RepoManager } from './repositories/repoManager.js'
-import { z } from 'zod'
-import { readFileSync } from 'fs'
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+} from "./services/control.js"
+import { TransportFactory } from "./transports/factory.js"
+import type { TransportAdapter } from "./transports/adapter.js"
+import { RepoManager } from "./repositories/repoManager.js"
+import { z } from "zod"
+import { readFileSync } from "fs"
+import { fileURLToPath } from "url"
+import { dirname, join } from "path"
 
 /**
  * Get package version from package.json
@@ -44,17 +44,17 @@ function getPackageVersion(): string {
     try {
         const __filename = fileURLToPath(import.meta.url)
         const __dirname = dirname(__filename)
-        const packageJsonPath = join(__dirname, '..', 'package.json')
+        const packageJsonPath = join(__dirname, "..", "package.json")
         const packageJson = JSON.parse(
-            readFileSync(packageJsonPath, 'utf-8')
+            readFileSync(packageJsonPath, "utf-8")
         ) as { version: string }
         return packageJson.version
     } catch (error) {
         logger.warn(
             { error },
-            'Failed to read version from package.json, using default'
+            "Failed to read version from package.json, using default"
         )
-        return '1.0.0'
+        return "1.0.0"
     }
 }
 
@@ -67,15 +67,15 @@ async function main() {
     const startTime = Date.now()
 
     try {
-        logger.info('Starting MCP Prompt Manager')
+        logger.info("Starting MCP Prompt Manager")
 
         // 1. Create Transport Adapter
         const packageVersion = getPackageVersion()
         const transport = TransportFactory.createAdapter(TRANSPORT_TYPE, {
-            serverName: 'mcp-prompt-manager',
+            serverName: "mcp-prompt-manager",
             version: packageVersion,
         })
-        logger.info({ type: transport.getType() }, 'Transport adapter created')
+        logger.info({ type: transport.getType() }, "Transport adapter created")
 
         // 2. Get MCP Server instance EARLY (before connecting)
         const server = transport.getServer()
@@ -97,24 +97,24 @@ async function main() {
                 repoCount: repoConfigs.length,
                 hasSystemRepo: systemRepoConfig !== null,
             },
-            'Repo manager created'
+            "Repo manager created"
         )
 
         // 4. Load Repository (optimized for local paths - skips copy if source == target)
         await repoManager.loadRepository(STORAGE_DIR)
-        logger.info('Main repository loaded')
+        logger.info("Main repository loaded")
 
         // 5. Load System Repository (if available) - can be parallelized in future
         let systemStorageDir: string | undefined
         if (systemRepoConfig) {
             await repoManager.loadSystemRepository(STORAGE_DIR)
             systemStorageDir = repoManager.getSystemStorageDir(STORAGE_DIR)
-            logger.info('System repository loaded')
+            logger.info("System repository loaded")
         }
 
         // 6. Load Handlebars Partials
         const partialsCount = await loadPartials(STORAGE_DIR)
-        logger.info({ count: partialsCount }, 'Partials loaded')
+        logger.info({ count: partialsCount }, "Partials loaded")
 
         // 7. Load and register Prompts (this will register tools from prompts)
         // Notify user before loading (if using default values)
@@ -122,9 +122,9 @@ async function main() {
             logger.info(
                 {
                     activeGroups: ACTIVE_GROUPS,
-                    hint: 'Set MCP_GROUPS environment variable to load additional groups',
+                    hint: "Set MCP_GROUPS environment variable to load additional groups",
                 },
-                'No groups specified (common is now optional, use SYSTEM_REPO_URL to provide common group)'
+                "No groups specified (common is now optional, use SYSTEM_REPO_URL to provide common group)"
             )
         }
 
@@ -144,26 +144,26 @@ async function main() {
                         message: e.error.message,
                     })),
                 },
-                'Some prompts failed to load'
+                "Some prompts failed to load"
             )
         } else {
-            logger.info({ loaded }, 'All prompts loaded successfully')
+            logger.info({ loaded }, "All prompts loaded successfully")
         }
 
         if (loaded === 0) {
             logger.warn(
-                'No prompts were loaded. Check your configuration and repository.'
+                "No prompts were loaded. Check your configuration and repository."
             )
         }
 
         // 8. Register basic tools AFTER prompts (so all tools are registered together)
         // This ensures all tools (basic + prompts) are available when client connects
         await registerTools(transport, server, startTime)
-        logger.info('Basic tools registered')
+        logger.info("Basic tools registered")
 
         // 9. Register basic resources
         await registerResources(transport, server, startTime)
-        logger.info('Basic resources registered')
+        logger.info("Basic resources registered")
 
         // 10. Log total tool count before connecting
         // This helps diagnose tool registration issues across different clients
@@ -179,7 +179,7 @@ async function main() {
                 loadedPrompts: loaded, // Total prompts loaded (including non-active ones)
                 totalTools: totalToolsCount,
             },
-            'All tools registered - ready to connect'
+            "All tools registered - ready to connect"
         )
 
         // 11. Connect transport AFTER all tools are registered
@@ -192,53 +192,55 @@ async function main() {
                 promptTools: promptToolsCount,
                 totalTools: totalToolsCount,
             },
-            'Transport connected - all tools available'
+            "Transport connected - all tools available"
         )
 
         // 11. Initialize cache cleanup mechanism
         const cleanupInterval = CACHE_CLEANUP_INTERVAL ?? 10000
         startCacheCleanup(cleanupInterval, (cleaned) => {
             if (cleaned > 0) {
-                logger.debug({ cleaned }, 'Cache cleanup completed')
+                logger.debug({ cleaned }, "Cache cleanup completed")
             }
         })
         logger.debug(
             { interval: cleanupInterval },
-            'Cache cleanup mechanism started'
+            "Cache cleanup mechanism started"
         )
 
         // 12. Start watch mode if enabled
         if (WATCH_MODE) {
-            logger.info('Watch mode enabled, starting file watchers and Git polling')
+            logger.info(
+                "Watch mode enabled, starting file watchers and Git polling"
+            )
             repoManager.startWatchMode(server, STORAGE_DIR, systemStorageDir)
-            logger.info('Watch mode started successfully')
+            logger.info("Watch mode started successfully")
         } else {
-            logger.debug('Watch mode disabled (set WATCH_MODE=true to enable)')
+            logger.debug("Watch mode disabled (set WATCH_MODE=true to enable)")
         }
 
         // 13. Register graceful shutdown handlers
         const shutdown = () => {
-            logger.info('Shutting down gracefully...')
-            
+            logger.info("Shutting down gracefully...")
+
             // Stop watch mode
             if (WATCH_MODE) {
                 repoManager.stopWatchMode()
             }
-            
+
             stopCacheCleanup()
             transport.disconnect().catch((error) => {
-                logger.error({ error }, 'Error disconnecting transport')
+                logger.error({ error }, "Error disconnecting transport")
             })
-            logger.debug('Cache cleanup stopped')
+            logger.debug("Cache cleanup stopped")
             process.exit(0)
         }
 
-        process.on('SIGINT', shutdown)
-        process.on('SIGTERM', shutdown)
+        process.on("SIGINT", shutdown)
+        process.on("SIGTERM", shutdown)
     } catch (error) {
         const fatalError =
             error instanceof Error ? error : new Error(String(error))
-        logger.fatal({ error: fatalError }, 'Fatal error occurred')
+        logger.fatal({ error: fatalError }, "Fatal error occurred")
         stopCacheCleanup()
         process.exit(1)
     }
@@ -273,12 +275,12 @@ function highlightVariables(
 
     // Get all variable values from context (excluding system variables)
     const variableEntries = Object.entries(context)
-        .filter(([key]) => key !== 'output_lang_rule' && key !== 'sys_lang')
+        .filter(([key]) => key !== "output_lang_rule" && key !== "sys_lang")
         .map(([key, value]) => {
             if (value === null || value === undefined) {
-                return [key, '']
+                return [key, ""]
             }
-            if (typeof value === 'object') {
+            if (typeof value === "object") {
                 return [key, JSON.stringify(value)]
             }
             // Ensure value is a primitive before stringifying
@@ -297,23 +299,23 @@ function highlightVariables(
         if (value.length < 2) continue
 
         // Escape special regex characters
-        const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        
+        const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
         // Try to match the value, but be careful with word boundaries
         // For values with spaces or special chars, use a more flexible approach
         let regex: RegExp
         if (/^[a-zA-Z0-9_]+$/.test(value)) {
             // Simple alphanumeric value - use word boundaries
-            regex = new RegExp(`\\b${escapedValue}\\b`, 'g')
+            regex = new RegExp(`\\b${escapedValue}\\b`, "g")
         } else {
             // Complex value - match as-is (but escape special chars)
-            regex = new RegExp(escapedValue.replace(/\s+/g, '\\s+'), 'g')
+            regex = new RegExp(escapedValue.replace(/\s+/g, "\\s+"), "g")
         }
 
         // Only replace if not already highlighted
         highlightedText = highlightedText.replace(regex, (match) => {
             // Skip if already wrapped in markdown bold
-            if (match.startsWith('**') && match.endsWith('**')) {
+            if (match.startsWith("**") && match.endsWith("**")) {
                 return match
             }
             return `**${value}**`
@@ -339,23 +341,27 @@ function checkSchemaWarnings(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             const schemaDef = (schema as any)._def
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            const isOptional = schemaDef?.typeName === 'ZodOptional' || 
-                              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-                              schemaDef?.typeName === 'ZodDefault' ||
-                              schema instanceof z.ZodOptional ||
-                              schema instanceof z.ZodDefault
+            const isOptional =
+                schemaDef?.typeName === "ZodOptional" ||
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                schemaDef?.typeName === "ZodDefault" ||
+                schema instanceof z.ZodOptional ||
+                schema instanceof z.ZodDefault
 
             if (isOptional) {
                 // Optional field - check description for hints about importance
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-                const description = schemaDef?.description || 
-                                   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-                                   (schema as any).description || 
-                                   ''
+                const description =
+                    schemaDef?.description ||
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                    (schema as any).description ||
+                    ""
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-                if (description.toLowerCase().includes('recommended') || 
+                if (
+                    description.toLowerCase().includes("recommended") ||
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-                    description.toLowerCase().includes('suggested')) {
+                    description.toLowerCase().includes("suggested")
+                ) {
                     warnings.push(`Missing recommended field: '${key}'`)
                 }
             } else {
@@ -380,15 +386,15 @@ async function registerTools(
 ): Promise<void> {
     // Register mcp_reload() tool
     transport.registerTool({
-        name: 'mcp_reload',
-        title: 'Reload Prompts',
+        name: "mcp_reload",
+        title: "Reload Prompts",
         description:
-            'Reload all prompts from Git repository without restarting the server. This will: 1) Pull latest changes from Git, 2) Clear cache, 3) Reload all Handlebars partials, 4) Reload all prompts and tools (zero-downtime).',
+            "Reload all prompts from Git repository without restarting the server. This will: 1) Pull latest changes from Git, 2) Clear cache, 3) Reload all Handlebars partials, 4) Reload all prompts and tools (zero-downtime).",
         inputSchema: z.object({}),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async () => {
             try {
-                logger.info('mcp_reload tool invoked')
+                logger.info("mcp_reload tool invoked")
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
                 const result = await reloadPrompts(server, STORAGE_DIR)
 
@@ -397,7 +403,7 @@ async function registerTools(
                 return {
                     content: [
                         {
-                            type: 'text' as const,
+                            type: "text" as const,
                             text: JSON.stringify({
                                 success: true,
                                 loaded: result.loaded,
@@ -422,15 +428,13 @@ async function registerTools(
                 }
             } catch (error) {
                 const reloadError =
-                    error instanceof Error
-                        ? error
-                        : new Error(String(error))
-                logger.error({ error: reloadError }, 'Reload prompts failed')
+                    error instanceof Error ? error : new Error(String(error))
+                logger.error({ error: reloadError }, "Reload prompts failed")
 
                 return {
                     content: [
                         {
-                            type: 'text' as const,
+                            type: "text" as const,
                             text: JSON.stringify({
                                 success: false,
                                 error: reloadError.message,
@@ -446,25 +450,25 @@ async function registerTools(
             }
         },
     })
-    logger.info('mcp_reload tool registered')
+    logger.info("mcp_reload tool registered")
 
     // Register mcp_stats() tool
     transport.registerTool({
-        name: 'mcp_stats',
-        title: 'Get Prompt Statistics',
+        name: "mcp_stats",
+        title: "Get Prompt Statistics",
         description:
-            'Get statistics about all prompts including counts by runtime state (active, legacy, invalid, disabled, warning) and tool counts (basic tools, prompt tools, total tools).',
+            "Get statistics about all prompts including counts by runtime state (active, legacy, invalid, disabled, warning) and tool counts (basic tools, prompt tools, total tools).",
         inputSchema: z.object({}),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async () => {
             try {
-                logger.info('mcp_stats tool invoked')
+                logger.info("mcp_stats tool invoked")
                 const stats = getPromptStats()
 
                 return {
                     content: [
                         {
-                            type: 'text' as const,
+                            type: "text" as const,
                             text: JSON.stringify(stats, null, 2),
                         },
                     ],
@@ -472,15 +476,13 @@ async function registerTools(
                 }
             } catch (error) {
                 const statsError =
-                    error instanceof Error
-                        ? error
-                        : new Error(String(error))
-                logger.error({ error: statsError }, 'Failed to get stats')
+                    error instanceof Error ? error : new Error(String(error))
+                logger.error({ error: statsError }, "Failed to get stats")
 
                 return {
                     content: [
                         {
-                            type: 'text' as const,
+                            type: "text" as const,
                             text: JSON.stringify({
                                 success: false,
                                 error: statsError.message,
@@ -496,68 +498,61 @@ async function registerTools(
             }
         },
     })
-    logger.info('mcp_stats tool registered')
+    logger.info("mcp_stats tool registered")
 
     // Register mcp_list() tool
     transport.registerTool({
-        name: 'mcp_list',
-        title: 'List Prompts',
+        name: "mcp_list",
+        title: "List Prompts",
         description:
-            'List all prompts with optional filtering by status, group, or tag. Returns prompt metadata including runtime state, version, tags, and use cases.',
+            "List all prompts with optional filtering by status, group, or tag. Returns prompt metadata including runtime state, version, tags, and use cases.",
         inputSchema: z.object({
             status: z
-                .enum(['draft', 'stable', 'deprecated', 'legacy'])
+                .enum(["draft", "stable", "deprecated", "legacy"])
                 .optional()
-                .describe('Filter by prompt status'),
-            group: z
-                .string()
-                .optional()
-                .describe('Filter by group name'),
+                .describe("Filter by prompt status"),
+            group: z.string().optional().describe("Filter by group name"),
             tag: z
                 .string()
                 .optional()
-                .describe('Filter by tag (prompts must have this tag)'),
+                .describe("Filter by tag (prompts must have this tag)"),
             runtime_state: z
-                .enum(['active', 'legacy', 'invalid', 'disabled', 'warning'])
+                .enum(["active", "legacy", "invalid", "disabled", "warning"])
                 .optional()
-                .describe('Filter by runtime state'),
+                .describe("Filter by runtime state"),
         }),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (args: Record<string, unknown>) => {
             try {
-                    logger.info({ args }, 'mcp_list tool invoked')
-                    let runtimes = getAllPromptRuntimes()
+                logger.info({ args }, "mcp_list tool invoked")
+                let runtimes = getAllPromptRuntimes()
 
-                    // Filter by status
-                    if (args.status) {
-                        runtimes = runtimes.filter(
-                            (r) => r.status === args.status
-                        )
-                    }
+                // Filter by status
+                if (args.status) {
+                    runtimes = runtimes.filter((r) => r.status === args.status)
+                }
 
-                    // Filter by group
-                    if (args.group) {
-                        runtimes = runtimes.filter(
-                            (r) => r.group === args.group
-                        )
-                    }
+                // Filter by group
+                if (args.group) {
+                    runtimes = runtimes.filter((r) => r.group === args.group)
+                }
 
-                    // Filter by tag
-                    if (args.tag) {
-                        runtimes = runtimes.filter((r) =>
-                            r.tags.includes(args.tag as string)
-                        )
-                    }
+                // Filter by tag
+                if (args.tag) {
+                    runtimes = runtimes.filter((r) =>
+                        r.tags.includes(args.tag as string)
+                    )
+                }
 
-                    // Filter by runtime_state
-                    if (args.runtime_state) {
-                        runtimes = runtimes.filter(
-                            (r) => r.runtime_state === args.runtime_state
-                        )
-                    }
+                // Filter by runtime_state
+                if (args.runtime_state) {
+                    runtimes = runtimes.filter(
+                        (r) => r.runtime_state === args.runtime_state
+                    )
+                }
 
-                    // Convert to output format
-                    const prompts = runtimes.map((runtime) => ({
+                // Convert to output format
+                const prompts = runtimes.map((runtime) => ({
                     id: runtime.id,
                     title: runtime.title,
                     version: runtime.version,
@@ -573,7 +568,7 @@ async function registerTools(
                 return {
                     content: [
                         {
-                            type: 'text' as const,
+                            type: "text" as const,
                             text: JSON.stringify(
                                 {
                                     total: prompts.length,
@@ -591,15 +586,13 @@ async function registerTools(
                 }
             } catch (error) {
                 const listError =
-                    error instanceof Error
-                        ? error
-                        : new Error(String(error))
-                logger.error({ error: listError }, 'Failed to list prompts')
+                    error instanceof Error ? error : new Error(String(error))
+                logger.error({ error: listError }, "Failed to list prompts")
 
                 return {
                     content: [
                         {
-                            type: 'text' as const,
+                            type: "text" as const,
                             text: JSON.stringify({
                                 success: false,
                                 error: listError.message,
@@ -615,29 +608,29 @@ async function registerTools(
             }
         },
     })
-    logger.info('mcp_list tool registered')
+    logger.info("mcp_list tool registered")
 
     // Register mcp_inspect() tool
     transport.registerTool({
-        name: 'mcp_inspect',
-        title: 'Inspect Prompt',
+        name: "mcp_inspect",
+        title: "Inspect Prompt",
         description:
-            'Get detailed runtime information for a specific prompt by ID. Returns complete runtime metadata including state, source, version, status, tags, and use cases.',
+            "Get detailed runtime information for a specific prompt by ID. Returns complete runtime metadata including state, source, version, status, tags, and use cases.",
         inputSchema: z.object({
-            id: z.string().describe('Prompt ID to inspect'),
+            id: z.string().describe("Prompt ID to inspect"),
         }),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (args: Record<string, unknown>) => {
             try {
                 const id = args.id as string
-                logger.info({ id }, 'mcp_inspect tool invoked')
+                logger.info({ id }, "mcp_inspect tool invoked")
                 const runtime = getPromptRuntime(id)
 
                 if (!runtime) {
                     return {
                         content: [
                             {
-                                type: 'text' as const,
+                                type: "text" as const,
                                 text: JSON.stringify({
                                     success: false,
                                     error: `Prompt with ID "${id}" not found`,
@@ -655,7 +648,7 @@ async function registerTools(
                 return {
                     content: [
                         {
-                            type: 'text' as const,
+                            type: "text" as const,
                             text: JSON.stringify(runtime, null, 2),
                         },
                     ],
@@ -666,15 +659,16 @@ async function registerTools(
                 }
             } catch (error) {
                 const inspectError =
-                    error instanceof Error
-                        ? error
-                        : new Error(String(error))
-                logger.error({ error: inspectError }, 'Failed to inspect prompt')
+                    error instanceof Error ? error : new Error(String(error))
+                logger.error(
+                    { error: inspectError },
+                    "Failed to inspect prompt"
+                )
 
                 return {
                     content: [
                         {
-                            type: 'text' as const,
+                            type: "text" as const,
                             text: JSON.stringify({
                                 success: false,
                                 error: inspectError.message,
@@ -690,55 +684,55 @@ async function registerTools(
             }
         },
     })
-    logger.info('mcp_inspect tool registered')
+    logger.info("mcp_inspect tool registered")
 
     // Register MCP Control Tools
     transport.registerTool({
-        name: 'mcp_reload_prompts',
-        title: 'Reload Prompts',
+        name: "mcp_reload_prompts",
+        title: "Reload Prompts",
         description:
-            'Reload all prompts from Git repository without restarting the server (hot-reload).',
+            "Reload all prompts from Git repository without restarting the server (hot-reload).",
         inputSchema: z.object({}),
         handler: async () => {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             return await handleReload(server)
         },
     })
-    logger.info('mcp_reload_prompts tool registered')
+    logger.info("mcp_reload_prompts tool registered")
 
     transport.registerTool({
-        name: 'mcp_prompt_stats',
-        title: 'Get Prompt Statistics',
+        name: "mcp_prompt_stats",
+        title: "Get Prompt Statistics",
         description:
-            'Get statistics about all prompts including counts by runtime state.',
+            "Get statistics about all prompts including counts by runtime state.",
         inputSchema: z.object({}),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async () => {
             return await handlePromptStats()
         },
     })
-    logger.info('mcp_prompt_stats tool registered')
+    logger.info("mcp_prompt_stats tool registered")
 
     transport.registerTool({
-        name: 'mcp_prompt_list',
-        title: 'List All Prompts',
+        name: "mcp_prompt_list",
+        title: "List All Prompts",
         description:
-            'List all prompt runtimes with complete metadata information.',
+            "List all prompt runtimes with complete metadata information.",
         inputSchema: z.object({}),
         handler: async () => {
             return await handlePromptList()
         },
     })
-    logger.info('mcp_prompt_list tool registered')
+    logger.info("mcp_prompt_list tool registered")
 
     transport.registerTool({
-        name: 'mcp_repo_switch',
-        title: 'Switch Prompt Repository',
+        name: "mcp_repo_switch",
+        title: "Switch Prompt Repository",
         description:
-            'Switch to a different prompt repository and reload prompts (zero-downtime).',
+            "Switch to a different prompt repository and reload prompts (zero-downtime).",
         inputSchema: z.object({
-            repo_url: z.string().describe('Repository URL'),
-            branch: z.string().optional().describe('Branch name'),
+            repo_url: z.string().describe("Repository URL"),
+            branch: z.string().optional().describe("Branch name"),
         }),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (args: Record<string, unknown>) => {
@@ -749,17 +743,25 @@ async function registerTools(
             })
         },
     })
-    logger.info('mcp_repo_switch tool registered')
+    logger.info("mcp_repo_switch tool registered")
 
     // Register preview_prompt tool
     transport.registerTool({
-        name: 'preview_prompt',
-        title: 'Preview Prompt',
+        name: "preview_prompt",
+        title: "Preview Prompt",
         description:
-            'Debug utility: Renders a prompt template with given arguments to show the final text without sending it to an LLM. Use this to verify template logic.',
+            "Debug utility: Renders a prompt template with given arguments to show the final text without sending it to an LLM. Use this to verify template logic.",
         inputSchema: z.object({
-            promptId: z.string().describe('The ID of the prompt to test (e.g., \'laravel:code-review\')'),
-            args: z.record(z.string(), z.unknown()).describe('JSON object containing the arguments/variables for the template'),
+            promptId: z
+                .string()
+                .describe(
+                    "The ID of the prompt to test (e.g., 'laravel:code-review')"
+                ),
+            args: z
+                .record(z.string(), z.unknown())
+                .describe(
+                    "JSON object containing the arguments/variables for the template"
+                ),
         }),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (args: Record<string, unknown>) => {
@@ -767,7 +769,7 @@ async function registerTools(
                 const promptId = args.promptId as string
                 const inputArgs = args.args as Record<string, unknown>
 
-                logger.info({ promptId }, 'preview_prompt tool invoked')
+                logger.info({ promptId }, "preview_prompt tool invoked")
 
                 // 1. Validate if promptId exists
                 const cachedPrompt = getPrompt(promptId)
@@ -775,7 +777,7 @@ async function registerTools(
                     return {
                         content: [
                             {
-                                type: 'text' as const,
+                                type: "text" as const,
                                 text: JSON.stringify({
                                     success: false,
                                     error: `Prompt not found: ${promptId}`,
@@ -791,31 +793,34 @@ async function registerTools(
                 }
 
                 // 2. Validate args parameters
-                const zodSchema = Object.keys(cachedPrompt.zodShape).length > 0
-                    ? z.object(cachedPrompt.zodShape)
-                    : z.object({})
+                const zodSchema =
+                    Object.keys(cachedPrompt.zodShape).length > 0
+                        ? z.object(cachedPrompt.zodShape)
+                        : z.object({})
 
                 const validationResult = zodSchema.safeParse(inputArgs)
                 if (!validationResult.success) {
-                    const errorDetails = validationResult.error.issues.map((issue) => ({
-                        path: issue.path.join('.'),
-                        message: issue.message,
-                    }))
+                    const errorDetails = validationResult.error.issues.map(
+                        (issue) => ({
+                            path: issue.path.join("."),
+                            message: issue.message,
+                        })
+                    )
 
                     return {
                         content: [
                             {
-                                type: 'text' as const,
+                                type: "text" as const,
                                 text: JSON.stringify({
                                     success: false,
-                                    error: 'Validation failed',
+                                    error: "Validation failed",
                                     details: errorDetails,
                                 }),
                             },
                         ],
                         structuredContent: {
                             success: false,
-                            error: 'Validation failed',
+                            error: "Validation failed",
                             details: errorDetails,
                         },
                         isError: true,
@@ -823,7 +828,10 @@ async function registerTools(
                 }
 
                 // 2.5. Check Schema warnings (missing required or recommended fields)
-                const warnings = checkSchemaWarnings(cachedPrompt.zodShape, inputArgs)
+                const warnings = checkSchemaWarnings(
+                    cachedPrompt.zodShape,
+                    inputArgs
+                )
 
                 // 3. Render template
                 try {
@@ -852,13 +860,13 @@ async function registerTools(
                             renderedLength,
                             estimatedTokens,
                         },
-                        'Template rendered successfully'
+                        "Template rendered successfully"
                     )
 
                     return {
                         content: [
                             {
-                                type: 'text' as const,
+                                type: "text" as const,
                                 text: JSON.stringify({
                                     success: true,
                                     renderedText,
@@ -890,13 +898,13 @@ async function registerTools(
 
                     logger.error(
                         { promptId, error },
-                        'Template rendering failed'
+                        "Template rendering failed"
                     )
 
                     return {
                         content: [
                             {
-                                type: 'text' as const,
+                                type: "text" as const,
                                 text: JSON.stringify({
                                     success: false,
                                     error: `Template rendering failed: ${error.message}`,
@@ -913,12 +921,15 @@ async function registerTools(
             } catch (error) {
                 const previewError =
                     error instanceof Error ? error : new Error(String(error))
-                logger.error({ error: previewError }, 'preview_prompt tool failed')
+                logger.error(
+                    { error: previewError },
+                    "preview_prompt tool failed"
+                )
 
                 return {
                     content: [
                         {
-                            type: 'text' as const,
+                            type: "text" as const,
                             text: JSON.stringify({
                                 success: false,
                                 error: previewError.message,
@@ -934,7 +945,7 @@ async function registerTools(
             }
         },
     })
-    logger.info('preview_prompt tool registered')
+    logger.info("preview_prompt tool registered")
 }
 
 /**
@@ -949,11 +960,11 @@ async function registerResources(
 ): Promise<void> {
     // Register system.health Resource
     transport.registerResource({
-        uri: 'system://health',
-        name: 'system-health',
+        uri: "system://health",
+        name: "system-health",
         description:
-            'System health status including Git info, prompts, cache, and system metrics',
-        mimeType: 'application/json',
+            "System health status including Git info, prompts, cache, and system metrics",
+        mimeType: "application/json",
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async () => {
             try {
@@ -961,8 +972,8 @@ async function registerResources(
                 return {
                     contents: [
                         {
-                            uri: 'system://health',
-                            mimeType: 'application/json',
+                            uri: "system://health",
+                            mimeType: "application/json",
                             text: JSON.stringify(healthStatus, null, 2),
                         },
                     ],
@@ -972,21 +983,21 @@ async function registerResources(
                     error instanceof Error ? error : new Error(String(error))
                 logger.error(
                     { error: healthError },
-                    'Failed to get health status'
+                    "Failed to get health status"
                 )
                 throw healthError
             }
         },
     })
-    logger.info('System health resource registered')
+    logger.info("System health resource registered")
 
     // Register prompts list resource
     transport.registerResource({
-        uri: 'prompts://list',
-        name: 'prompts-list',
+        uri: "prompts://list",
+        name: "prompts-list",
         description:
-            'Complete list of all prompts with metadata including runtime state, version, status, tags, and use cases',
-        mimeType: 'application/json',
+            "Complete list of all prompts with metadata including runtime state, version, status, tags, and use cases",
+        mimeType: "application/json",
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async () => {
             try {
@@ -1006,8 +1017,8 @@ async function registerResources(
                 return {
                     contents: [
                         {
-                            uri: 'prompts://list',
-                            mimeType: 'application/json',
+                            uri: "prompts://list",
+                            mimeType: "application/json",
                             text: JSON.stringify(prompts, null, 2),
                         },
                     ],
@@ -1015,12 +1026,12 @@ async function registerResources(
             } catch (error) {
                 const listError =
                     error instanceof Error ? error : new Error(String(error))
-                logger.error({ error: listError }, 'Failed to get prompts list')
+                logger.error({ error: listError }, "Failed to get prompts list")
                 throw listError
             }
         },
     })
-    logger.info('Prompts list resource registered')
+    logger.info("Prompts list resource registered")
 }
 
 // Start the application

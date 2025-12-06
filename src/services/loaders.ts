@@ -1,6 +1,10 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { SourceManager, type LoadError, type CachedPrompt } from './sourceManager.js'
-import type { PromptRuntime } from '../types/promptRuntime.js'
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import {
+    SourceManager,
+    type LoadError,
+    type CachedPrompt,
+} from "./sourceManager.js"
+import type { PromptRuntime } from "../types/promptRuntime.js"
 
 // --- Exported Functions (Delegating to SourceManager) ---
 
@@ -74,8 +78,16 @@ export async function loadPrompts(
     server: McpServer,
     storageDir?: string,
     systemStorageDir?: string
-): Promise<{ loaded: number; errors: LoadError[]; loadedToolIds?: Set<string> }> {
-    return SourceManager.getInstance().loadPrompts(server, storageDir, systemStorageDir)
+): Promise<{
+    loaded: number
+    errors: LoadError[]
+    loadedToolIds?: Set<string>
+}> {
+    return SourceManager.getInstance().loadPrompts(
+        server,
+        storageDir,
+        systemStorageDir
+    )
 }
 
 /**
@@ -86,7 +98,11 @@ export async function reloadPrompts(
     storageDir?: string,
     systemStorageDir?: string
 ): Promise<{ loaded: number; errors: LoadError[] }> {
-    return SourceManager.getInstance().reloadPrompts(server, storageDir, systemStorageDir)
+    return SourceManager.getInstance().reloadPrompts(
+        server,
+        storageDir,
+        systemStorageDir
+    )
 }
 
 /**
@@ -97,5 +113,9 @@ export async function reloadSinglePrompt(
     filePath: string,
     storageDir?: string
 ): Promise<{ success: boolean; error?: Error }> {
-    return SourceManager.getInstance().reloadSinglePrompt(server, filePath, storageDir)
+    return SourceManager.getInstance().reloadSinglePrompt(
+        server,
+        filePath,
+        storageDir
+    )
 }

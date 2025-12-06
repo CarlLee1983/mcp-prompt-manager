@@ -85,7 +85,7 @@ export interface CacheProvider {
  */
 export interface CacheConfig {
     /** Cache provider type */
-    provider: 'local' | 'redis'
+    provider: "local" | "redis"
     /** Maximum cache size (only for local cache) */
     maxSize?: number
     /** Default TTL (milliseconds) */
@@ -99,4 +99,3 @@ export interface CacheConfig {
         keyPrefix?: string
     }
 }
-

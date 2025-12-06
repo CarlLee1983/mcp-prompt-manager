@@ -1,16 +1,16 @@
-import { execSync } from 'child_process'
-import { simpleGit, type SimpleGitOptions } from 'simple-git'
+import { execSync } from "child_process"
+import { simpleGit, type SimpleGitOptions } from "simple-git"
 import {
     REPO_URL,
     STORAGE_DIR,
     ACTIVE_GROUPS,
     CACHE_CLEANUP_INTERVAL,
-} from '../config/env.js'
-import { logger } from '../utils/logger.js'
-import { getCacheStats } from '../utils/fileSystem.js'
-import { getLoadedPromptCount, getPromptStats } from './loaders.js'
-import fs from 'fs/promises'
-import path from 'path'
+} from "../config/env.js"
+import { logger } from "../utils/logger.js"
+import { getCacheStats } from "../utils/fileSystem.js"
+import { getLoadedPromptCount, getPromptStats } from "./loaders.js"
+import fs from "fs/promises"
+import path from "path"
 
 /**
  * Health status data structure
@@ -32,7 +32,7 @@ export interface HealthStatus {
     }
     registry: {
         enabled: boolean
-        source: 'registry.yaml' | 'none'
+        source: "registry.yaml" | "none"
     }
     cache: {
         size: number
@@ -54,33 +54,34 @@ export interface HealthStatus {
  * @param storageDir - Git repository directory
  * @returns HEAD commit hash or null
  */
-async function getGitHeadCommit(
-    storageDir: string
-): Promise<string | null> {
+async function getGitHeadCommit(storageDir: string): Promise<string | null> {
     try {
         // Prefer simple-git
         const gitOptions: Partial<SimpleGitOptions> = {
             baseDir: storageDir,
-            binary: 'git',
+            binary: "git",
             maxConcurrentProcesses: 6,
         }
         const git = simpleGit(gitOptions)
-        const commit = await git.revparse(['HEAD'])
+        const commit = await git.revparse(["HEAD"])
         return commit.trim() || null
     } catch (error) {
-        logger.debug({ error }, 'Failed to get HEAD commit using simple-git, trying exec')
-        
+        logger.debug(
+            { error },
+            "Failed to get HEAD commit using simple-git, trying exec"
+        )
+
         try {
             // Fallback to exec
-            const commit = execSync('git rev-parse HEAD', {
+            const commit = execSync("git rev-parse HEAD", {
                 cwd: storageDir,
-                encoding: 'utf-8',
+                encoding: "utf-8",
             })
             return commit.trim() || null
         } catch (execError) {
             logger.warn(
                 { error: execError },
-                'Failed to get HEAD commit using exec'
+                "Failed to get HEAD commit using exec"
             )
             return null
         }
@@ -94,7 +95,7 @@ async function getGitHeadCommit(
  */
 async function checkRegistryExists(storageDir: string): Promise<boolean> {
     try {
-        const registryPath = path.join(storageDir, 'registry.yaml')
+        const registryPath = path.join(storageDir, "registry.yaml")
         await fs.access(registryPath)
         return true
     } catch {
@@ -133,7 +134,7 @@ export async function getHealthStatus(
 
     return {
         git: {
-            repoUrl: REPO_URL || '',
+            repoUrl: REPO_URL || "",
             repoPath: dir,
             headCommit,
         },
@@ -148,7 +149,7 @@ export async function getHealthStatus(
         },
         registry: {
             enabled: registryExists,
-            source: registryExists ? 'registry.yaml' : 'none',
+            source: registryExists ? "registry.yaml" : "none",
         },
         cache: {
             size: cacheStats.size,
@@ -164,4 +165,3 @@ export async function getHealthStatus(
         },
     }
 }
-

@@ -1,12 +1,12 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import type { TransportAdapter } from './adapter.js'
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
+import type { TransportAdapter } from "./adapter.js"
 import type {
     RegisterToolParams,
     RegisterPromptParams,
     RegisterResourceParams,
-} from './adapter.js'
-import { logger } from '../utils/logger.js'
+} from "./adapter.js"
+import { logger } from "../utils/logger.js"
 
 /**
  * Stdio Transport Adapter
@@ -16,7 +16,10 @@ export class StdioTransportAdapter implements TransportAdapter {
     private readonly server: McpServer
     private transport: StdioServerTransport | null = null
 
-    constructor(serverName: string = 'mcp-prompt-manager', version: string = '1.0.0') {
+    constructor(
+        serverName: string = "mcp-prompt-manager",
+        version: string = "1.0.0"
+    ) {
         this.server = new McpServer({
             name: serverName,
             version,
@@ -24,7 +27,7 @@ export class StdioTransportAdapter implements TransportAdapter {
     }
 
     getType(): string {
-        return 'stdio'
+        return "stdio"
     }
 
     getServer(): McpServer {
@@ -33,20 +36,20 @@ export class StdioTransportAdapter implements TransportAdapter {
 
     async connect(): Promise<void> {
         if (this.transport) {
-            logger.warn('Transport already connected')
+            logger.warn("Transport already connected")
             return
         }
 
         this.transport = new StdioServerTransport()
         await this.server.connect(this.transport)
-        logger.info('Stdio transport connected')
+        logger.info("Stdio transport connected")
     }
 
     // eslint-disable-next-line @typescript-eslint/require-await
     async disconnect(): Promise<void> {
         // Stdio transport usually doesn't need explicit disconnection
         // It will automatically disconnect when process ends
-        logger.info('Stdio transport disconnected')
+        logger.info("Stdio transport disconnected")
     }
 
     registerTool(params: RegisterToolParams): { remove: () => void } {
@@ -60,15 +63,14 @@ export class StdioTransportAdapter implements TransportAdapter {
             async (args: unknown, _extra?: unknown) => {
                 // Type conversion: MCP SDK's args is unknown, need to convert to Record<string, unknown>
                 const typedArgs =
-                    typeof args === 'object' && args !== null
+                    typeof args === "object" && args !== null
                         ? (args as Record<string, unknown>)
                         : {}
                 const result = await params.handler(typedArgs)
                 // Ensure return format matches MCP SDK requirements
                 return {
                     ...result,
-                    structuredContent:
-                        result.structuredContent,
+                    structuredContent: result.structuredContent,
                 }
             }
         )
@@ -81,15 +83,15 @@ export class StdioTransportAdapter implements TransportAdapter {
             async (args: unknown, _extra?: unknown) => {
                 // Type conversion: MCP SDK's args is unknown, need to convert to Record<string, unknown>
                 const typedArgs =
-                    typeof args === 'object' && args !== null
+                    typeof args === "object" && args !== null
                         ? (args as Record<string, unknown>)
                         : {}
                 const result = await params.handler(typedArgs)
                 // Ensure return format matches MCP SDK requirements
                 return result as {
                     messages: Array<{
-                        role: 'user' | 'assistant'
-                        content: { type: 'text'; text: string }
+                        role: "user" | "assistant"
+                        content: { type: "text"; text: string }
                     }>
                     [key: string]: unknown
                 }
@@ -104,10 +106,9 @@ export class StdioTransportAdapter implements TransportAdapter {
             {
                 title: params.name,
                 description: params.description,
-                mimeType: params.mimeType || 'application/json',
+                mimeType: params.mimeType || "application/json",
             },
             params.handler
         )
     }
 }
-

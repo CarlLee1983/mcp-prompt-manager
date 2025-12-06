@@ -1,5 +1,5 @@
-import type { z } from 'zod'
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import type { z } from "zod"
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 
 /**
  * Tool registration parameters
@@ -9,10 +9,8 @@ export interface RegisterToolParams {
     title: string
     description: string
     inputSchema: z.ZodTypeAny
-    handler: (
-        args: Record<string, unknown>
-    ) => Promise<{
-        content: Array<{ type: 'text'; text: string }>
+    handler: (args: Record<string, unknown>) => Promise<{
+        content: Array<{ type: "text"; text: string }>
         structuredContent?: Record<string, unknown>
         isError?: boolean
         [key: string]: unknown
@@ -25,12 +23,10 @@ export interface RegisterToolParams {
 export interface RegisterPromptParams {
     name: string
     inputSchema: z.ZodRawShape
-    handler: (
-        args: Record<string, unknown>
-    ) => Promise<{
+    handler: (args: Record<string, unknown>) => Promise<{
         messages: Array<{
-            role: 'user' | 'assistant'
-            content: { type: 'text'; text: string }
+            role: "user" | "assistant"
+            content: { type: "text"; text: string }
         }>
         [key: string]: unknown
     }>
@@ -100,4 +96,3 @@ export interface TransportAdapter {
      */
     getServer(): McpServer | null
 }
-

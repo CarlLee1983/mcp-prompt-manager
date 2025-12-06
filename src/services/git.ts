@@ -1,14 +1,14 @@
-import { simpleGit, type SimpleGitOptions } from 'simple-git'
-import fs from 'fs/promises'
-import path from 'path'
+import { simpleGit, type SimpleGitOptions } from "simple-git"
+import fs from "fs/promises"
+import path from "path"
 import {
     getRepoUrl,
     getGitBranch,
     STORAGE_DIR,
     GIT_MAX_RETRIES,
-} from '../config/env.js'
-import { logger } from '../utils/logger.js'
-import { ensureDirectoryAccess, clearFileCache } from '../utils/fileSystem.js'
+} from "../config/env.js"
+import { logger } from "../utils/logger.js"
+import { ensureDirectoryAccess, clearFileCache } from "../utils/fileSystem.js"
 
 /**
  * Sync Git repository
@@ -20,18 +20,18 @@ import { ensureDirectoryAccess, clearFileCache } from '../utils/fileSystem.js'
  * Directory and file names to exclude (case-insensitive)
  */
 const EXCLUDED_ITEMS = new Set([
-    '.git',
-    'node_modules',
-    '.DS_Store',
-    '.vscode',
-    '.idea',
-    'dist',
-    'build',
-    '.next',
-    '.nuxt',
-    '.cache',
-    'coverage',
-    '.nyc_output',
+    ".git",
+    "node_modules",
+    ".DS_Store",
+    ".vscode",
+    ".idea",
+    "dist",
+    "build",
+    ".next",
+    ".nuxt",
+    ".cache",
+    "coverage",
+    ".nyc_output",
 ])
 
 /**
@@ -71,7 +71,7 @@ async function copyLocalRepository(
             // If copy fails, log warning but continue processing other files
             logger.warn(
                 { sourcePath, targetPath, error },
-                'Failed to copy file, skipping'
+                "Failed to copy file, skipping"
             )
         }
     }
@@ -82,19 +82,19 @@ export async function syncRepo(
 ): Promise<void> {
     const repoUrl = getRepoUrl()
     const gitBranch = getGitBranch()
-    
+
     if (!repoUrl) {
-        throw new Error('❌ Error: PROMPT_REPO_URL is missing.')
+        throw new Error("❌ Error: PROMPT_REPO_URL is missing.")
     }
 
-    logger.info({ repoUrl, branch: gitBranch }, 'Git syncing from repository')
+    logger.info({ repoUrl, branch: gitBranch }, "Git syncing from repository")
 
     // Check if it's a local path
     const isLocalPath =
         path.isAbsolute(repoUrl) &&
-        !repoUrl.startsWith('http://') &&
-        !repoUrl.startsWith('https://') &&
-        !repoUrl.startsWith('git@')
+        !repoUrl.startsWith("http://") &&
+        !repoUrl.startsWith("https://") &&
+        !repoUrl.startsWith("git@")
 
     if (isLocalPath) {
         // Local path: directly copy files from source directory (supports uncommitted changes)
@@ -106,7 +106,7 @@ export async function syncRepo(
 
             logger.info(
                 { source: repoUrl, target: STORAGE_DIR },
-                'Copying from local repository (includes uncommitted changes)'
+                "Copying from local repository (includes uncommitted changes)"
             )
 
             // Ensure target directory exists
@@ -117,12 +117,15 @@ export async function syncRepo(
 
             // Clear cache to ensure data consistency
             clearFileCache(STORAGE_DIR)
-            logger.info('Local repository sync successful')
+            logger.info("Local repository sync successful")
             return
         } catch (error) {
             const syncError =
                 error instanceof Error ? error : new Error(String(error))
-            logger.error({ error: syncError }, 'Failed to sync local repository')
+            logger.error(
+                { error: syncError },
+                "Failed to sync local repository"
+            )
             throw new Error(
                 `Local repository sync failed: ${syncError.message}`
             )
@@ -133,7 +136,7 @@ export async function syncRepo(
     const exists = await fs.stat(STORAGE_DIR).catch(() => null)
     const gitOptions: Partial<SimpleGitOptions> = {
         baseDir: STORAGE_DIR,
-        binary: 'git',
+        binary: "git",
         maxConcurrentProcesses: 6,
     }
 
@@ -143,51 +146,60 @@ export async function syncRepo(
         try {
             if (exists) {
                 const isRepo = await fs
-                    .stat(path.join(STORAGE_DIR, '.git'))
+                    .stat(path.join(STORAGE_DIR, ".git"))
                     .catch(() => null)
                 if (isRepo) {
                     // Ensure directory is accessible
                     await ensureDirectoryAccess(STORAGE_DIR)
 
                     const git = simpleGit(gitOptions)
-                    
+
                     // Fetch remote updates first
                     await git.fetch()
-                    
+
                     // Check current branch
-                    const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD'])
+                    const currentBranch = await git.revparse([
+                        "--abbrev-ref",
+                        "HEAD",
+                    ])
                     const branchName = currentBranch.trim() || gitBranch
-                    
+
                     // Try pull with rebase (preferred strategy)
                     try {
-                        await git.pull(['--rebase'])
-                        logger.info({ branch: branchName }, 'Git pull with rebase successful')
+                        await git.pull(["--rebase"])
+                        logger.info(
+                            { branch: branchName },
+                            "Git pull with rebase successful"
+                        )
                     } catch (rebaseError) {
                         // If rebase fails (possibly due to divergence), use reset to force sync to remote
                         logger.warn(
                             { branch: branchName, error: rebaseError },
-                            'Git pull with rebase failed, resetting to remote branch'
+                            "Git pull with rebase failed, resetting to remote branch"
                         )
                         const remoteBranch = `origin/${branchName}`
-                        await git.reset(['--hard', remoteBranch])
-                        logger.info({ branch: branchName }, 'Git reset to remote branch successful')
+                        await git.reset(["--hard", remoteBranch])
+                        logger.info(
+                            { branch: branchName },
+                            "Git reset to remote branch successful"
+                        )
                     }
-                    
+
                     // Clear cache to ensure data consistency
                     clearFileCache(STORAGE_DIR)
-                    logger.info('Git sync successful')
+                    logger.info("Git sync successful")
                     return
                 } else {
                     // Directory exists but is not a git repo, re-clone
                     logger.warn(
-                        'Directory exists but is not a git repository, re-cloning'
+                        "Directory exists but is not a git repository, re-cloning"
                     )
                     await fs.rm(STORAGE_DIR, { recursive: true, force: true })
                     await fs.mkdir(STORAGE_DIR, { recursive: true })
                     await cloneRepository(repoUrl, STORAGE_DIR, gitBranch)
                     // Clear cache to ensure data consistency
                     clearFileCache(STORAGE_DIR)
-                    logger.info('Git re-cloned successful')
+                    logger.info("Git re-cloned successful")
                     return
                 }
             } else {
@@ -196,7 +208,7 @@ export async function syncRepo(
                 await cloneRepository(repoUrl, STORAGE_DIR, gitBranch)
                 // Clear cache to ensure data consistency
                 clearFileCache(STORAGE_DIR)
-                logger.info('Git first clone successful')
+                logger.info("Git first clone successful")
                 return
             }
         } catch (error) {
@@ -204,14 +216,14 @@ export async function syncRepo(
                 error instanceof Error ? error : new Error(String(error))
             logger.warn(
                 { attempt, maxRetries, error: lastError },
-                'Git sync attempt failed'
+                "Git sync attempt failed"
             )
 
             if (attempt < maxRetries) {
                 const delay = 1000 * attempt // Exponential backoff
                 logger.info(
                     { delay, nextAttempt: attempt + 1 },
-                    'Retrying git sync'
+                    "Retrying git sync"
                 )
                 await new Promise((resolve) => setTimeout(resolve, delay))
                 continue
@@ -220,7 +232,7 @@ export async function syncRepo(
     }
 
     // All retries failed
-    logger.error({ error: lastError }, 'Git sync failed after all retries')
+    logger.error({ error: lastError }, "Git sync failed after all retries")
     throw new Error(
         `Git sync failed after ${maxRetries} attempts: ${lastError?.message}`
     )
@@ -239,6 +251,6 @@ async function cloneRepository(
     branch?: string
 ): Promise<void> {
     const git = simpleGit()
-    const cloneOptions = branch ? ['-b', branch] : []
+    const cloneOptions = branch ? ["-b", branch] : []
     await git.clone(repoUrl, targetDir, cloneOptions)
 }

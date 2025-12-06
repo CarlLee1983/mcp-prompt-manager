@@ -1,15 +1,15 @@
 /**
  * Prompt argument type definition
- * 
+ *
  * Supported argument types: string, number, boolean
  */
-export type PromptArgType = 'string' | 'number' | 'boolean'
+export type PromptArgType = "string" | "number" | "boolean"
 
 /**
  * Prompt argument definition
- * 
+ *
  * Defines the structure of a Prompt argument, including type, description, and default value.
- * 
+ *
  * @example
  * ```typescript
  * const arg: PromptArgDefinition = {
@@ -17,7 +17,7 @@ export type PromptArgType = 'string' | 'number' | 'boolean'
  *   description: 'Code to review',
  * }
  * ```
- * 
+ *
  * @example
  * ```typescript
  * const optionalArg: PromptArgDefinition = {
@@ -40,7 +40,7 @@ export interface PromptArgDefinition {
 
 /**
  * Prompt triggers definition
- * 
+ *
  * Defines trigger patterns for when the prompt should be used.
  */
 export interface PromptTriggers {
@@ -50,9 +50,9 @@ export interface PromptTriggers {
 
 /**
  * Prompt definition interface
- * 
+ *
  * Defines a complete Prompt template structure, including ID, title, description, arguments, and Handlebars template.
- * 
+ *
  * @example
  * ```typescript
  * const prompt: PromptDefinition = {

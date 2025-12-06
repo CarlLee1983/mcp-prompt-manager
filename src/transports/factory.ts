@@ -1,8 +1,8 @@
-import type { TransportAdapter } from './adapter.js'
-import { StdioTransportAdapter } from './stdioAdapter.js'
-import { HttpTransportAdapter } from './httpAdapter.js'
-import { SseTransportAdapter } from './sseAdapter.js'
-import { logger } from '../utils/logger.js'
+import type { TransportAdapter } from "./adapter.js"
+import { StdioTransportAdapter } from "./stdioAdapter.js"
+import { HttpTransportAdapter } from "./httpAdapter.js"
+import { SseTransportAdapter } from "./sseAdapter.js"
+import { logger } from "../utils/logger.js"
 
 /**
  * Transport Factory
@@ -28,31 +28,31 @@ export class TransportFactory {
         const normalizedType = type.toLowerCase()
 
         switch (normalizedType) {
-            case 'stdio':
-                logger.debug('Creating StdioTransportAdapter')
+            case "stdio":
+                logger.debug("Creating StdioTransportAdapter")
                 return new StdioTransportAdapter(
                     options?.serverName,
                     options?.version
                 )
 
-            case 'http':
+            case "http":
                 logger.debug(
                     { port: options?.port, host: options?.host },
-                    'Creating HttpTransportAdapter'
+                    "Creating HttpTransportAdapter"
                 )
                 return new HttpTransportAdapter(
                     options?.port || 3000,
-                    options?.host || 'localhost'
+                    options?.host || "localhost"
                 )
 
-            case 'sse':
+            case "sse":
                 logger.debug(
                     { port: options?.port, host: options?.host },
-                    'Creating SseTransportAdapter'
+                    "Creating SseTransportAdapter"
                 )
                 return new SseTransportAdapter(
                     options?.port || 3001,
-                    options?.host || 'localhost'
+                    options?.host || "localhost"
                 )
 
             default:
@@ -62,4 +62,3 @@ export class TransportFactory {
         }
     }
 }
-

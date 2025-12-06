@@ -1,11 +1,11 @@
-import pino from 'pino'
-import { LOG_LEVEL, LOG_FILE } from '../config/env.js'
-import fs from 'fs'
-import path from 'path'
+import pino from "pino"
+import { LOG_LEVEL, LOG_FILE } from "../config/env.js"
+import fs from "fs"
+import path from "path"
 
 /**
  * MCP server logging configuration
- * 
+ *
  * Note: MCP protocol uses stdout for communication, so all logs are output to stderr.
  * To prevent clients from treating normal logs as errors, we adopt the following strategy:
  * 1. stderr only outputs warn/error/fatal level logs (to avoid being marked as error)
@@ -14,13 +14,15 @@ import path from 'path'
  * 4. Use silent mode to completely disable logging (when LOG_LEVEL=silent)
  * 5. Use PRETTY_LOG=true to enable formatted output (even when LOG_FILE is set)
  */
-const logLevel = LOG_LEVEL || (process.env.NODE_ENV === 'development' ? 'info' : 'warn')
+const logLevel =
+    LOG_LEVEL || (process.env.NODE_ENV === "development" ? "info" : "warn")
 
 // Check if pretty log is enabled
-const prettyLog = process.env.PRETTY_LOG === 'true' || process.env.PRETTY_LOG === '1'
+const prettyLog =
+    process.env.PRETTY_LOG === "true" || process.env.PRETTY_LOG === "1"
 
 // stderr log level: only output warn/error/fatal, avoid info being marked as error
-const stderrLogLevel = 'warn'
+const stderrLogLevel = "warn"
 
 // Create logger instance
 const loggerOptions: pino.LoggerOptions = {
@@ -35,12 +37,12 @@ let logger: pino.Logger
 // Error formatting is handled in errorFormatter.ts instead
 const prettyOptions = {
     colorize: true,
-    translateTime: 'SYS:standard',
-    ignore: 'pid,hostname',
+    translateTime: "SYS:standard",
+    ignore: "pid,hostname",
     singleLine: false,
     hideObject: false,
-    errorLikeObjectKeys: ['err', 'error'],
-    messageFormat: '{msg}',
+    errorLikeObjectKeys: ["err", "error"],
+    messageFormat: "{msg}",
 }
 
 // If LOG_FILE is set, use multistream to output to stderr and file separately
@@ -56,20 +58,21 @@ if (LOG_FILE) {
     }
 
     // Create output stream array
-    const streams: Array<{ level: string; stream: any }> = []
+    const streams: Array<{ level: string; stream: pino.DestinationStream }> = []
 
     // stderr output: only output warn/error/fatal (to avoid info being marked as error)
-    if (prettyLog || process.env.NODE_ENV === 'development') {
+    if (prettyLog || process.env.NODE_ENV === "development") {
         // Use pretty format for stderr
         streams.push({
             level: stderrLogLevel,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             stream: pino.transport({
-                target: 'pino-pretty',
+                target: "pino-pretty",
                 options: {
                     ...prettyOptions,
                     destination: 2, // stderr
                 },
-            }),
+            }) as unknown as pino.DestinationStream, // Cast to compatible type
         })
     } else {
         streams.push({
@@ -83,19 +86,22 @@ if (LOG_FILE) {
         // Use pretty format for file too (if PRETTY_LOG is enabled)
         streams.push({
             level: logLevel,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             stream: pino.transport({
-                target: 'pino-pretty',
+                target: "pino-pretty",
                 options: {
                     ...prettyOptions,
-                    destination: fs.createWriteStream(logFilePath, { flags: 'a' }),
+                    destination: fs.createWriteStream(logFilePath, {
+                        flags: "a",
+                    }),
                 },
-            }),
+            }) as unknown as pino.DestinationStream, // Cast to compatible type
         })
     } else {
         // Raw JSON format (convenient for parsing and searching)
         streams.push({
             level: logLevel,
-            stream: fs.createWriteStream(logFilePath, { flags: 'a' }),
+            stream: fs.createWriteStream(logFilePath, { flags: "a" }),
         })
     }
 
@@ -107,9 +113,9 @@ if (LOG_FILE) {
     loggerOptions.level = stderrLogLevel
 
     // Use pino-pretty for formatted output in development or when PRETTY_LOG is enabled
-    if (prettyLog || process.env.NODE_ENV === 'development') {
+    if (prettyLog || process.env.NODE_ENV === "development") {
         loggerOptions.transport = {
-            target: 'pino-pretty',
+            target: "pino-pretty",
             options: prettyOptions,
         }
     }

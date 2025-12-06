@@ -1,12 +1,12 @@
-import { z } from 'zod'
-import dotenv from 'dotenv'
-import path from 'path'
+import { z } from "zod"
+import dotenv from "dotenv"
+import path from "path"
 import {
     type RepoConfig,
     parseRepoUrls,
     parseSingleRepoUrl,
     sortReposByPriority,
-} from './repoConfig.js'
+} from "./repoConfig.js"
 
 /**
  * Load environment variables
@@ -26,20 +26,20 @@ process.stdout.write = originalWrite
 const ConfigSchema = z.object({
     PROMPT_REPO_URL: z
         .string()
-        .min(1, 'PROMPT_REPO_URL is required')
+        .min(1, "PROMPT_REPO_URL is required")
         .refine(
             (url) => {
                 // Validate URL format or local path
                 // Disallow path traversal attacks
-                if (url.includes('..') || url.includes('\0')) {
+                if (url.includes("..") || url.includes("\0")) {
                     return false
                 }
                 // Validate that it's a valid URL or absolute path
                 try {
                     if (
-                        url.startsWith('http://') ||
-                        url.startsWith('https://') ||
-                        url.startsWith('git@')
+                        url.startsWith("http://") ||
+                        url.startsWith("https://") ||
+                        url.startsWith("git@")
                     ) {
                         return true
                     }
@@ -51,28 +51,28 @@ const ConfigSchema = z.object({
             },
             {
                 message:
-                    'Invalid REPO_URL: must be a valid URL or absolute path',
+                    "Invalid REPO_URL: must be a valid URL or absolute path",
             }
         )
         .optional(), // Made optional because PROMPT_REPO_URLS can be used
     PROMPT_REPO_URLS: z
         .string()
         .optional()
-        .describe('Multiple repo URLs separated by commas'),
+        .describe("Multiple repo URLs separated by commas"),
     SYSTEM_REPO_URL: z
         .string()
         .optional()
         .refine(
             (url) => {
                 if (!url) return true // Optional
-                if (url.includes('..') || url.includes('\0')) {
+                if (url.includes("..") || url.includes("\0")) {
                     return false
                 }
                 try {
                     if (
-                        url.startsWith('http://') ||
-                        url.startsWith('https://') ||
-                        url.startsWith('git@')
+                        url.startsWith("http://") ||
+                        url.startsWith("https://") ||
+                        url.startsWith("git@")
                     ) {
                         return true
                     }
@@ -83,14 +83,14 @@ const ConfigSchema = z.object({
             },
             {
                 message:
-                    'Invalid SYSTEM_REPO_URL: must be a valid URL or absolute path',
+                    "Invalid SYSTEM_REPO_URL: must be a valid URL or absolute path",
             }
         ),
     TRANSPORT_TYPE: z
-        .enum(['stdio', 'http', 'sse'])
-        .default('stdio')
-        .describe('Transport type: stdio, http, or sse'),
-    MCP_LANGUAGE: z.enum(['en', 'zh']).default('en'),
+        .enum(["stdio", "http", "sse"])
+        .default("stdio")
+        .describe("Transport type: stdio, http, or sse"),
+    MCP_LANGUAGE: z.enum(["en", "zh"]).default("en"),
     MCP_GROUPS: z
         .string()
         .optional()
@@ -98,7 +98,7 @@ const ConfigSchema = z.object({
             if (!val) return undefined
             // Validate and clean group names
             const groups = val
-                .split(',')
+                .split(",")
                 .map((g) => g.trim())
                 .filter(Boolean)
             // Validate each group name format
@@ -114,8 +114,8 @@ const ConfigSchema = z.object({
         }),
     STORAGE_DIR: z.string().optional(),
     LOG_LEVEL: z
-        .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
-        .default('info'),
+        .enum(["fatal", "error", "warn", "info", "debug", "trace"])
+        .default("info"),
     LOG_FILE: z.string().optional(),
     GIT_BRANCH: z.string().optional(),
     GIT_MAX_RETRIES: z
@@ -127,9 +127,9 @@ const ConfigSchema = z.object({
         .optional()
         .transform((val) => (val ? parseInt(val, 10) : undefined)),
     CACHE_PROVIDER: z
-        .enum(['local', 'redis'])
-        .default('local')
-        .describe('Cache provider: local or redis'),
+        .enum(["local", "redis"])
+        .default("local")
+        .describe("Cache provider: local or redis"),
     CACHE_MAX_SIZE: z
         .string()
         .optional()
@@ -141,7 +141,7 @@ const ConfigSchema = z.object({
     WATCH_MODE: z
         .string()
         .optional()
-        .transform((val) => val === 'true' || val === '1'),
+        .transform((val) => val === "true" || val === "1"),
     GIT_POLLING_INTERVAL: z
         .string()
         .optional()
@@ -191,7 +191,7 @@ function loadConfig() {
         // Validation: at least one of PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided
         if (!parsed.PROMPT_REPO_URL && !parsed.PROMPT_REPO_URLS) {
             throw new Error(
-                'Either PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided'
+                "Either PROMPT_REPO_URL or PROMPT_REPO_URLS must be provided"
             )
         }
 
@@ -199,8 +199,8 @@ function loadConfig() {
     } catch (error) {
         if (error instanceof z.ZodError) {
             const messages = error.issues
-                .map((e) => `${e.path.join('.')}: ${e.message}`)
-                .join('\n')
+                .map((e) => `${e.path.join(".")}: ${e.message}`)
+                .join("\n")
             throw new Error(`Configuration validation failed:\n${messages}`)
         }
         throw error
@@ -221,23 +221,23 @@ let ACTIVE_REPO_BRANCH: string | null = null
  */
 export function setActiveRepo(url: string, branch?: string): void {
     // Validate URL format
-    if (url.includes('..') || url.includes('\0')) {
-        throw new Error('Invalid REPO_URL: path traversal detected')
+    if (url.includes("..") || url.includes("\0")) {
+        throw new Error("Invalid REPO_URL: path traversal detected")
     }
-    
+
     // Validate URL format or absolute path
     const isValidUrl =
-        url.startsWith('http://') ||
-        url.startsWith('https://') ||
-        url.startsWith('git@') ||
+        url.startsWith("http://") ||
+        url.startsWith("https://") ||
+        url.startsWith("git@") ||
         path.isAbsolute(url)
-    
+
     if (!isValidUrl) {
         throw new Error(
-            'Invalid REPO_URL: must be a valid URL or absolute path'
+            "Invalid REPO_URL: must be a valid URL or absolute path"
         )
     }
-    
+
     ACTIVE_REPO_URL = url
     ACTIVE_REPO_BRANCH = branch ?? null
 }
@@ -250,10 +250,10 @@ export function getActiveRepo(): { url: string; branch: string } | null {
     if (ACTIVE_REPO_URL === null) {
         return null
     }
-    
+
     return {
         url: ACTIVE_REPO_URL,
-        branch: ACTIVE_REPO_BRANCH || config.GIT_BRANCH || 'main',
+        branch: ACTIVE_REPO_BRANCH || config.GIT_BRANCH || "main",
     }
 }
 
@@ -261,12 +261,12 @@ export function getActiveRepo(): { url: string; branch: string } | null {
 // REPO_URL and GIT_BRANCH now prioritize dynamic settings
 export function getRepoUrl(): string {
     const activeRepo = getActiveRepo()
-    return activeRepo?.url ?? config.PROMPT_REPO_URL ?? ''
+    return activeRepo?.url ?? config.PROMPT_REPO_URL ?? ""
 }
 
 export function getGitBranch(): string {
     const activeRepo = getActiveRepo()
-    return activeRepo?.branch ?? config.GIT_BRANCH ?? 'main'
+    return activeRepo?.branch ?? config.GIT_BRANCH ?? "main"
 }
 
 // For backward compatibility, keep REPO_URL and GIT_BRANCH as getters
@@ -275,7 +275,7 @@ export function getGitBranch(): string {
 export const REPO_URL = config.PROMPT_REPO_URL
 export const STORAGE_DIR = config.STORAGE_DIR
     ? path.resolve(process.cwd(), config.STORAGE_DIR)
-    : path.resolve(process.cwd(), '.prompts_cache')
+    : path.resolve(process.cwd(), ".prompts_cache")
 export const LANG_SETTING = config.MCP_LANGUAGE
 
 /**
@@ -294,9 +294,9 @@ export const IS_DEFAULT_GROUPS = !config.MCP_GROUPS
 
 export const LOG_LEVEL = config.LOG_LEVEL
 export const LOG_FILE = config.LOG_FILE
-export const GIT_BRANCH = config.GIT_BRANCH || 'main'
+export const GIT_BRANCH = config.GIT_BRANCH || "main"
 export const GIT_MAX_RETRIES = config.GIT_MAX_RETRIES
-export const TRANSPORT_TYPE: 'stdio' | 'http' | 'sse' = config.TRANSPORT_TYPE
+export const TRANSPORT_TYPE: "stdio" | "http" | "sse" = config.TRANSPORT_TYPE
 export const SYSTEM_REPO_URL = config.SYSTEM_REPO_URL || undefined
 export const PROMPT_REPO_URLS = config.PROMPT_REPO_URLS || undefined
 export const WATCH_MODE = config.WATCH_MODE || false
@@ -311,9 +311,9 @@ export const CACHE_CLEANUP_INTERVAL = config.CACHE_CLEANUP_INTERVAL
 
 // Language instruction
 export const LANG_INSTRUCTION =
-    LANG_SETTING === 'zh'
-        ? 'Please reply in Traditional Chinese (繁體中文). Keep technical terms in English.'
-        : 'Please reply in English.'
+    LANG_SETTING === "zh"
+        ? "Please reply in Traditional Chinese (繁體中文). Keep technical terms in English."
+        : "Please reply in English."
 
 /**
  * Get all configured repo URLs (including backward compatibility)

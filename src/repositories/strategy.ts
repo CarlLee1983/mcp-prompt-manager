@@ -35,4 +35,3 @@ export interface RepositoryStrategy {
      */
     getUrl(): string
 }
-

@@ -1,8 +1,8 @@
-import path from 'path'
-import type { RepositoryStrategy } from './strategy.js'
-import { GitRepositoryStrategy } from './gitStrategy.js'
-import { LocalRepositoryStrategy } from './localStrategy.js'
-import { logger } from '../utils/logger.js'
+import path from "path"
+import type { RepositoryStrategy } from "./strategy.js"
+import { GitRepositoryStrategy } from "./gitStrategy.js"
+import { LocalRepositoryStrategy } from "./localStrategy.js"
+import { logger } from "../utils/logger.js"
 
 /**
  * Repository Factory
@@ -19,34 +19,34 @@ export class RepositoryFactory {
      */
     static createStrategy(
         repoUrl: string,
-        defaultBranch: string = 'main',
+        defaultBranch: string = "main",
         maxRetries: number = 3
     ): RepositoryStrategy {
         // Validate URL format
-        if (repoUrl.includes('..') || repoUrl.includes('\0')) {
-            throw new Error('Invalid REPO_URL: path traversal detected')
+        if (repoUrl.includes("..") || repoUrl.includes("\0")) {
+            throw new Error("Invalid REPO_URL: path traversal detected")
         }
 
         // Check if it's a local path
         const isLocalPath =
             path.isAbsolute(repoUrl) &&
-            !repoUrl.startsWith('http://') &&
-            !repoUrl.startsWith('https://') &&
-            !repoUrl.startsWith('git@')
+            !repoUrl.startsWith("http://") &&
+            !repoUrl.startsWith("https://") &&
+            !repoUrl.startsWith("git@")
 
         if (isLocalPath) {
-            logger.debug({ repoUrl }, 'Creating LocalRepositoryStrategy')
+            logger.debug({ repoUrl }, "Creating LocalRepositoryStrategy")
             return new LocalRepositoryStrategy(repoUrl)
         }
 
         // Check if it's a Git repository
         const isGitRepo =
-            repoUrl.startsWith('http://') ||
-            repoUrl.startsWith('https://') ||
-            repoUrl.startsWith('git@')
+            repoUrl.startsWith("http://") ||
+            repoUrl.startsWith("https://") ||
+            repoUrl.startsWith("git@")
 
         if (isGitRepo) {
-            logger.debug({ repoUrl }, 'Creating GitRepositoryStrategy')
+            logger.debug({ repoUrl }, "Creating GitRepositoryStrategy")
             return new GitRepositoryStrategy(repoUrl, defaultBranch, maxRetries)
         }
 
@@ -55,4 +55,3 @@ export class RepositoryFactory {
         )
     }
 }
-

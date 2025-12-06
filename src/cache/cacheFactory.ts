@@ -1,6 +1,6 @@
-import type { CacheProvider, CacheConfig } from './cacheProvider.js'
-import { LocalCache } from './localCache.js'
-import { logger } from '../utils/logger.js'
+import type { CacheProvider, CacheConfig } from "./cacheProvider.js"
+import { LocalCache } from "./localCache.js"
+import { logger } from "../utils/logger.js"
 
 /**
  * Cache factory
@@ -14,9 +14,9 @@ export class CacheFactory {
      */
     static create(config: CacheConfig): CacheProvider {
         switch (config.provider) {
-            case 'local':
+            case "local":
                 return new LocalCache(config.maxSize, config.ttl)
-            case 'redis':
+            case "redis":
                 // Redis cache will be implemented in the future
                 throw new Error(
                     'Redis cache provider is not yet implemented. Please use "local" provider for now.'
@@ -33,7 +33,9 @@ export class CacheFactory {
      * @returns Cache provider instance
      */
     static createFromEnv(): CacheProvider {
-        const provider = (process.env.CACHE_PROVIDER || 'local') as 'local' | 'redis'
+        const provider = (process.env.CACHE_PROVIDER || "local") as
+            | "local"
+            | "redis"
         const maxSize = process.env.CACHE_MAX_SIZE
             ? parseInt(process.env.CACHE_MAX_SIZE, 10)
             : 1000
@@ -44,13 +46,13 @@ export class CacheFactory {
             ? parseInt(process.env.CACHE_CLEANUP_INTERVAL, 10)
             : 60000 // Default 1 minute
 
-        if (provider === 'redis') {
+        if (provider === "redis") {
             logger.warn(
-                'Redis cache provider is not yet implemented. Falling back to local cache.'
+                "Redis cache provider is not yet implemented. Falling back to local cache."
             )
             // Temporarily fall back to local cache
             const config: CacheConfig = {
-                provider: 'local',
+                provider: "local",
                 maxSize,
             }
             if (ttl !== undefined) {
@@ -61,16 +63,16 @@ export class CacheFactory {
 
         logger.info(
             { provider, maxSize, ttl, cleanupIntervalMs },
-            'Creating cache provider from environment'
+            "Creating cache provider from environment"
         )
 
         // For local cache, need to directly create LocalCache instance to support cleanupIntervalMs
-        if (provider === 'local') {
+        if (provider === "local") {
             return new LocalCache(maxSize, ttl, cleanupIntervalMs)
         }
 
         return this.create({
-            provider: 'local',
+            provider: "local",
             maxSize,
             ...(ttl !== undefined && { ttl }),
         })

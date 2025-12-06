@@ -1,7 +1,7 @@
-import fs from 'fs/promises'
-import path from 'path'
+import fs from "fs/promises"
+import path from "path"
 
-const HIDDEN_FILE_PREFIX = '.'
+const HIDDEN_FILE_PREFIX = "."
 
 // File list cache
 const fileCache = new Map<string, { files: string[]; timestamp: number }>()
@@ -159,6 +159,8 @@ export async function ensureDirectoryAccess(dir: string): Promise<void> {
     try {
         await fs.access(dir, fs.constants.R_OK | fs.constants.W_OK)
     } catch (error) {
-        throw new Error(`No access to directory ${dir}: ${error}`)
+        const errorMessage =
+            error instanceof Error ? error.message : String(error)
+        throw new Error(`No access to directory ${dir}: ${errorMessage}`)
     }
 }

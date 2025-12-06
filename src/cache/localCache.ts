@@ -1,5 +1,5 @@
-import type { CacheProvider, CacheStats } from './cacheProvider.js'
-import { logger } from '../utils/logger.js'
+import type { CacheProvider, CacheStats } from "./cacheProvider.js"
+import { logger } from "../utils/logger.js"
 
 /**
  * Internal cache entry structure
@@ -20,7 +20,7 @@ interface CacheEntry<T> {
 /**
  * Local in-memory cache implementation
  * Uses Map for storage, supports LRU strategy and TTL
- * 
+ *
  * Note: For backward compatibility, LocalCache provides synchronous methods
  * These methods are only for local cache, not applicable to remote caches like Redis
  */
@@ -46,23 +46,26 @@ export class LocalCache implements CacheProvider {
      * @param defaultTTL - Default TTL (milliseconds), optional
      * @param cleanupIntervalMs - TTL cleanup interval (milliseconds), default 60000 (1 minute)
      */
-    constructor(maxSize: number = 1000, defaultTTL?: number, cleanupIntervalMs: number = 60000) {
+    constructor(
+        maxSize: number = 1000,
+        defaultTTL?: number,
+        cleanupIntervalMs: number = 60000
+    ) {
         this.maxSize = maxSize
         this.defaultTTL = defaultTTL
         this.cleanupIntervalMs = cleanupIntervalMs
         this.createdAt = Date.now()
-        
+
         // Start periodic cleanup if TTL is set
         if (defaultTTL) {
             this.startCleanupInterval()
         }
-        
+
         logger.debug(
             { maxSize, defaultTTL, cleanupIntervalMs },
-            'Local cache initialized'
+            "Local cache initialized"
         )
     }
-
 
     /**
      * Get cache value
@@ -85,7 +88,7 @@ export class LocalCache implements CacheProvider {
             this.cache.delete(key)
             this.stats.misses++
             this.stats.expirations++
-            logger.debug({ key }, 'Cache entry expired')
+            logger.debug({ key }, "Cache entry expired")
             return null
         }
 
@@ -122,7 +125,7 @@ export class LocalCache implements CacheProvider {
         }
 
         this.cache.set(key, entry)
-        logger.debug({ key, ttl: entry.ttl }, 'Cache entry set')
+        logger.debug({ key, ttl: entry.ttl }, "Cache entry set")
     }
 
     /**
@@ -134,7 +137,7 @@ export class LocalCache implements CacheProvider {
     async delete(key: string): Promise<void> {
         const deleted = this.cache.delete(key)
         if (deleted) {
-            logger.debug({ key }, 'Cache entry deleted')
+            logger.debug({ key }, "Cache entry deleted")
         }
     }
 
@@ -177,7 +180,7 @@ export class LocalCache implements CacheProvider {
             expirations: 0,
             totalAccesses: 0,
         }
-        logger.info({ cleared: size }, 'Cache cleared')
+        logger.info({ cleared: size }, "Cache cleared")
     }
 
     /**
@@ -205,12 +208,12 @@ export class LocalCache implements CacheProvider {
         // Calculate average access count
         let totalAccessCount = 0
         const accessCounts: Array<{ key: string; accessCount: number }> = []
-        
+
         for (const [key, entry] of this.cache.entries()) {
             totalAccessCount += entry.accessCount
             accessCounts.push({ key, accessCount: entry.accessCount })
         }
-        
+
         const averageAccessCount =
             this.cache.size > 0
                 ? parseFloat((totalAccessCount / this.cache.size).toFixed(2))
@@ -311,7 +314,7 @@ export class LocalCache implements CacheProvider {
     deleteSync(key: string): void {
         const deleted = this.cache.delete(key)
         if (deleted) {
-            logger.debug({ key }, 'Cache entry deleted')
+            logger.debug({ key }, "Cache entry deleted")
         }
     }
 
@@ -329,7 +332,7 @@ export class LocalCache implements CacheProvider {
             expirations: 0,
             totalAccesses: 0,
         }
-        logger.info({ cleared: size }, 'Cache cleared')
+        logger.info({ cleared: size }, "Cache cleared")
     }
 
     /**
@@ -341,7 +344,7 @@ export class LocalCache implements CacheProvider {
         let highestScore = -1
 
         const now = Date.now()
-        
+
         for (const [key, entry] of this.cache.entries()) {
             // Calculate eviction score: considers last access time and access frequency
             // Higher score means more likely to be evicted
@@ -349,7 +352,7 @@ export class LocalCache implements CacheProvider {
             // This prioritizes keeping frequently accessed items
             const timeSinceAccess = now - entry.lastAccessed
             const score = timeSinceAccess / (entry.accessCount + 1)
-            
+
             if (score > highestScore) {
                 highestScore = score
                 oldestKey = key
@@ -359,7 +362,10 @@ export class LocalCache implements CacheProvider {
         if (oldestKey) {
             this.cache.delete(oldestKey)
             this.stats.evictions++
-            logger.debug({ key: oldestKey, score: highestScore.toFixed(2) }, 'Cache entry evicted (LRU)')
+            logger.debug(
+                { key: oldestKey, score: highestScore.toFixed(2) },
+                "Cache entry evicted (LRU)"
+            )
         }
     }
 
@@ -376,9 +382,9 @@ export class LocalCache implements CacheProvider {
         }, this.cleanupIntervalMs)
 
         // Ensure cleanup on process exit
-        if (typeof process !== 'undefined') {
-            process.once('SIGINT', () => this.stopCleanupInterval())
-            process.once('SIGTERM', () => this.stopCleanupInterval())
+        if (typeof process !== "undefined") {
+            process.once("SIGINT", () => this.stopCleanupInterval())
+            process.once("SIGTERM", () => this.stopCleanupInterval())
         }
     }
 
@@ -417,7 +423,7 @@ export class LocalCache implements CacheProvider {
 
         if (cleaned > 0) {
             this.lastCleanup = now
-            logger.debug({ cleaned }, 'Expired cache entries cleaned')
+            logger.debug({ cleaned }, "Expired cache entries cleaned")
         }
 
         return cleaned
@@ -436,7 +442,6 @@ export class LocalCache implements CacheProvider {
     public destroy(): void {
         this.stopCleanupInterval()
         this.cache.clear()
-        logger.info('Local cache destroyed')
+        logger.info("Local cache destroyed")
     }
 }
-
