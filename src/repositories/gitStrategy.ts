@@ -1,10 +1,11 @@
-import { simpleGit, type SimpleGitOptions } from 'simple-git'
-import fs from 'fs/promises'
-import path from 'path'
-import type { RepositoryStrategy } from './strategy.js'
-import { logger } from '../utils/logger.js'
-import { ensureDirectoryAccess, clearFileCache } from '../utils/fileSystem.js'
-import { GIT_MAX_RETRIES, GIT_POLLING_INTERVAL } from '../config/env.js'
+import { simpleGit, type SimpleGitOptions } from "simple-git"
+import fs from "fs/promises"
+import path from "path"
+import type { RepositoryStrategy } from "./strategy.js"
+import { RepositorySyncError } from "../types/errors.js"
+import { logger } from "../utils/logger.js"
+import { ensureDirectoryAccess, clearFileCache } from "../utils/fileSystem.js"
+import { GIT_MAX_RETRIES, GIT_POLLING_INTERVAL } from "../config/env.js"
 
 /**
  * Git Repository Strategy
@@ -22,7 +23,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
 
     constructor(
         repoUrl: string,
-        defaultBranch: string = 'main',
+        defaultBranch: string = "main",
         maxRetries: number = GIT_MAX_RETRIES
     ) {
         this.repoUrl = repoUrl
@@ -31,7 +32,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
     }
 
     getType(): string {
-        return 'git'
+        return "git"
     }
 
     getUrl(): string {
@@ -43,9 +44,9 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
         try {
             // Simple validation: check if URL format is correct
             const isValidUrl =
-                this.repoUrl.startsWith('http://') ||
-                this.repoUrl.startsWith('https://') ||
-                this.repoUrl.startsWith('git@')
+                this.repoUrl.startsWith("http://") ||
+                this.repoUrl.startsWith("https://") ||
+                this.repoUrl.startsWith("git@")
             return isValidUrl
         } catch {
             return false
@@ -62,14 +63,17 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
 
         logger.info(
             { repoUrl: this.repoUrl, branch: gitBranch },
-            'Git syncing from repository'
+            "Git syncing from repository"
         )
 
         const exists = await fs.stat(storageDir).catch(() => null)
         const gitOptions: Partial<SimpleGitOptions> = {
             baseDir: storageDir,
-            binary: 'git',
+            binary: "git",
             maxConcurrentProcesses: 6,
+            timeout: {
+                block: 30000, // 30s timeout for git operations
+            },
         }
 
         let lastError: Error | null = null
@@ -78,7 +82,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
             try {
                 if (exists) {
                     const isRepo = await fs
-                        .stat(path.join(storageDir, '.git'))
+                        .stat(path.join(storageDir, ".git"))
                         .catch(() => null)
                     if (isRepo) {
                         // Ensure directory is accessible
@@ -91,42 +95,45 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
 
                         // Check current branch
                         const currentBranch = await git.revparse([
-                            '--abbrev-ref',
-                            'HEAD',
+                            "--abbrev-ref",
+                            "HEAD",
                         ])
                         const branchName = currentBranch.trim() || gitBranch
 
                         // Try pull with rebase (preferred strategy)
                         try {
-                            await git.pull(['--rebase'])
+                            await git.pull(["--rebase"])
                             logger.info(
                                 { branch: branchName },
-                                'Git pull with rebase successful'
+                                "Git pull with rebase successful"
                             )
                         } catch (rebaseError) {
                             // If rebase fails (possibly due to divergence), use reset to force sync to remote
                             logger.warn(
                                 { branch: branchName, error: rebaseError },
-                                'Git pull with rebase failed, resetting to remote branch'
+                                "Git pull with rebase failed, resetting to remote branch"
                             )
                             const remoteBranch = `origin/${branchName}`
-                            await git.reset(['--hard', remoteBranch])
+                            await git.reset(["--hard", remoteBranch])
                             logger.info(
                                 { branch: branchName },
-                                'Git reset to remote branch successful'
+                                "Git reset to remote branch successful"
                             )
                         }
 
                         // Clear cache to ensure data consistency
                         clearFileCache(storageDir)
-                        logger.info('Git sync successful')
+                        logger.info("Git sync successful")
                         return
                     } else {
                         // Directory exists but is not a git repo, re-clone
                         logger.warn(
-                            'Directory exists but is not a git repository, re-cloning'
+                            "Directory exists but is not a git repository, re-cloning"
                         )
-                        await fs.rm(storageDir, { recursive: true, force: true })
+                        await fs.rm(storageDir, {
+                            recursive: true,
+                            force: true,
+                        })
                         await fs.mkdir(storageDir, { recursive: true })
                         await this.cloneRepository(
                             this.repoUrl,
@@ -135,7 +142,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
                         )
                         // Clear cache to ensure data consistency
                         clearFileCache(storageDir)
-                        logger.info('Git re-cloned successful')
+                        logger.info("Git re-cloned successful")
                         return
                     }
                 } else {
@@ -148,7 +155,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
                     )
                     // Clear cache to ensure data consistency
                     clearFileCache(storageDir)
-                    logger.info('Git first clone successful')
+                    logger.info("Git first clone successful")
                     return
                 }
             } catch (error) {
@@ -156,26 +163,29 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
                     error instanceof Error ? error : new Error(String(error))
                 logger.warn(
                     { attempt, maxRetries: retries, error: lastError },
-                    'Git sync attempt failed'
+                    "Git sync attempt failed"
                 )
 
                 if (attempt < retries) {
                     const delay = 1000 * attempt // Exponential backoff
                     logger.info(
                         { delay, nextAttempt: attempt + 1 },
-                        'Retrying git sync'
+                        "Retrying git sync"
                     )
                     await new Promise((resolve) => setTimeout(resolve, delay))
-                    continue
+                    // continue - redundant as it's the last statement in the loop
                 }
             }
         }
 
         // All retries failed
-        logger.error({ error: lastError }, 'Git sync failed after all retries')
-        throw new Error(
-            `Git sync failed after ${retries} attempts: ${lastError?.message}`
+        const syncError = new RepositorySyncError(
+            this.repoUrl,
+            retries,
+            lastError || undefined
         )
+        logger.error({ error: syncError }, "Git sync failed after all retries")
+        throw syncError
     }
 
     /**
@@ -190,8 +200,12 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
         targetDir: string,
         branch?: string
     ): Promise<void> {
-        const git = simpleGit()
-        const cloneOptions = branch ? ['-b', branch] : []
+        const git = simpleGit({
+            timeout: {
+                block: 60000, // 60s timeout for clone (can be large)
+            },
+        })
+        const cloneOptions = branch ? ["-b", branch] : []
         await git.clone(repoUrl, targetDir, cloneOptions)
     }
 
@@ -209,7 +223,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
         pollingInterval?: number
     ): void {
         if (this.pollingTimer) {
-            logger.debug('Polling already started, stopping existing polling')
+            logger.debug("Polling already started, stopping existing polling")
             this.stopPolling()
         }
 
@@ -220,17 +234,20 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
 
         logger.info(
             { repoUrl: this.repoUrl, branch: this.currentBranch, interval },
-            'Starting Git polling'
+            "Starting Git polling"
         )
 
         // Get initial commit hash
         this.getCurrentCommitHash(storageDir)
             .then((hash) => {
                 this.lastCommitHash = hash
-                logger.info({ commitHash: hash }, 'Initial commit hash recorded')
+                logger.info(
+                    { commitHash: hash },
+                    "Initial commit hash recorded"
+                )
             })
             .catch((error) => {
-                logger.warn({ error }, 'Failed to get initial commit hash')
+                logger.warn({ error }, "Failed to get initial commit hash")
             })
 
         // Start polling
@@ -240,7 +257,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
             })()
         }, interval)
 
-        logger.info({ interval }, 'Git polling started successfully')
+        logger.info({ interval }, "Git polling started successfully")
     }
 
     /**
@@ -254,7 +271,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
             this.storageDir = null
             this.currentBranch = null
             this.lastCommitHash = null
-            logger.info('Git polling stopped')
+            logger.info("Git polling stopped")
         }
     }
 
@@ -272,14 +289,16 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
      */
     private async checkForUpdates(): Promise<void> {
         if (!this.storageDir || !this.currentBranch) {
-            logger.warn('Cannot check for updates: storageDir or branch not set')
+            logger.warn(
+                "Cannot check for updates: storageDir or branch not set"
+            )
             return
         }
 
         try {
             const gitOptions: Partial<SimpleGitOptions> = {
                 baseDir: this.storageDir,
-                binary: 'git',
+                binary: "git",
                 maxConcurrentProcesses: 6,
             }
 
@@ -290,25 +309,36 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
 
             // Get remote commit hash
             const remoteBranch = `origin/${this.currentBranch}`
-            const remoteCommitHash = await git.revparse([remoteBranch]).catch(() => null)
+            const remoteCommitHash = await git
+                .revparse([remoteBranch])
+                .catch(() => null)
 
             if (!remoteCommitHash) {
-                logger.warn({ branch: this.currentBranch }, 'Failed to get remote commit hash')
+                logger.warn(
+                    { branch: this.currentBranch },
+                    "Failed to get remote commit hash"
+                )
                 return
             }
 
             // Get local commit hash
-            const localCommitHash = await this.getCurrentCommitHash(this.storageDir)
+            const localCommitHash = await this.getCurrentCommitHash(
+                this.storageDir
+            )
 
             // Compare hashes
-            if (this.lastCommitHash && localCommitHash && remoteCommitHash.trim() !== this.lastCommitHash.trim()) {
+            if (
+                this.lastCommitHash &&
+                localCommitHash &&
+                remoteCommitHash.trim() !== this.lastCommitHash.trim()
+            ) {
                 logger.info(
                     {
                         oldHash: this.lastCommitHash,
                         newHash: remoteCommitHash.trim(),
                         branch: this.currentBranch,
                     },
-                    'Git repository update detected'
+                    "Git repository update detected"
                 )
 
                 // Update local repository
@@ -318,21 +348,36 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
 
                     // Trigger callback to reload prompts
                     if (this.pollingCallback) {
-                        logger.info('Triggering prompt reload due to Git update')
+                        logger.info(
+                            "Triggering prompt reload due to Git update"
+                        )
                         await this.pollingCallback()
                     }
                 } catch (error) {
-                    const syncError = error instanceof Error ? error : new Error(String(error))
-                    logger.error({ error: syncError }, 'Failed to sync Git repository during polling')
+                    const syncError =
+                        error instanceof Error
+                            ? error
+                            : new Error(String(error))
+                    logger.error(
+                        { error: syncError },
+                        "Failed to sync Git repository during polling"
+                    )
                 }
             } else if (!this.lastCommitHash) {
                 // First time, just record the hash
                 this.lastCommitHash = remoteCommitHash.trim()
-                logger.debug({ commitHash: this.lastCommitHash }, 'Initial commit hash set')
+                logger.debug(
+                    { commitHash: this.lastCommitHash },
+                    "Initial commit hash set"
+                )
             }
         } catch (error) {
-            const checkError = error instanceof Error ? error : new Error(String(error))
-            logger.error({ error: checkError }, 'Error checking for Git updates')
+            const checkError =
+                error instanceof Error ? error : new Error(String(error))
+            logger.error(
+                { error: checkError },
+                "Error checking for Git updates"
+            )
         }
     }
 
@@ -341,21 +386,22 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
      * @param storageDir - Storage directory path
      * @returns Commit hash or null if not available
      */
-    private async getCurrentCommitHash(storageDir: string): Promise<string | null> {
+    private async getCurrentCommitHash(
+        storageDir: string
+    ): Promise<string | null> {
         try {
             const gitOptions: Partial<SimpleGitOptions> = {
                 baseDir: storageDir,
-                binary: 'git',
+                binary: "git",
                 maxConcurrentProcesses: 6,
             }
 
             const git = simpleGit(gitOptions)
-            const commitHash = await git.revparse(['HEAD'])
+            const commitHash = await git.revparse(["HEAD"])
             return commitHash.trim() || null
         } catch (error) {
-            logger.debug({ error }, 'Failed to get commit hash')
+            logger.debug({ error }, "Failed to get commit hash")
             return null
         }
     }
 }
-

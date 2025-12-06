@@ -1,27 +1,28 @@
-import fs from 'fs/promises'
-import path from 'path'
-import chokidar from 'chokidar'
-import type { FSWatcher } from 'chokidar'
-import type { RepositoryStrategy } from './strategy.js'
-import { logger } from '../utils/logger.js'
-import { clearFileCache } from '../utils/fileSystem.js'
+import fs from "fs/promises"
+import path from "path"
+import chokidar from "chokidar"
+import type { FSWatcher } from "chokidar"
+import type { RepositoryStrategy } from "./strategy.js"
+import { RepositorySyncError } from "../types/errors.js"
+import { logger } from "../utils/logger.js"
+import { clearFileCache } from "../utils/fileSystem.js"
 
 /**
  * Directory and file names to exclude (case-insensitive)
  */
 const EXCLUDED_ITEMS = new Set([
-    '.git',
-    'node_modules',
-    '.DS_Store',
-    '.vscode',
-    '.idea',
-    'dist',
-    'build',
-    '.next',
-    '.nuxt',
-    '.cache',
-    'coverage',
-    '.nyc_output',
+    ".git",
+    "node_modules",
+    ".DS_Store",
+    ".vscode",
+    ".idea",
+    "dist",
+    "build",
+    ".next",
+    ".nuxt",
+    ".cache",
+    "coverage",
+    ".nyc_output",
 ])
 
 /**
@@ -38,7 +39,7 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
     }
 
     getType(): string {
-        return 'local'
+        return "local"
     }
 
     getUrl(): string {
@@ -61,21 +62,25 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
     ): Promise<void> {
         const sourceStat = await fs.stat(this.repoPath).catch(() => null)
         if (!sourceStat) {
-            throw new Error(`Source directory does not exist: ${this.repoPath}`)
+            throw new RepositorySyncError(
+                this.repoPath,
+                1,
+                new Error(`Source directory does not exist: ${this.repoPath}`)
+            )
         }
 
         // Optimize: If source and target are the same (or resolve to same path), skip copying
         const resolvedSource = path.resolve(this.repoPath)
         const resolvedTarget = path.resolve(storageDir)
-        
+
         if (resolvedSource === resolvedTarget) {
             logger.info(
                 { source: this.repoPath, target: storageDir },
-                'Source and target are the same, skipping copy (using direct read)'
+                "Source and target are the same, skipping copy (using direct read)"
             )
             // Clear cache to ensure data consistency
             clearFileCache(storageDir)
-            logger.info('Local repository sync successful (direct read mode)')
+            logger.info("Local repository sync successful (direct read mode)")
             return
         }
 
@@ -85,7 +90,7 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
         // For now, we still copy but log that it's a local path operation
         logger.info(
             { source: this.repoPath, target: storageDir },
-            'Copying from local repository (includes uncommitted changes)'
+            "Copying from local repository (includes uncommitted changes)"
         )
 
         // Ensure target directory exists
@@ -98,7 +103,7 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
 
         // Clear cache to ensure data consistency
         clearFileCache(storageDir)
-        logger.info('Local repository sync successful')
+        logger.info("Local repository sync successful")
     }
 
     /**
@@ -138,7 +143,7 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
                 // If copy fails, log warning but continue processing other files
                 logger.warn(
                     { sourcePath, targetPath, error },
-                    'Failed to copy file, skipping'
+                    "Failed to copy file, skipping"
                 )
             }
         }
@@ -154,14 +159,17 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
         watchPath?: string
     ): void {
         if (this.watcher) {
-            logger.debug('Watcher already started, stopping existing watcher')
+            logger.debug("Watcher already started, stopping existing watcher")
             this.stopWatching()
         }
 
         const pathToWatch = watchPath || this.repoPath
         this.watchCallback = onFileChange
 
-        logger.info({ path: pathToWatch }, 'Starting file watcher for local repository')
+        logger.info(
+            { path: pathToWatch },
+            "Starting file watcher for local repository"
+        )
 
         try {
             // Create watcher with appropriate options
@@ -170,18 +178,18 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
                     // Exclude common directories and files
                     // eslint-disable-next-line no-useless-escape
                     /(^|[/\\])\../, // Hidden files and directories
-                    '**/node_modules/**',
-                    '**/.git/**',
-                    '**/dist/**',
-                    '**/build/**',
-                    '**/.next/**',
-                    '**/.nuxt/**',
-                    '**/.cache/**',
-                    '**/coverage/**',
-                    '**/.nyc_output/**',
-                    '**/.DS_Store',
-                    '**/.vscode/**',
-                    '**/.idea/**',
+                    "**/node_modules/**",
+                    "**/.git/**",
+                    "**/dist/**",
+                    "**/build/**",
+                    "**/.next/**",
+                    "**/.nuxt/**",
+                    "**/.cache/**",
+                    "**/coverage/**",
+                    "**/.nyc_output/**",
+                    "**/.DS_Store",
+                    "**/.vscode/**",
+                    "**/.idea/**",
                 ],
                 persistent: true,
                 ignoreInitial: true, // Don't trigger events for existing files
@@ -193,36 +201,64 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
 
             // Watch for changes, additions, and deletions
             this.watcher
-                .on('change', (filePath: string) => {
-                    if (filePath.endsWith('.yaml') || filePath.endsWith('.yml')) {
-                        logger.info({ filePath }, 'File changed, triggering reload')
+                .on("change", (filePath: string) => {
+                    if (
+                        filePath.endsWith(".yaml") ||
+                        filePath.endsWith(".yml")
+                    ) {
+                        logger.info(
+                            { filePath },
+                            "File changed, triggering reload"
+                        )
                         this.watchCallback?.(filePath)
                     }
                 })
-                .on('add', (filePath: string) => {
-                    if (filePath.endsWith('.yaml') || filePath.endsWith('.yml')) {
-                        logger.info({ filePath }, 'File added, triggering reload')
+                .on("add", (filePath: string) => {
+                    if (
+                        filePath.endsWith(".yaml") ||
+                        filePath.endsWith(".yml")
+                    ) {
+                        logger.info(
+                            { filePath },
+                            "File added, triggering reload"
+                        )
                         this.watchCallback?.(filePath)
                     }
                 })
-                .on('unlink', (filePath: string) => {
-                    if (filePath.endsWith('.yaml') || filePath.endsWith('.yml')) {
-                        logger.info({ filePath }, 'File deleted, triggering reload')
+                .on("unlink", (filePath: string) => {
+                    if (
+                        filePath.endsWith(".yaml") ||
+                        filePath.endsWith(".yml")
+                    ) {
+                        logger.info(
+                            { filePath },
+                            "File deleted, triggering reload"
+                        )
                         this.watchCallback?.(filePath)
                     }
                 })
-                .on('error', (error: unknown) => {
-                    const watchError = error instanceof Error ? error : new Error(String(error))
-                    logger.error({ error: watchError }, 'File watcher error')
+                .on("error", (error: unknown) => {
+                    const watchError =
+                        error instanceof Error
+                            ? error
+                            : new Error(String(error))
+                    logger.error({ error: watchError }, "File watcher error")
                 })
-                .on('ready', () => {
-                    logger.info({ path: pathToWatch }, 'File watcher ready')
+                .on("ready", () => {
+                    logger.info({ path: pathToWatch }, "File watcher ready")
                 })
 
-            logger.info({ path: pathToWatch }, 'File watcher started successfully')
+            logger.info(
+                { path: pathToWatch },
+                "File watcher started successfully"
+            )
         } catch (error) {
-            const watchError = error instanceof Error ? error : new Error(String(error))
-            logger.error({ error: watchError, path: pathToWatch }, 'Failed to start file watcher')
+            const watchError =
+                error instanceof Error ? error : new Error(String(error))
+            logger.error(
+                { error: watchError, path: pathToWatch },
+                "Failed to start file watcher"
+            )
             this.watcher = null
             throw watchError
         }
@@ -235,9 +271,9 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
         if (this.watcher) {
             try {
                 void this.watcher.close()
-                logger.info('File watcher stopped')
+                logger.info("File watcher stopped")
             } catch (error) {
-                logger.warn({ error }, 'Error stopping file watcher')
+                logger.warn({ error }, "Error stopping file watcher")
             }
             this.watcher = null
             this.watchCallback = null
@@ -252,4 +288,3 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
         return this.watcher !== null
     }
 }
-

@@ -1,13 +1,14 @@
-import type { RepositoryStrategy } from './strategy.js'
-import { RepositoryFactory } from './factory.js'
-import type { RepoConfig } from '../config/repoConfig.js'
-import { logger } from '../utils/logger.js'
-import { GIT_MAX_RETRIES } from '../config/env.js'
-import { LocalRepositoryStrategy } from './localStrategy.js'
-import { GitRepositoryStrategy } from './gitStrategy.js'
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { reloadSinglePrompt, reloadPrompts } from '../services/loaders.js'
-import path from 'path'
+import type { RepositoryStrategy } from "./strategy.js"
+import { RepositoryFactory } from "./factory.js"
+import type { RepoConfig } from "../config/repoConfig.js"
+import { logger } from "../utils/logger.js"
+import { GIT_MAX_RETRIES } from "../config/env.js"
+import { LocalRepositoryStrategy } from "./localStrategy.js"
+import { GitRepositoryStrategy } from "./gitStrategy.js"
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { reloadSinglePrompt, reloadPrompts } from "../services/loaders.js"
+import path from "path"
+import { RepositoryValidationError } from "../types/errors.js"
 
 /**
  * Repo Manager
@@ -52,7 +53,7 @@ export class RepoManager {
      */
     async loadRepository(storageDir: string): Promise<RepositoryStrategy> {
         if (this.repoConfigs.length === 0) {
-            throw new Error('No repository configurations provided')
+            throw new Error("No repository configurations provided")
         }
 
         const errors: Error[] = []
@@ -65,20 +66,20 @@ export class RepoManager {
                         branch: repoConfig.branch,
                         priority: repoConfig.priority,
                     },
-                    'Attempting to load repository'
+                    "Attempting to load repository"
                 )
 
                 // Create strategy
                 const strategy = RepositoryFactory.createStrategy(
                     repoConfig.url,
-                    repoConfig.branch || 'main',
+                    repoConfig.branch || "main",
                     GIT_MAX_RETRIES
                 )
 
                 // Validate repository
                 const isValid = await strategy.validate()
                 if (!isValid) {
-                    throw new Error(`Repository validation failed: ${repoConfig.url}`)
+                    throw new RepositoryValidationError(repoConfig.url)
                 }
 
                 // Attempt to sync
@@ -88,21 +89,19 @@ export class RepoManager {
                 this.activeStrategy = strategy
                 logger.info(
                     { url: repoConfig.url },
-                    'Repository loaded successfully'
+                    "Repository loaded successfully"
                 )
                 return strategy
             } catch (error) {
                 const loadError =
-                    error instanceof Error
-                        ? error
-                        : new Error(String(error))
+                    error instanceof Error ? error : new Error(String(error))
                 errors.push(loadError)
                 logger.warn(
                     {
                         url: repoConfig.url,
                         error: loadError.message,
                     },
-                    'Failed to load repository, trying next'
+                    "Failed to load repository, trying next"
                 )
                 // Continue to next
             }
@@ -111,7 +110,7 @@ export class RepoManager {
         // All repositories failed
         const errorMessages = errors
             .map((e, i) => `Repo ${i + 1}: ${e.message}`)
-            .join('; ')
+            .join("; ")
         throw new Error(
             `Failed to load any repository. Errors: ${errorMessages}`
         )
@@ -126,7 +125,7 @@ export class RepoManager {
         storageDir: string
     ): Promise<RepositoryStrategy | null> {
         if (!this.systemRepoConfig) {
-            logger.debug('No system repository configured')
+            logger.debug("No system repository configured")
             return null
         }
 
@@ -136,7 +135,7 @@ export class RepoManager {
                     url: this.systemRepoConfig.url,
                     branch: this.systemRepoConfig.branch,
                 },
-                'Loading system repository'
+                "Loading system repository"
             )
 
             // System repo uses independent storage directory
@@ -145,7 +144,7 @@ export class RepoManager {
             // Create strategy
             const strategy = RepositoryFactory.createStrategy(
                 this.systemRepoConfig.url,
-                this.systemRepoConfig.branch || 'main',
+                this.systemRepoConfig.branch || "main",
                 GIT_MAX_RETRIES
             )
 
@@ -164,7 +163,7 @@ export class RepoManager {
             this.systemStrategy = strategy
             logger.info(
                 { url: this.systemRepoConfig.url },
-                'System repository loaded successfully'
+                "System repository loaded successfully"
             )
             return strategy
         } catch (error) {
@@ -175,7 +174,7 @@ export class RepoManager {
                     url: this.systemRepoConfig.url,
                     error: loadError.message,
                 },
-                'Failed to load system repository'
+                "Failed to load system repository"
             )
             // System repo load failure should not block main flow
             return null
@@ -202,7 +201,7 @@ export class RepoManager {
         storageDir: string,
         systemStorageDir?: string
     ): void {
-        logger.info('Starting watch mode for repositories')
+        logger.info("Starting watch mode for repositories")
 
         // Start watching active repository
         if (this.activeStrategy) {
@@ -211,7 +210,9 @@ export class RepoManager {
                 server,
                 storageDir,
                 systemStorageDir,
-                this.repoConfigs.find((c) => c.url === this.activeStrategy?.getUrl())?.branch
+                this.repoConfigs.find(
+                    (c) => c.url === this.activeStrategy?.getUrl()
+                )?.branch
             )
         }
 
@@ -226,14 +227,14 @@ export class RepoManager {
             )
         }
 
-        logger.info('Watch mode started for all repositories')
+        logger.info("Watch mode started for all repositories")
     }
 
     /**
      * Stop watch mode for all repositories
      */
     stopWatchMode(): void {
-        logger.info('Stopping watch mode for repositories')
+        logger.info("Stopping watch mode for repositories")
 
         // Stop watching active repository
         if (this.activeStrategy) {
@@ -245,7 +246,7 @@ export class RepoManager {
             this.stopStrategyWatchMode(this.systemStrategy)
         }
 
-        logger.info('Watch mode stopped for all repositories')
+        logger.info("Watch mode stopped for all repositories")
     }
 
     /**
@@ -269,45 +270,59 @@ export class RepoManager {
                 const repoPath = strategy.getUrl()
                 const resolvedSource = path.resolve(repoPath)
                 const resolvedTarget = path.resolve(storageDir)
-                const watchPath = resolvedSource === resolvedTarget ? repoPath : storageDir
+                const watchPath =
+                    resolvedSource === resolvedTarget ? repoPath : storageDir
 
                 logger.info(
                     { repoPath, storageDir, watchPath },
-                    'Starting file watcher for local repository'
+                    "Starting file watcher for local repository"
                 )
 
                 strategy.startWatching((filePath: string) => {
                     void (async (): Promise<void> => {
                         try {
-                            logger.info({ filePath }, 'File change detected, reloading single prompt')
-                            const result = await reloadSinglePrompt(server, filePath, storageDir)
+                            logger.info(
+                                { filePath },
+                                "File change detected, reloading single prompt"
+                            )
+                            const result = await reloadSinglePrompt(
+                                server,
+                                filePath,
+                                storageDir
+                            )
                             if (result.success) {
-                                logger.info({ filePath }, 'Single prompt reloaded successfully')
+                                logger.info(
+                                    { filePath },
+                                    "Single prompt reloaded successfully"
+                                )
                             } else if (result.error) {
                                 logger.info(
-                                    { 
-                                        filePath, 
+                                    {
+                                        filePath,
                                         errorMessage: result.error.message,
                                         errorStack: result.error.stack,
-                                        errorName: result.error.name
+                                        errorName: result.error.name,
                                     },
                                     `Single prompt reload failed: ${result.error.message}. Full reload may have been triggered.`
                                 )
                             } else {
                                 logger.info(
                                     { filePath },
-                                    'Single prompt reload failed (no error details), full reload may have been triggered'
+                                    "Single prompt reload failed (no error details), full reload may have been triggered"
                                 )
                             }
                         } catch (error) {
-                            const reloadError = error instanceof Error ? error : new Error(String(error))
+                            const reloadError =
+                                error instanceof Error
+                                    ? error
+                                    : new Error(String(error))
                             logger.error(
-                                { 
-                                    filePath, 
+                                {
+                                    filePath,
                                     errorMessage: reloadError.message,
                                     errorStack: reloadError.stack,
-                                    errorName: reloadError.name
-                                }, 
+                                    errorName: reloadError.name,
+                                },
                                 `Failed to reload single prompt: ${reloadError.message}`
                             )
                         }
@@ -316,17 +331,29 @@ export class RepoManager {
             } else if (strategy instanceof GitRepositoryStrategy) {
                 logger.info(
                     { repoUrl: strategy.getUrl(), branch, storageDir },
-                    'Starting Git polling'
+                    "Starting Git polling"
                 )
 
                 strategy.startPolling(
                     async () => {
                         try {
-                            logger.info('Git update detected, reloading all prompts')
-                            await reloadPrompts(server, storageDir, systemStorageDir)
+                            logger.info(
+                                "Git update detected, reloading all prompts"
+                            )
+                            await reloadPrompts(
+                                server,
+                                storageDir,
+                                systemStorageDir
+                            )
                         } catch (error) {
-                            const reloadError = error instanceof Error ? error : new Error(String(error))
-                            logger.error({ error: reloadError }, 'Failed to reload prompts after Git update')
+                            const reloadError =
+                                error instanceof Error
+                                    ? error
+                                    : new Error(String(error))
+                            logger.error(
+                                { error: reloadError },
+                                "Failed to reload prompts after Git update"
+                            )
                         }
                     },
                     storageDir,
@@ -335,14 +362,15 @@ export class RepoManager {
             } else {
                 logger.warn(
                     { strategyType: strategy.getType() },
-                    'Watch mode not supported for this strategy type'
+                    "Watch mode not supported for this strategy type"
                 )
             }
         } catch (error) {
-            const watchError = error instanceof Error ? error : new Error(String(error))
+            const watchError =
+                error instanceof Error ? error : new Error(String(error))
             logger.error(
                 { strategyType: strategy.getType(), error: watchError },
-                'Failed to start watch mode for strategy'
+                "Failed to start watch mode for strategy"
             )
         }
     }
@@ -356,18 +384,21 @@ export class RepoManager {
             if (strategy instanceof LocalRepositoryStrategy) {
                 if (strategy.isWatching()) {
                     strategy.stopWatching()
-                    logger.info('File watcher stopped for local repository')
+                    logger.info("File watcher stopped for local repository")
                 }
             } else if (strategy instanceof GitRepositoryStrategy) {
                 if (strategy.isPolling()) {
                     strategy.stopPolling()
-                    logger.info('Git polling stopped')
+                    logger.info("Git polling stopped")
                 }
             }
         } catch (error) {
-            const stopError = error instanceof Error ? error : new Error(String(error))
-            logger.warn({ strategyType: strategy.getType(), error: stopError }, 'Error stopping watch mode')
+            const stopError =
+                error instanceof Error ? error : new Error(String(error))
+            logger.warn(
+                { strategyType: strategy.getType(), error: stopError },
+                "Error stopping watch mode"
+            )
         }
     }
 }
-

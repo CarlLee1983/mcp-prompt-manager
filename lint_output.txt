@@ -1,0 +1,30 @@
+
+> mcp-prompt-manager@1.0.0 lint /Users/carl/Dev/Carl/mcp-prompt-manager
+> eslint src --ext .ts
+
+
+/Users/carl/Dev/Carl/mcp-prompt-manager/src/index.ts
+  345:28  warning  Unsafe member access .typeName on an `any` value     @typescript-eslint/no-unsafe-member-access
+  355:32  warning  Unsafe member access .description on an `any` value  @typescript-eslint/no-unsafe-member-access
+  361:21  warning  Unsafe call of a(n) `any` typed value                @typescript-eslint/no-unsafe-call
+  361:21  warning  Unsafe call of a(n) `any` typed value                @typescript-eslint/no-unsafe-call
+  361:33  warning  Unsafe member access .toLowerCase on an `any` value  @typescript-eslint/no-unsafe-member-access
+  361:47  warning  Unsafe member access .includes on an `any` value     @typescript-eslint/no-unsafe-member-access
+
+/Users/carl/Dev/Carl/mcp-prompt-manager/src/services/sourceManager.ts
+   766:59  error  Async arrow function has no 'await' expression                                        @typescript-eslint/require-await
+  1277:59  error  Async arrow function has no 'await' expression                                        @typescript-eslint/require-await
+  1501:33  error  'groupName' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  1511:19  error  'registry' is assigned a value but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+  1531:19  error  'promptDef' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/carl/Dev/Carl/mcp-prompt-manager/src/transports/httpAdapter.ts
+  19:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/carl/Dev/Carl/mcp-prompt-manager/src/transports/sseAdapter.ts
+  19:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  20:26  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 14 problems (5 errors, 9 warnings)
+
+ ELIFECYCLE  Command failed with exit code 1.
