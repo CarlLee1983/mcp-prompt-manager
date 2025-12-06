@@ -16,6 +16,7 @@ import { logger } from "../utils/logger.js"
 export class HttpTransportAdapter implements TransportAdapter {
     private readonly port: number
     private readonly host: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private server: any = null // HTTP server instance (type needs to be defined based on actual framework used)
 
     constructor(port: number = 3000, host: string = "localhost") {

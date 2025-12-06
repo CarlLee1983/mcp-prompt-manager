@@ -16,7 +16,9 @@ import { logger } from "../utils/logger.js"
 export class SseTransportAdapter implements TransportAdapter {
     private readonly port: number
     private readonly host: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private server: any = null // HTTP server instance
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private clients: Set<any> = new Set() // SSE client connection set
 
     constructor(port: number = 3001, host: string = "localhost") {

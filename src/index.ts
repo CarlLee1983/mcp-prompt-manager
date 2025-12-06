@@ -338,29 +338,32 @@ function checkSchemaWarnings(
     for (const [key, schema] of Object.entries(zodShape)) {
         if (!providedKeys.has(key)) {
             // Check if schema is optional or has default
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-            const schemaDef = (schema as any)._def
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+            const schemaDef = (schema as any)._def as
+                | { typeName?: string; description?: string }
+                | undefined
+
             const isOptional =
                 schemaDef?.typeName === "ZodOptional" ||
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                 schemaDef?.typeName === "ZodDefault" ||
                 schema instanceof z.ZodOptional ||
                 schema instanceof z.ZodDefault
 
             if (isOptional) {
                 // Optional field - check description for hints about importance
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+                const directDescription = (schema as any).description
                 const description =
                     schemaDef?.description ||
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-                    (schema as any).description ||
+                    (directDescription as string | undefined) ||
                     ""
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
+                // eslint-disable-next-line @typescript-eslint/no-base-to-string
+                const descriptionStr = String(description).toLowerCase()
+
                 if (
-                    description.toLowerCase().includes("recommended") ||
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-                    description.toLowerCase().includes("suggested")
+                    descriptionStr.includes("recommended") ||
+                    descriptionStr.includes("suggested")
                 ) {
                     warnings.push(`Missing recommended field: '${key}'`)
                 }
