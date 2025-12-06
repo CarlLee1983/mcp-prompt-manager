@@ -573,7 +573,12 @@ All MCP-compatible clients follow the same configuration format:
 | `CACHE_TTL`              |    No    |        -         | Time-to-live for cache items (optional).                                                                               |
 | `CACHE_CLEANUP_INTERVAL` |    No    |     `10000`      | Interval (ms) to clean up expired cache items.                                                                         |
 
-> **Security Note**: Never commit real passwords or API keys to `PROMPT_REPO_URL`. If using HTTPS with authentication, consider using SSH keys (`git@github.com...`) or mounting credentials safely in your environment.
+> **Security Note**:
+>
+> 1. Never commit `.env` files to version control. The `.env.example` file is provided as a template only.
+> 2. Avoid hardcoding sensitive credentials (passwords, tokens) in `PROMPT_REPO_URL`.
+> 3. Use SSH keys (`git@github.com...`) for secure, password-less authentication.
+> 4. For production, use Docker Secrets or your platform's secret management system.
 
 #### Important Configuration Notes
 
