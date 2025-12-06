@@ -25,7 +25,7 @@ export async function handleReload(
         return {
             content: [
                 {
-                    type: "text",
+                    type: "text" as const,
                     text: message,
                 },
             ],
@@ -38,7 +38,7 @@ export async function handleReload(
         return {
             content: [
                 {
-                    type: "text",
+                    type: "text" as const,
                     text: `Error: ${reloadError.message}`,
                 },
             ],
@@ -61,7 +61,7 @@ export async function handlePromptStats(): Promise<{
         return {
             content: [
                 {
-                    type: "text",
+                    type: "text" as const,
                     text: JSON.stringify(stats, null, 2),
                 },
             ],
@@ -74,7 +74,7 @@ export async function handlePromptStats(): Promise<{
         return {
             content: [
                 {
-                    type: "text",
+                    type: "text" as const,
                     text: `Error: ${statsError.message}`,
                 },
             ],
@@ -97,7 +97,7 @@ export async function handlePromptList(): Promise<{
         return {
             content: [
                 {
-                    type: "text",
+                    type: "text" as const,
                     text: JSON.stringify(runtimes, null, 2),
                 },
             ],
@@ -110,7 +110,7 @@ export async function handlePromptList(): Promise<{
         return {
             content: [
                 {
-                    type: "text",
+                    type: "text" as const,
                     text: `Error: ${listError.message}`,
                 },
             ],
@@ -155,7 +155,7 @@ export async function handleRepoSwitch(
         return {
             content: [
                 {
-                    type: "text",
+                    type: "text" as const,
                     text: message,
                 },
             ],
@@ -168,7 +168,7 @@ export async function handleRepoSwitch(
         return {
             content: [
                 {
-                    type: "text",
+                    type: "text" as const,
                     text: `Error: ${switchError.message}`,
                 },
             ],
