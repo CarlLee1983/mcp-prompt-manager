@@ -43,7 +43,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
         repoUrl: string,
         defaultBranch: string = "main",
         maxRetries: number = GIT_MAX_RETRIES,
-        gitFactory: GitFactory = (options) => simpleGit(options)
+        gitFactory: GitFactory = (options) => simpleGit(options || {})
     ) {
         // Validate inputs using Zod
         const config = this.configSchema.parse({
