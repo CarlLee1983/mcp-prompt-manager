@@ -43,7 +43,43 @@ This is a Git-driven Model Context Protocol (MCP) Server designed for managing a
 
 ## 🚀 Quick Start
 
-### Option 1: Docker Deployment (Recommended)
+### Option 1: Marketplace Installation (Easiest)
+
+If you're installing from an MCP marketplace (e.g., [mcp.so](https://mcp.so/)), follow the marketplace's installation instructions. Typically, you'll need to:
+
+1. **Install via marketplace**: Use the marketplace's installation interface
+2. **Configure your MCP client**: Add the server configuration to your MCP client
+
+#### Configuration Example
+
+After installation, configure your MCP client (Cursor, Claude Desktop, etc.) with the following:
+
+**For Cursor** (`~/Library/Application Support/Cursor/User/globalStorage/cursor.mcp/mcp.json`):
+
+```json
+{
+    "mcpServers": {
+        "mcp-prompt-manager": {
+            "command": "node",
+            "args": ["/absolute/path/to/mcp-prompt-manager/dist/index.js"],
+            "env": {
+                "PROMPT_REPO_URL": "https://github.com/yourusername/your-prompts-repo.git",
+                "MCP_LANGUAGE": "en",
+                "MCP_GROUPS": "common",
+                "LOG_LEVEL": "info"
+            }
+        }
+    }
+}
+```
+
+> **Note**: Replace `/absolute/path/to/mcp-prompt-manager/dist/index.js` with the actual path where the marketplace installed the server.
+
+> **Tip**: See [mcp.json.example](./mcp.json.example) for a complete configuration template.
+
+For detailed configuration instructions for different MCP clients, see the [Configuration](#-configuration) section below.
+
+### Option 2: Docker Deployment (Recommended)
 
 The easiest way to get started is using Docker:
 
@@ -67,7 +103,7 @@ docker-compose logs -f
 
 For detailed Docker deployment instructions, see [DOCKER.md](DOCKER.md).
 
-### Option 2: Local Installation
+### Option 3: Local Installation
 
 ## Quick Start (Development)
 

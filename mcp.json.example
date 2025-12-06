@@ -1,0 +1,15 @@
+{
+    "mcpServers": {
+        "mcp-prompt-manager": {
+            "command": "node",
+            "args": ["/absolute/path/to/mcp-prompt-manager/dist/index.js"],
+            "env": {
+                "PROMPT_REPO_URL": "https://github.com/yourusername/your-prompts-repo.git",
+                "MCP_LANGUAGE": "en",
+                "MCP_GROUPS": "common",
+                "LOG_LEVEL": "info"
+            }
+        }
+    }
+}
+

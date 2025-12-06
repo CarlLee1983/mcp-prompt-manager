@@ -21,28 +21,64 @@
 
 **主要優勢：**
 
-- 🔄 團隊協作：透過 Git 版本控制，確保團隊使用統一的 Prompt 版本
-- 🎯 動態模板：支援 Handlebars 語法，建立可重用的動態 Prompt
-- 🚀 零停機重載：支援熱重載，無需重啟即可更新 Prompts
-- 🔍 智能管理：內建 Prompt 版本管理、狀態追蹤和群組過濾
-- 📊 完整監控：提供系統健康狀態和 Prompt 統計資訊
+-   🔄 團隊協作：透過 Git 版本控制，確保團隊使用統一的 Prompt 版本
+-   🎯 動態模板：支援 Handlebars 語法，建立可重用的動態 Prompt
+-   🚀 零停機重載：支援熱重載，無需重啟即可更新 Prompts
+-   🔍 智能管理：內建 Prompt 版本管理、狀態追蹤和群組過濾
+-   📊 完整監控：提供系統健康狀態和 Prompt 統計資訊
 
 ## ✨ 特色
 
-- **Git 同步**: Prompts 直接從指定的 Git Repository 同步，確保團隊使用統一的 Prompt 版本。
-- **Handlebars 模板**: 支援強大的 Handlebars 語法，可以建立動態、可重用的 Prompt 模板。
-- **Partials 支援**: 支援 Handlebars Partials，方便拆分和重用 Prompt 片段（例如角色設定、輸出格式）。
-- **本地緩存**: 自動將 Git Repo 內容緩存到本地 `.prompts_cache` 目錄，提高讀取速度。
-- **快取失效策略**: 自動定期清理過期快取項目，避免記憶體洩漏，確保資料一致性。
-- **群組過濾**: 支援按群組過濾載入 prompts，只載入需要的部分。
-- **錯誤處理**: 完整的錯誤統計和報告，確保問題可追蹤。
-- **重試機制**: Git 操作自動重試，提高可靠性。
-- **類型安全**: 使用 Zod 驗證配置和 prompt 定義，確保類型安全。
-- **專業日誌**: 使用 pino 日誌系統，支援結構化日誌和多種日誌級別。
+-   **Git 同步**: Prompts 直接從指定的 Git Repository 同步，確保團隊使用統一的 Prompt 版本。
+-   **Handlebars 模板**: 支援強大的 Handlebars 語法，可以建立動態、可重用的 Prompt 模板。
+-   **Partials 支援**: 支援 Handlebars Partials，方便拆分和重用 Prompt 片段（例如角色設定、輸出格式）。
+-   **本地緩存**: 自動將 Git Repo 內容緩存到本地 `.prompts_cache` 目錄，提高讀取速度。
+-   **快取失效策略**: 自動定期清理過期快取項目，避免記憶體洩漏，確保資料一致性。
+-   **群組過濾**: 支援按群組過濾載入 prompts，只載入需要的部分。
+-   **錯誤處理**: 完整的錯誤統計和報告，確保問題可追蹤。
+-   **重試機制**: Git 操作自動重試，提高可靠性。
+-   **類型安全**: 使用 Zod 驗證配置和 prompt 定義，確保類型安全。
+-   **專業日誌**: 使用 pino 日誌系統，支援結構化日誌和多種日誌級別。
 
 ## 🚀 快速開始
 
-### 選項 1：Docker 部署（推薦）
+### 選項 1：Marketplace 安裝（最簡單）
+
+如果您是從 MCP marketplace（例如 [mcp.so](https://mcp.so/)）安裝，請遵循 marketplace 的安裝說明。通常，您需要：
+
+1. **透過 marketplace 安裝**：使用 marketplace 的安裝介面
+2. **配置您的 MCP 客戶端**：將伺服器配置添加到您的 MCP 客戶端
+
+#### 配置範例
+
+安裝後，請使用以下配置設定您的 MCP 客戶端（Cursor、Claude Desktop 等）：
+
+**適用於 Cursor** (`~/Library/Application Support/Cursor/User/globalStorage/cursor.mcp/mcp.json`)：
+
+```json
+{
+    "mcpServers": {
+        "mcp-prompt-manager": {
+            "command": "node",
+            "args": ["/absolute/path/to/mcp-prompt-manager/dist/index.js"],
+            "env": {
+                "PROMPT_REPO_URL": "https://github.com/yourusername/your-prompts-repo.git",
+                "MCP_LANGUAGE": "en",
+                "MCP_GROUPS": "common",
+                "LOG_LEVEL": "info"
+            }
+        }
+    }
+}
+```
+
+> **注意**：請將 `/absolute/path/to/mcp-prompt-manager/dist/index.js` 替換為 marketplace 實際安裝伺服器的路徑。
+
+> **提示**：請參閱 [mcp.json.example](./mcp.json.example) 以獲取完整的配置範本。
+
+不同 MCP 客戶端的詳細配置說明，請參閱下方的 [配置](#-配置) 章節。
+
+### 選項 2：Docker 部署（推薦）
 
 最簡單的方式是使用 Docker：
 
@@ -66,7 +102,7 @@ docker-compose logs -f
 
 詳細的 Docker 部署說明，請參閱 [DOCKER.md](DOCKER.md)。
 
-### 選項 2：本地安裝
+### 選項 3：本地安裝
 
 ### 1. 安裝
 
@@ -186,10 +222,10 @@ pnpm run inspector:dev
 
 Inspector 會啟動一個網頁介面，你可以在其中：
 
-- 查看所有已載入的 prompts
-- 測試 prompt 的輸出
-- 檢查錯誤訊息
-- 驗證環境變數設定
+-   查看所有已載入的 prompts
+-   測試 prompt 的輸出
+-   檢查錯誤訊息
+-   驗證環境變數設定
 
 ### 在 Cursor 中使用
 
@@ -216,6 +252,7 @@ Inspector 會啟動一個網頁介面，你可以在其中：
 #### 設定步驟
 
 1. **找到設定檔**：
+
     - 方法一：在 Cursor 中按 `Cmd/Ctrl + Shift + P`，搜尋 "MCP: Add server"
     - 方法二：直接編輯上述路徑的 `mcp.json` 檔案
 
@@ -238,6 +275,7 @@ Inspector 會啟動一個網頁介面，你可以在其中：
 ```
 
 3. **重要設定說明**：
+
     - `command`: 使用 `node` 執行編譯後的 JavaScript 檔案
     - `args`: 必須是**絕對路徑**指向 `dist/index.js`
     - `env`: 環境變數（可選，如果已在 `.env` 中設定）
@@ -249,9 +287,9 @@ Inspector 會啟動一個網頁介面，你可以在其中：
 
 > **注意**:
 >
-> - 請將 `/path/to/mcp-prompt-manager` 替換為本專案的實際絕對路徑
-> - 如果在 `.env` 中已經設定了環境變數，則 `env` 區塊可以省略，但直接在 JSON 中指定通常更穩健
-> - 如果設定檔不存在，需要先建立 `mcp.json` 檔案
+> -   請將 `/path/to/mcp-prompt-manager` 替換為本專案的實際絕對路徑
+> -   如果在 `.env` 中已經設定了環境變數，則 `env` 區塊可以省略，但直接在 JSON 中指定通常更穩健
+> -   如果設定檔不存在，需要先建立 `mcp.json` 檔案
 
 ### 在 Claude Desktop 中使用
 
@@ -312,9 +350,9 @@ touch ~/Library/Application\ Support/Claude/claude_desktop_config.json
 
 > **注意**:
 >
-> - 設定檔必須是有效的 JSON 格式
-> - 路徑必須使用絕對路徑
-> - 修改設定檔後必須完全重啟 Claude Desktop
+> -   設定檔必須是有效的 JSON 格式
+> -   路徑必須使用絕對路徑
+> -   修改設定檔後必須完全重啟 Claude Desktop
 
 ### 在 VS Code 中使用（透過擴充功能）
 
@@ -323,6 +361,7 @@ VS Code 可以透過 MCP 擴充功能來使用 MCP Server。
 #### 設定步驟
 
 1. **安裝 MCP 擴充功能**：
+
     - 在 VS Code 擴充功能市場搜尋 "MCP" 或 "Model Context Protocol"
     - 安裝對應的擴充功能
 
@@ -512,8 +551,8 @@ async def main():
 
 > **注意**: 路徑中的 `~` 代表使用者主目錄，在不同作業系統中會自動展開為：
 >
-> - macOS/Linux: `/Users/username` 或 `/home/username`
-> - Windows: `C:\Users\username`
+> -   macOS/Linux: `/Users/username` 或 `/home/username`
+> -   Windows: `C:\Users\username`
 
 ### 通用設定格式
 
@@ -538,17 +577,17 @@ async def main():
 
 #### 設定欄位說明
 
-- **`command`**: 執行命令（通常是 `node`）
-- **`args`**: 命令參數陣列，必須包含編譯後的 `dist/index.js` 的絕對路徑
-- **`env`**: 環境變數物件（可選）
-    - `PROMPT_REPO_URL`: Git 倉庫 URL 或本地路徑（必填）
-    - `MCP_LANGUAGE`: 輸出語言，`en` 或 `zh`（可選，預設 `en`）
-    - `MCP_GROUPS`: 要載入的群組，逗號分隔（可選，未設定時預設只載入 `common` 群組，系統會在日誌中提示）
-    - `STORAGE_DIR`: 本地緩存目錄（可選）
-    - `GIT_BRANCH`: Git 分支（可選，預設 `main`）
-    - `GIT_MAX_RETRIES`: Git 重試次數（可選，預設 `3`）
-    - `CACHE_CLEANUP_INTERVAL`: 快取清理間隔，毫秒（可選，預設 `10000`）
-    - `LOG_LEVEL`: 日誌級別（可選，預設 `info`）
+-   **`command`**: 執行命令（通常是 `node`）
+-   **`args`**: 命令參數陣列，必須包含編譯後的 `dist/index.js` 的絕對路徑
+-   **`env`**: 環境變數物件（可選）
+    -   `PROMPT_REPO_URL`: Git 倉庫 URL 或本地路徑（必填）
+    -   `MCP_LANGUAGE`: 輸出語言，`en` 或 `zh`（可選，預設 `en`）
+    -   `MCP_GROUPS`: 要載入的群組，逗號分隔（可選，未設定時預設只載入 `common` 群組，系統會在日誌中提示）
+    -   `STORAGE_DIR`: 本地緩存目錄（可選）
+    -   `GIT_BRANCH`: Git 分支（可選，預設 `main`）
+    -   `GIT_MAX_RETRIES`: Git 重試次數（可選，預設 `3`）
+    -   `CACHE_CLEANUP_INTERVAL`: 快取清理間隔，毫秒（可選，預設 `10000`）
+    -   `LOG_LEVEL`: 日誌級別（可選，預設 `info`）
 
 #### 重要注意事項
 
@@ -575,9 +614,9 @@ pnpm run inspector:dev
 
 這會啟動一個網頁介面，你可以在其中：
 
-- 查看所有已載入的 prompts
-- 測試 prompt 的輸出
-- 檢查錯誤訊息
+-   查看所有已載入的 prompts
+-   測試 prompt 的輸出
+-   檢查錯誤訊息
 
 > **注意**: Inspector 執行的是 `dist/index.js`，修改源碼後必須先執行 `build` 才能看到最新變更。
 
@@ -618,17 +657,17 @@ ls -la /path/to/mcp-prompt-manager/.prompts_cache
 
 **解決方案**:
 
-- 確認應用程式已經啟動過至少一次（會自動建立設定目錄）
-- 手動建立設定檔和目錄
-- 檢查路徑是否正確（注意大小寫和空格）
+-   確認應用程式已經啟動過至少一次（會自動建立設定目錄）
+-   手動建立設定檔和目錄
+-   檢查路徑是否正確（注意大小寫和空格）
 
 #### 問題 2: JSON 格式錯誤
 
 **解決方案**:
 
-- 使用 JSON 驗證工具檢查格式（如 [JSONLint](https://jsonlint.com/)）
-- 確保所有字串都用雙引號
-- 確保最後一個項目後沒有逗號
+-   使用 JSON 驗證工具檢查格式（如 [JSONLint](https://jsonlint.com/)）
+-   確保所有字串都用雙引號
+-   確保最後一個項目後沒有逗號
 
 #### 問題 3: Server 無法啟動
 
@@ -675,22 +714,22 @@ my-prompts/
 
 ### 群組過濾規則
 
-- **根目錄** (`/`): 永遠載入
-- **common 群組** (`common/`): 永遠載入
-- **其他群組**: 只有在 `MCP_GROUPS` 環境變數中指定時才載入
+-   **根目錄** (`/`): 永遠載入
+-   **common 群組** (`common/`): 永遠載入
+-   **其他群組**: 只有在 `MCP_GROUPS` 環境變數中指定時才載入
 
 #### 預設行為
 
 當 `MCP_GROUPS` **未設定**時：
 
-- 系統會自動載入 `common` 群組（以及根目錄的 prompts）
-- 啟動時會在日誌中明確提示使用預設群組
-- 日誌會包含提示訊息，建議設定 `MCP_GROUPS` 以載入更多群組
+-   系統會自動載入 `common` 群組（以及根目錄的 prompts）
+-   啟動時會在日誌中明確提示使用預設群組
+-   日誌會包含提示訊息，建議設定 `MCP_GROUPS` 以載入更多群組
 
 #### 範例
 
-- `MCP_GROUPS=laravel,vue` → 載入根目錄、common、laravel、vue
-- `MCP_GROUPS=` 或未設定 → 只載入根目錄和 common（系統會提示使用預設值）
+-   `MCP_GROUPS=laravel,vue` → 載入根目錄、common、laravel、vue
+-   `MCP_GROUPS=` 或未設定 → 只載入根目錄和 common（系統會提示使用預設值）
 
 ### Prompt 定義檔範例 (`.yaml`)
 
@@ -722,9 +761,9 @@ template: |
 
 Prompt 支援三種參數類型：
 
-- `string`: 字串類型（預設）
-- `number`: 數字類型
-- `boolean`: 布林類型
+-   `string`: 字串類型（預設）
+-   `number`: 數字類型
+-   `boolean`: 布林類型
 
 ### Registry 功能（可選）
 
@@ -745,19 +784,19 @@ prompts:
 
 #### Registry 欄位說明
 
-- **`id`**: Prompt ID（必填）
-- **`group`**: 群組名稱（可選）
-- **`visibility`**: 可見性設定
-    - `public`: 公開（預設）
-    - `private`: 私有
-    - `internal`: 內部使用
-- **`deprecated`**: 是否已棄用（預設 `false`）
+-   **`id`**: Prompt ID（必填）
+-   **`group`**: 群組名稱（可選）
+-   **`visibility`**: 可見性設定
+    -   `public`: 公開（預設）
+    -   `private`: 私有
+    -   `internal`: 內部使用
+-   **`deprecated`**: 是否已棄用（預設 `false`）
 
 #### Registry 的作用
 
-- **集中管理**: 在單一檔案中管理所有 prompts 的可見性和棄用狀態
-- **覆蓋預設值**: 可以覆蓋 prompt 定義檔中的預設設定
-- **版本控制**: 透過 Git 追蹤 prompts 的生命週期
+-   **集中管理**: 在單一檔案中管理所有 prompts 的可見性和棄用狀態
+-   **覆蓋預設值**: 可以覆蓋 prompt 定義檔中的預設設定
+-   **版本控制**: 透過 Git 追蹤 prompts 的生命週期
 
 > **注意**: `registry.yaml` 是可選的。如果不存在，系統會使用 prompt 定義檔中的預設值。
 
@@ -765,28 +804,28 @@ prompts:
 
 每個 prompt 都有一個運行狀態（`runtime_state`），用於表示 prompt 的當前可用性：
 
-- **`active`**: 活躍狀態，prompt 正常運作，可以作為 MCP Tool 使用
-- **`legacy`**: 遺留狀態，prompt 仍然可用但已標記為舊版本，建議使用新版本
-- **`invalid`**: 無效狀態，prompt 定義有問題（例如缺少必要欄位、模板錯誤等），無法使用
-- **`disabled`**: 已停用，prompt 被明確停用（例如在 registry 中標記為 deprecated）
-- **`warning`**: 警告狀態，prompt 可以運作但有一些警告（例如版本過舊）
+-   **`active`**: 活躍狀態，prompt 正常運作，可以作為 MCP Tool 使用
+-   **`legacy`**: 遺留狀態，prompt 仍然可用但已標記為舊版本，建議使用新版本
+-   **`invalid`**: 無效狀態，prompt 定義有問題（例如缺少必要欄位、模板錯誤等），無法使用
+-   **`disabled`**: 已停用，prompt 被明確停用（例如在 registry 中標記為 deprecated）
+-   **`warning`**: 警告狀態，prompt 可以運作但有一些警告（例如版本過舊）
 
 ### Prompt 來源
 
 每個 prompt 都有一個來源（`source`）標記，表示 metadata 的來源：
 
-- **`embedded`**: 嵌入在 prompt 定義檔中的 metadata（使用 `metadata:` 區塊）
-- **`registry`**: 來自 `registry.yaml` 的設定
-- **`legacy`**: 遺留模式，沒有 metadata，使用預設值
+-   **`embedded`**: 嵌入在 prompt 定義檔中的 metadata（使用 `metadata:` 區塊）
+-   **`registry`**: 來自 `registry.yaml` 的設定
+-   **`legacy`**: 遺留模式，沒有 metadata，使用預設值
 
 ### Prompt 狀態
 
 每個 prompt 都有一個狀態（`status`），表示 prompt 的開發階段：
 
-- **`draft`**: 草稿，正在開發中
-- **`stable`**: 穩定版本，可以正常使用
-- **`deprecated`**: 已棄用，不建議使用
-- **`legacy`**: 遺留版本，仍然可用但建議升級
+-   **`draft`**: 草稿，正在開發中
+-   **`stable`**: 穩定版本，可以正常使用
+-   **`deprecated`**: 已棄用，不建議使用
+-   **`legacy`**: 遺留版本，仍然可用但建議升級
 
 ## 🔧 MCP 工具與資源
 
@@ -800,9 +839,9 @@ prompts:
 
 重載所有 Prompts，無需重啟伺服器（熱重載）。
 
-- **功能**：從 Git 倉庫拉取最新變更，清除快取，重新載入所有 Handlebars partials 和 prompts
-- **參數**：無
-- **使用範例**：
+-   **功能**：從 Git 倉庫拉取最新變更，清除快取，重新載入所有 Handlebars partials 和 prompts
+-   **參數**：無
+-   **使用範例**：
     ```json
     {
         "tool": "mcp.reload",
@@ -814,27 +853,27 @@ prompts:
 
 獲取 Prompts 統計資訊。
 
-- **功能**：返回所有 prompts 的統計資訊，包括各運行狀態的數量（active、legacy、invalid、disabled、warning）
-- **參數**：無
-- **返回內容**：
-    - `total`: 總數
-    - `active`: 活躍狀態數量
-    - `legacy`: 遺留狀態數量
-    - `invalid`: 無效狀態數量
-    - `disabled`: 已停用數量
-    - `warning`: 警告狀態數量
+-   **功能**：返回所有 prompts 的統計資訊，包括各運行狀態的數量（active、legacy、invalid、disabled、warning）
+-   **參數**：無
+-   **返回內容**：
+    -   `total`: 總數
+    -   `active`: 活躍狀態數量
+    -   `legacy`: 遺留狀態數量
+    -   `invalid`: 無效狀態數量
+    -   `disabled`: 已停用數量
+    -   `warning`: 警告狀態數量
 
 #### 3. `mcp.list` / `mcp.prompt.list`
 
 列出所有 Prompts，支援多種過濾條件。
 
-- **功能**：列出所有 prompt runtimes，包含完整的元數據資訊
-- **參數**（可選）：
-    - `status`: 過濾狀態（`draft`、`stable`、`deprecated`、`legacy`）
-    - `group`: 過濾群組名稱
-    - `tag`: 過濾標籤（prompts 必須包含此標籤）
-    - `runtime_state`: 過濾運行狀態（`active`、`legacy`、`invalid`、`disabled`、`warning`）
-- **使用範例**：
+-   **功能**：列出所有 prompt runtimes，包含完整的元數據資訊
+-   **參數**（可選）：
+    -   `status`: 過濾狀態（`draft`、`stable`、`deprecated`、`legacy`）
+    -   `group`: 過濾群組名稱
+    -   `tag`: 過濾標籤（prompts 必須包含此標籤）
+    -   `runtime_state`: 過濾運行狀態（`active`、`legacy`、`invalid`、`disabled`、`warning`）
+-   **使用範例**：
     ```json
     {
         "tool": "mcp.list",
@@ -849,10 +888,10 @@ prompts:
 
 檢查特定 Prompt 的詳細運行資訊。
 
-- **功能**：根據 Prompt ID 獲取完整的運行時元數據，包括狀態、來源、版本、標籤和使用案例
-- **參數**：
-    - `id`: Prompt ID（必填）
-- **使用範例**：
+-   **功能**：根據 Prompt ID 獲取完整的運行時元數據，包括狀態、來源、版本、標籤和使用案例
+-   **參數**：
+    -   `id`: Prompt ID（必填）
+-   **使用範例**：
     ```json
     {
         "tool": "mcp.inspect",
@@ -866,11 +905,11 @@ prompts:
 
 切換到不同的 Prompt 倉庫並重新載入（零停機時間）。
 
-- **功能**：切換到新的 Git 倉庫並重新載入所有 prompts
-- **參數**：
-    - `repo_url`: 倉庫 URL（必填）
-    - `branch`: 分支名稱（可選）
-- **使用範例**：
+-   **功能**：切換到新的 Git 倉庫並重新載入所有 prompts
+-   **參數**：
+    -   `repo_url`: 倉庫 URL（必填）
+    -   `branch`: 分支名稱（可選）
+-   **使用範例**：
     ```json
     {
         "tool": "mcp.repo.switch",
@@ -885,17 +924,17 @@ prompts:
 
 預覽/渲染 Prompt 模板（除錯工具）。
 
-- **功能**：使用給定的參數渲染 Prompt 模板，顯示最終文字而不執行它。用於驗證模板邏輯。
-- **參數**：
-    - `promptId`: Prompt ID（必填，例如 `'laravel:code-review'`）
-    - `args`: JSON 物件，包含要傳入模板的變數（必填）
-- **返回內容**：
-    - `success`: 布林值，表示成功或失敗
-    - `renderedText`: 渲染後的 Prompt 文字
-    - `highlightedText`: 渲染後的文字，變數以 Markdown 粗體標示
-    - `statistics`: 物件，包含 `renderedLength`（字元數）和 `estimatedTokens`（估算的 token 數）
-    - `warnings`: Schema 驗證警告陣列（例如缺少建議欄位）
-- **使用範例**：
+-   **功能**：使用給定的參數渲染 Prompt 模板，顯示最終文字而不執行它。用於驗證模板邏輯。
+-   **參數**：
+    -   `promptId`: Prompt ID（必填，例如 `'laravel:code-review'`）
+    -   `args`: JSON 物件，包含要傳入模板的變數（必填）
+-   **返回內容**：
+    -   `success`: 布林值，表示成功或失敗
+    -   `renderedText`: 渲染後的 Prompt 文字
+    -   `highlightedText`: 渲染後的文字，變數以 Markdown 粗體標示
+    -   `statistics`: 物件，包含 `renderedLength`（字元數）和 `estimatedTokens`（估算的 token 數）
+    -   `warnings`: Schema 驗證警告陣列（例如缺少建議欄位）
+-   **使用範例**：
     ```json
     {
         "tool": "preview_prompt",
@@ -908,11 +947,11 @@ prompts:
         }
     }
     ```
-- **進階功能**：
-    - **Schema 驗證**：嚴格驗證參數是否符合 Prompt 的 Zod schema
-    - **Token 估算**：估算 token 數量（支援英文和中文文字）
-    - **變數高亮**：使用 Markdown 粗體標示動態替換的變數
-    - **Schema 警告**：檢測並報告缺少的必填或建議欄位
+-   **進階功能**：
+    -   **Schema 驗證**：嚴格驗證參數是否符合 Prompt 的 Zod schema
+    -   **Token 估算**：估算 token 數量（支援英文和中文文字）
+    -   **變數高亮**：使用 Markdown 粗體標示動態替換的變數
+    -   **Schema 警告**：檢測並報告缺少的必填或建議欄位
 
 ### MCP 資源（Resources）
 
@@ -920,40 +959,40 @@ prompts:
 
 系統健康狀態資源。
 
-- **URI**: `system://health`
-- **MIME 類型**: `application/json`
-- **內容**：包含以下資訊：
-    - `git`: Git 倉庫資訊（URL、路徑、HEAD commit）
-    - `prompts`: Prompts 統計（總數、各狀態數量、已載入數量、群組列表）
-    - `registry`: Registry 狀態（是否啟用、來源）
-    - `cache`: 快取資訊（大小、清理間隔）
-    - `system`: 系統資訊（運行時間、記憶體使用）
+-   **URI**: `system://health`
+-   **MIME 類型**: `application/json`
+-   **內容**：包含以下資訊：
+    -   `git`: Git 倉庫資訊（URL、路徑、HEAD commit）
+    -   `prompts`: Prompts 統計（總數、各狀態數量、已載入數量、群組列表）
+    -   `registry`: Registry 狀態（是否啟用、來源）
+    -   `cache`: 快取資訊（大小、清理間隔）
+    -   `system`: 系統資訊（運行時間、記憶體使用）
 
 #### 2. `prompts://list`
 
 Prompts 列表資源。
 
-- **URI**: `prompts://list`
-- **MIME 類型**: `application/json`
-- **內容**：所有 prompts 的完整元數據列表，包括：
-    - `id`: Prompt ID
-    - `title`: 標題
-    - `version`: 版本
-    - `status`: 狀態
-    - `runtime_state`: 運行狀態
-    - `source`: 來源
-    - `tags`: 標籤陣列
-    - `use_cases`: 使用案例陣列
-    - `group`: 群組名稱
-    - `visibility`: 可見性
+-   **URI**: `prompts://list`
+-   **MIME 類型**: `application/json`
+-   **內容**：所有 prompts 的完整元數據列表，包括：
+    -   `id`: Prompt ID
+    -   `title`: 標題
+    -   `version`: 版本
+    -   `status`: 狀態
+    -   `runtime_state`: 運行狀態
+    -   `source`: 來源
+    -   `tags`: 標籤陣列
+    -   `use_cases`: 使用案例陣列
+    -   `group`: 群組名稱
+    -   `visibility`: 可見性
 
 ### 工具使用建議
 
-- **開發時**：使用 `mcp.reload` 快速重載 prompts，無需重啟伺服器
-- **除錯時**：使用 `mcp.inspect` 檢查特定 prompt 的詳細資訊，或使用 `preview_prompt` 測試模板渲染
-- **監控時**：使用 `mcp.stats` 和 `system://health` 資源監控系統狀態
-- **查詢時**：使用 `mcp.list` 配合過濾條件查找特定 prompts
-- **測試時**：使用 `preview_prompt` 驗證模板邏輯、檢查 token 數量，並在實際執行前查看變數替換結果
+-   **開發時**：使用 `mcp.reload` 快速重載 prompts，無需重啟伺服器
+-   **除錯時**：使用 `mcp.inspect` 檢查特定 prompt 的詳細資訊，或使用 `preview_prompt` 測試模板渲染
+-   **監控時**：使用 `mcp.stats` 和 `system://health` 資源監控系統狀態
+-   **查詢時**：使用 `mcp.list` 配合過濾條件查找特定 prompts
+-   **測試時**：使用 `preview_prompt` 驗證模板邏輯、檢查 token 數量，並在實際執行前查看變數替換結果
 
 ## 💻 開發指南
 
@@ -964,11 +1003,13 @@ MCP Prompt Manager 採用模組化架構，具有清晰的職責分離：
 #### 核心元件
 
 1. **Repository Interface** (`src/repositories/strategy.ts`)
+
     - 不同儲存庫類型的抽象介面（Git、本地）
     - 支援多個儲存庫策略，按優先順序載入
     - 處理儲存庫同步和檔案監聽
 
 2. **Source Manager** (`src/services/sourceManager.ts`)
+
     - 使用單例模式管理 Prompt 生命週期
     - 處理 Prompt 載入、快取和註冊
     - 在載入時編譯 Handlebars 模板以提升效能
@@ -1028,11 +1069,11 @@ MCP Prompt Manager 採用模組化架構，具有清晰的職責分離：
 
 #### 關鍵模組
 
-- **Repository Interface**: Git 和本地儲存庫的抽象策略模式
-- **Source Manager**: 集中式 Prompt 生命週期管理與快取
-- **Cache Provider**: 可插拔的快取系統（本地記憶體或 Redis）
-- **Loaders**: 載入 Prompts 和 Partials 的高階 API
-- **MCP Tools**: 基於載入的 Prompts 動態註冊工具
+-   **Repository Interface**: Git 和本地儲存庫的抽象策略模式
+-   **Source Manager**: 集中式 Prompt 生命週期管理與快取
+-   **Cache Provider**: 可插拔的快取系統（本地記憶體或 Redis）
+-   **Loaders**: 載入 Prompts 和 Partials 的高階 API
+-   **MCP Tools**: 基於載入的 Prompts 動態註冊工具
 
 ### 專案結構
 
@@ -1130,17 +1171,17 @@ pnpm format:check
 
 > **重要提示**:
 >
-> - `inspector` 指令執行的是 `dist/index.js`（編譯後的檔案）
-> - 修改源碼後必須先執行 `build` 才能看到最新變更
-> - 使用 `inspector:dev` 可以自動編譯並啟動，適合開發時使用
+> -   `inspector` 指令執行的是 `dist/index.js`（編譯後的檔案）
+> -   修改源碼後必須先執行 `build` 才能看到最新變更
+> -   使用 `inspector:dev` 可以自動編譯並啟動，適合開發時使用
 
 ## 🧪 測試
 
 專案包含完整的測試套件：
 
-- **單元測試**: 多個測試檔案涵蓋所有核心功能
-- **整合測試**: 端對端測試，涵蓋 prompt 載入和 MCP 工具
-- **總計**: 107 個測試，全部通過
+-   **單元測試**: 多個測試檔案涵蓋所有核心功能
+-   **整合測試**: 端對端測試，涵蓋 prompt 載入和 MCP 工具
+-   **總計**: 107 個測試，全部通過
 
 運行測試：
 
@@ -1159,10 +1200,10 @@ pnpm test:ui
 
 本專案透過完善的測試覆蓋率維持高程式碼品質，設有以下門檻：
 
-- **語句覆蓋率**：≥ 80%
-- **行覆蓋率**：≥ 75%
-- **函數覆蓋率**：≥ 75%
-- **分支覆蓋率**：≥ 70%
+-   **語句覆蓋率**：≥ 80%
+-   **行覆蓋率**：≥ 75%
+-   **函數覆蓋率**：≥ 75%
+-   **分支覆蓋率**：≥ 70%
 
 > **注意**：覆蓋率報告使用 `@vitest/coverage-v8`，需要 Node.js 19+。覆蓋率閾值會強制檢查以維持程式碼品質。如果覆蓋率低於閾值，測試會失敗以確保品質標準。
 
@@ -1198,9 +1239,9 @@ pnpm test:coverage:view
 
 使用 [Husky](https://typicode.github.io/husky/) 和 [lint-staged](https://github.com/okonet/lint-staged) 在每次提交前自動執行檢查和格式化：
 
-- **ESLint**：自動修復 TypeScript 檔案中的 linting 問題
-- **Prettier**：自動格式化程式碼以確保一致的風格
-- **型別安全**：已啟用 TypeScript 嚴格模式（`tsconfig.json` 中的 `strict: true`）
+-   **ESLint**：自動修復 TypeScript 檔案中的 linting 問題
+-   **Prettier**：自動格式化程式碼以確保一致的風格
+-   **型別安全**：已啟用 TypeScript 嚴格模式（`tsconfig.json` 中的 `strict: true`）
 
 Pre-commit hook 僅在已暫存的檔案上執行，確保快速提交的同時維持程式碼品質。
 
@@ -1208,11 +1249,11 @@ Pre-commit hook 僅在已暫存的檔案上執行，確保快速提交的同時�
 
 GitHub Actions CI workflow 在每次推送和 Pull Request 時執行：
 
-- **Node.js 相容性**：在 Node.js 16.x、18.x 和 20.x 上測試
-- **Linting**：ESLint 檢查程式碼品質和風格
-- **型別檢查**：TypeScript 型別檢查（`tsc --noEmit`）
-- **測試**：完整的測試套件與覆蓋率報告
-- **覆蓋率上傳**：自動上傳到 Codecov
+-   **Node.js 相容性**：在 Node.js 16.x、18.x 和 20.x 上測試
+-   **Linting**：ESLint 檢查程式碼品質和風格
+-   **型別檢查**：TypeScript 型別檢查（`tsc --noEmit`）
+-   **測試**：完整的測試套件與覆蓋率報告
+-   **覆蓋率上傳**：自動上傳到 Codecov
 
 #### Pull Request 的必要檢查
 
@@ -1254,10 +1295,10 @@ GitHub Actions CI workflow 在每次推送和 Pull Request 時執行：
 
 #### 快取機制
 
-- **快取 TTL**: 5 秒（硬編碼）
-- **清理間隔**: 預設 10 秒（`CACHE_TTL * 2`），可透過 `CACHE_CLEANUP_INTERVAL` 環境變數調整
-- **自動清理**: 應用程式啟動時自動啟動清理機制
-- **優雅關閉**: 應用程式關閉時自動停止清理定時器
+-   **快取 TTL**: 5 秒（硬編碼）
+-   **清理間隔**: 預設 10 秒（`CACHE_TTL * 2`），可透過 `CACHE_CLEANUP_INTERVAL` 環境變數調整
+-   **自動清理**: 應用程式啟動時自動啟動清理機制
+-   **優雅關閉**: 應用程式關閉時自動停止清理定時器
 
 #### 工作原理
 
@@ -1290,9 +1331,9 @@ CACHE_CLEANUP_INTERVAL=30000  # 30 秒清理一次
 
 ### 安全性
 
-- ✅ 輸入驗證：所有環境變數都經過 Zod 驗證
-- ✅ 路徑安全：防止路徑遍歷攻擊
-- ✅ 群組驗證：群組名稱格式驗證（只允許字母、數字、下劃線、破折號）
+-   ✅ 輸入驗證：所有環境變數都經過 Zod 驗證
+-   ✅ 路徑安全：防止路徑遍歷攻擊
+-   ✅ 群組驗證：群組名稱格式驗證（只允許字母、數字、下劃線、破折號）
 
 ## 📝 日誌
 
@@ -1300,19 +1341,19 @@ CACHE_CLEANUP_INTERVAL=30000  # 30 秒清理一次
 
 ### 日誌級別
 
-- `fatal`: 致命錯誤，導致程序退出
-- `error`: 錯誤訊息
-- `warn`: 警告訊息
-- `info`: 一般資訊
-- `debug`: 除錯訊息
-- `trace`: 追蹤訊息
-- `silent`: 完全禁用日誌輸出
+-   `fatal`: 致命錯誤，導致程序退出
+-   `error`: 錯誤訊息
+-   `warn`: 警告訊息
+-   `info`: 一般資訊
+-   `debug`: 除錯訊息
+-   `trace`: 追蹤訊息
+-   `silent`: 完全禁用日誌輸出
 
 **預設行為**：
 
-- **生產環境**（`NODE_ENV` 未設定或不是 `development`）：預設為 `warn`，只輸出警告和錯誤
-- **開發環境**（`NODE_ENV=development`）：預設為 `info`，輸出所有資訊級別以上的日誌
-- 可通過 `LOG_LEVEL` 環境變數覆蓋預設值
+-   **生產環境**（`NODE_ENV` 未設定或不是 `development`）：預設為 `warn`，只輸出警告和錯誤
+-   **開發環境**（`NODE_ENV=development`）：預設為 `info`，輸出所有資訊級別以上的日誌
+-   可通過 `LOG_LEVEL` 環境變數覆蓋預設值
 
 ### 設定日誌級別
 
@@ -1375,9 +1416,9 @@ docker-compose logs -f
 
 ### 部署模式
 
-- **stdio 模式**：用於 MCP 客戶端直接連接
-- **http 模式**：用於 RESTful API 訪問
-- **sse 模式**：用於 Server-Sent Events 實時推送
+-   **stdio 模式**：用於 MCP 客戶端直接連接
+-   **http 模式**：用於 RESTful API 訪問
+-   **sse 模式**：用於 Server-Sent Events 實時推送
 
 ### 文檔
 
@@ -1385,21 +1426,21 @@ docker-compose logs -f
 
 ## 📦 主要依賴
 
-- **@modelcontextprotocol/sdk**: MCP SDK，提供 MCP Server 核心功能
-- **handlebars**: Handlebars 模板引擎，支援動態 Prompt 生成
-- **simple-git**: Git 操作庫，用於同步 Git 倉庫
-- **js-yaml**: YAML 解析器，用於解析 Prompt 定義檔
-- **zod**: TypeScript 優先的 schema 驗證庫，用於配置和類型驗證
-- **pino**: 高性能結構化日誌庫
-- **dotenv**: 環境變數載入工具
+-   **@modelcontextprotocol/sdk**: MCP SDK，提供 MCP Server 核心功能
+-   **handlebars**: Handlebars 模板引擎，支援動態 Prompt 生成
+-   **simple-git**: Git 操作庫，用於同步 Git 倉庫
+-   **js-yaml**: YAML 解析器，用於解析 Prompt 定義檔
+-   **zod**: TypeScript 優先的 schema 驗證庫，用於配置和類型驗證
+-   **pino**: 高性能結構化日誌庫
+-   **dotenv**: 環境變數載入工具
 
 ## 📚 相關資源
 
-- [Model Context Protocol 官方文檔](https://modelcontextprotocol.io/)
-- [Handlebars 文檔](https://handlebarsjs.com/)
-- [Zod 文檔](https://zod.dev/)
-- [Simple Git 文檔](https://github.com/steveukx/git-js)
-- [Pino 文檔](https://getpino.io/)
+-   [Model Context Protocol 官方文檔](https://modelcontextprotocol.io/)
+-   [Handlebars 文檔](https://handlebarsjs.com/)
+-   [Zod 文檔](https://zod.dev/)
+-   [Simple Git 文檔](https://github.com/steveukx/git-js)
+-   [Pino 文檔](https://getpino.io/)
 
 ## 📄 授權
 
