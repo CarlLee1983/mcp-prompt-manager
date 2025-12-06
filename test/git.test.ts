@@ -7,6 +7,9 @@ import * as env from '../src/config/env.js'
 import * as fileSystem from '../src/utils/fileSystem.js'
 import { logger } from '../src/utils/logger.js'
 
+// Save original fs.stat to avoid infinite recursion in mocks
+const originalFsStat = fs.stat
+
 // Mock dependencies
 vi.mock('../src/config/env.js', async () => {
     const actual = await vi.importActual('../src/config/env.js')
@@ -198,8 +201,8 @@ describe('git.ts', () => {
                 if (pathStr === testStorageDir) {
                     throw new Error('Not found') // Storage doesn't exist
                 }
-                // For other paths, use real fs.stat
-                return fs.stat(pathArg)
+                // For other paths, use real fs.stat (use original to avoid recursion)
+                return originalFsStat(pathArg)
             })
 
             await syncRepo()
@@ -259,8 +262,8 @@ describe('git.ts', () => {
                 if (statCallCount === 1 && pathStr === testSourceDir) {
                     return {} as any // Source exists
                 }
-                // For all other calls, use real fs.stat
-                return fs.stat(pathArg)
+                // For all other calls, use real fs.stat (use original to avoid recursion)
+                return originalFsStat(pathArg)
             })
 
             // Mock copyFile to fail for one file
@@ -524,8 +527,8 @@ describe('git.ts', () => {
                 if (statCallCount === 1 && pathStr === testSourceDir) {
                     return {} as any // Source exists
                 }
-                // For all other calls, use real fs.stat
-                return fs.stat(pathArg)
+                // For all other calls, use real fs.stat (use original to avoid recursion)
+                return originalFsStat(pathArg)
             })
 
             await syncRepo()
