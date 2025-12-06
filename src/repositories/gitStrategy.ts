@@ -1,4 +1,5 @@
-import { simpleGit, type SimpleGitOptions } from "simple-git"
+import { simpleGit, type SimpleGit, type SimpleGitOptions } from "simple-git"
+import { z } from "zod"
 import fs from "fs/promises"
 import path from "path"
 import type { RepositoryStrategy } from "./strategy.js"
@@ -7,6 +8,8 @@ import { logger } from "../utils/logger.js"
 import { ensureDirectoryAccess, clearFileCache } from "../utils/fileSystem.js"
 import { GIT_MAX_RETRIES, GIT_POLLING_INTERVAL } from "../config/env.js"
 
+export type GitFactory = (options?: Partial<SimpleGitOptions>) => SimpleGit
+
 /**
  * Git Repository Strategy
  * Handles synchronization operations for Git remote repositories
@@ -14,6 +17,7 @@ import { GIT_MAX_RETRIES, GIT_POLLING_INTERVAL } from "../config/env.js"
 export class GitRepositoryStrategy implements RepositoryStrategy {
     private readonly repoUrl: string
     private readonly defaultBranch: string
+    private readonly gitFactory: GitFactory
     private readonly maxRetries: number
     private pollingTimer: NodeJS.Timeout | null = null
     private pollingCallback: (() => Promise<void>) | null = null
@@ -21,14 +25,37 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
     private currentBranch: string | null = null
     private lastCommitHash: string | null = null
 
+    private readonly configSchema = z.object({
+        repoUrl: z
+            .string()
+            .refine(
+                (url) =>
+                    url.startsWith("http://") ||
+                    url.startsWith("https://") ||
+                    url.startsWith("git@"),
+                "Invalid Git URL format"
+            ),
+        defaultBranch: z.string().min(1),
+        maxRetries: z.number().min(0),
+    })
+
     constructor(
         repoUrl: string,
         defaultBranch: string = "main",
-        maxRetries: number = GIT_MAX_RETRIES
+        maxRetries: number = GIT_MAX_RETRIES,
+        gitFactory: GitFactory = (options) => simpleGit(options)
     ) {
-        this.repoUrl = repoUrl
-        this.defaultBranch = defaultBranch
-        this.maxRetries = maxRetries
+        // Validate inputs using Zod
+        const config = this.configSchema.parse({
+            repoUrl,
+            defaultBranch,
+            maxRetries,
+        })
+
+        this.repoUrl = config.repoUrl
+        this.defaultBranch = config.defaultBranch
+        this.maxRetries = config.maxRetries
+        this.gitFactory = gitFactory
     }
 
     getType(): string {
@@ -88,7 +115,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
                         // Ensure directory is accessible
                         await ensureDirectoryAccess(storageDir)
 
-                        const git = simpleGit(gitOptions)
+                        const git = this.gitFactory(gitOptions)
 
                         // Fetch remote updates first
                         await git.fetch()
@@ -200,7 +227,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
         targetDir: string,
         branch?: string
     ): Promise<void> {
-        const git = simpleGit({
+        const git = this.gitFactory({
             timeout: {
                 block: 60000, // 60s timeout for clone (can be large)
             },
@@ -302,7 +329,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
                 maxConcurrentProcesses: 6,
             }
 
-            const git = simpleGit(gitOptions)
+            const git = this.gitFactory(gitOptions)
 
             // Fetch remote updates (without merging)
             await git.fetch()
@@ -396,7 +423,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
                 maxConcurrentProcesses: 6,
             }
 
-            const git = simpleGit(gitOptions)
+            const git = this.gitFactory(gitOptions)
             const commitHash = await git.revparse(["HEAD"])
             return commitHash.trim() || null
         } catch (error) {
