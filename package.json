@@ -21,7 +21,8 @@
         "test:ci": "vitest run --coverage",
         "test:coverage": "vitest run --coverage",
         "test:coverage:ci": "vitest run --coverage",
-        "test:coverage:view": "vitest run --coverage && open coverage/index.html"
+        "test:coverage:view": "vitest run --coverage && open coverage/index.html",
+        "release": "npx gh-release"
     },
     "keywords": [
         "mcp",
