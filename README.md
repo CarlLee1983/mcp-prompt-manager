@@ -4,11 +4,12 @@
 
 **Git-driven Model Context Protocol (MCP) Server for managing and providing Prompt templates**
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/CarlLee1983/mcp-prompt-manager)
-[![License](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-blue.svg)](https://www.typescriptlang.org/)
-[![Node](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![CI](https://github.com/CarlLee1983/mcp-prompt-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/CarlLee1983/mcp-prompt-manager/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/CarlLee1983/mcp-prompt-manager/actions/workflows/codeql.yml/badge.svg)](https://github.com/CarlLee1983/mcp-prompt-manager/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/CarlLee1983/mcp-prompt-manager/graph/badge.svg)](https://codecov.io/gh/CarlLee1983/mcp-prompt-manager)
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
+[![TypeScript](https://img.shields.io/badge/TypeScript-%5E5.0.0-blue)](https://www.typescriptlang.org/)
+[![MCP SDK](https://img.shields.io/badge/MCP_SDK-%5E1.0.0-green)](https://modelcontextprotocol.io/)
 [![Coverage](https://codecov.io/gh/CarlLee1983/mcp-prompt-manager/branch/main/graph/badge.svg)](https://codecov.io/gh/CarlLee1983/mcp-prompt-manager)
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
