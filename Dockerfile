@@ -38,6 +38,7 @@ RUN apk add --no-cache \
     git \
     openssh-client \
     ca-certificates \
+    tini \
     && update-ca-certificates
 
 # 安裝 pnpm
@@ -80,5 +81,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # 啟動命令
 # 根據 TRANSPORT_TYPE 環境變數選擇不同的啟動方式
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "dist/index.js"]
 

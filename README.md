@@ -536,26 +536,35 @@ All MCP-compatible clients follow the same configuration format:
 }
 ```
 
-#### Configuration Field Descriptions
+### 📝 Environment Variables Reference
 
-- **`command`**: Execution command (usually `node`)
-- **`args`**: Command argument array, must include the absolute path to the compiled `dist/index.js`
-- **`env`**: Environment variable object (optional)
-    - `PROMPT_REPO_URL`: Git repository URL or local path (required)
-    - `MCP_LANGUAGE`: Output language, `en` or `zh` (optional, default `en`)
-    - `MCP_GROUPS`: Groups to load, comma-separated (optional, defaults to loading only `common` group when not set, system will prompt in logs)
-    - `STORAGE_DIR`: Local cache directory (optional)
-    - `GIT_BRANCH`: Git branch (optional, default `main`)
-    - `GIT_MAX_RETRIES`: Git retry count (optional, default `3`)
-    - `CACHE_CLEANUP_INTERVAL`: Cache cleanup interval in milliseconds (optional, default `10000`)
-    - `LOG_LEVEL`: Log level (optional, default `info`)
+| Variable                 | Required |     Default      | Description                                                                                                            |
+| ------------------------ | :------: | :--------------: | ---------------------------------------------------------------------------------------------------------------------- |
+| `PROMPT_REPO_URL`        |  Yes\*   |        -         | Primary Git repository URL or local path. (\*Required if `PROMPT_REPO_URLS` is not set)                                |
+| `PROMPT_REPO_URLS`       |    No    |        -         | Comma-separated list of multiple repository URLs (e.g. `url1,url2`).                                                   |
+| `SYSTEM_REPO_URL`        |    No    |        -         | Separate repository URL for system-level prompts (e.g. common prompts).                                                |
+| `MCP_LANGUAGE`           |    No    |       `en`       | Output language. Options: `en`, `zh`.                                                                                  |
+| `MCP_GROUPS`             |    No    |        -         | Comma-separated list of prompt groups to load (e.g. `laravel,vue`). If unset, checks System Repo or default behaviors. |
+| `TRANSPORT_TYPE`         |    No    |     `stdio`      | Communication method. Options: `stdio`, `http`, `sse`.                                                                 |
+| `LOG_LEVEL`              |    No    |      `info`      | Logging verbosity. Options: `debug`, `info`, `warn`, `error`, `silent`.                                                |
+| `LOG_FILE`               |    No    |        -         | Path to write log file (e.g. `logs/mcp.log`). Highly recommended for debugging.                                        |
+| `STORAGE_DIR`            |    No    | `.prompts_cache` | directory to store cloned repositories.                                                                                |
+| `GIT_BRANCH`             |    No    |      `main`      | Default Git branch to clone.                                                                                           |
+| `GIT_MAX_RETRIES`        |    No    |       `3`        | Number of retries for failed Git operations.                                                                           |
+| `GIT_POLLING_INTERVAL`   |    No    |     `300000`     | Interval (ms) to check for updates when `WATCH_MODE=true`.                                                             |
+| `WATCH_MODE`             |    No    |     `false`      | Enable auto-reloading when changes are detected in the repository.                                                     |
+| `CACHE_PROVIDER`         |    No    |     `local`      | Caching mechanism. Options: `local`, `redis`.                                                                          |
+| `CACHE_TTL`              |    No    |        -         | Time-to-live for cache items (optional).                                                                               |
+| `CACHE_CLEANUP_INTERVAL` |    No    |     `10000`      | Interval (ms) to clean up expired cache items.                                                                         |
 
-#### Important Notes
+> **Security Note**: Never commit real passwords or API keys to `PROMPT_REPO_URL`. If using HTTPS with authentication, consider using SSH keys (`git@github.com...`) or mounting credentials safely in your environment.
 
-1. **Absolute Paths**: Paths in `args` must be absolute paths, cannot use relative paths
-2. **JSON Format**: Ensure JSON format is correct, no comma after the last item
-3. **Environment Variable Priority**: `env` in JSON overrides settings in `.env` file
-4. **Restart Application**: After modifying configuration, you must completely restart the application for changes to take effect
+#### Important Configuration Notes
+
+1. **Absolute Paths**: When configuring clients like Cursor/Claude, paths to `dist/index.js` must be absolute.
+2. **JSON Format**: Ensure your config file is valid JSON (no trailing commas).
+3. **Precedence**: `env` defined in client config JSON overrides `.env` files.
+4. **Restart**: Always restart your AI editor/client after changing configuration.
 
 ### Verifying MCP Server is Running Properly
 
