@@ -274,7 +274,17 @@ function highlightVariables(
     // Get all variable values from context (excluding system variables)
     const variableEntries = Object.entries(context)
         .filter(([key]) => key !== 'output_lang_rule' && key !== 'sys_lang')
-        .map(([key, value]) => [key, String(value ?? '')])
+        .map(([key, value]) => {
+            if (value === null || value === undefined) {
+                return [key, '']
+            }
+            if (typeof value === 'object') {
+                return [key, JSON.stringify(value)]
+            }
+            // Ensure value is a primitive before stringifying
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
+            return [key, String(value)]
+        })
         .filter(([, value]) => value && value.length > 0) as [string, string][]
 
     // Sort by length (longest first) to avoid partial matches
@@ -282,6 +292,7 @@ function highlightVariables(
 
     // Replace each variable value with bolded version
     for (const [, value] of variableEntries) {
+        // value is already a string at this point (from the filter above)
         // Skip if value is too short (likely to cause false matches)
         if (value.length < 2) continue
 
@@ -325,18 +336,25 @@ function checkSchemaWarnings(
     for (const [key, schema] of Object.entries(zodShape)) {
         if (!providedKeys.has(key)) {
             // Check if schema is optional or has default
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             const schemaDef = (schema as any)._def
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             const isOptional = schemaDef?.typeName === 'ZodOptional' || 
+                              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                               schemaDef?.typeName === 'ZodDefault' ||
                               schema instanceof z.ZodOptional ||
                               schema instanceof z.ZodDefault
 
             if (isOptional) {
                 // Optional field - check description for hints about importance
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
                 const description = schemaDef?.description || 
+                                   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
                                    (schema as any).description || 
                                    ''
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                 if (description.toLowerCase().includes('recommended') || 
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                     description.toLowerCase().includes('suggested')) {
                     warnings.push(`Missing recommended field: '${key}'`)
                 }
@@ -353,10 +371,12 @@ function checkSchemaWarnings(
 /**
  * Register all tools
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 async function registerTools(
     transport: TransportAdapter,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     server: any, // MCP Server instance
-    startTime: number
+    _startTime: number
 ): Promise<void> {
     // Register mcp_reload() tool
     transport.registerTool({
@@ -365,9 +385,11 @@ async function registerTools(
         description:
             'Reload all prompts from Git repository without restarting the server. This will: 1) Pull latest changes from Git, 2) Clear cache, 3) Reload all Handlebars partials, 4) Reload all prompts and tools (zero-downtime).',
         inputSchema: z.object({}),
+        // eslint-disable-next-line @typescript-eslint/require-await
         handler: async () => {
             try {
                 logger.info('mcp_reload tool invoked')
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
                 const result = await reloadPrompts(server, STORAGE_DIR)
 
                 const message = `Successfully reloaded ${result.loaded} prompts. ${result.errors.length} error(s) occurred.`
@@ -433,6 +455,7 @@ async function registerTools(
         description:
             'Get statistics about all prompts including counts by runtime state (active, legacy, invalid, disabled, warning) and tool counts (basic tools, prompt tools, total tools).',
         inputSchema: z.object({}),
+        // eslint-disable-next-line @typescript-eslint/require-await
         handler: async () => {
             try {
                 logger.info('mcp_stats tool invoked')
@@ -499,6 +522,7 @@ async function registerTools(
                 .optional()
                 .describe('Filter by runtime state'),
         }),
+        // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (args: Record<string, unknown>) => {
             try {
                     logger.info({ args }, 'mcp_list tool invoked')
@@ -602,6 +626,7 @@ async function registerTools(
         inputSchema: z.object({
             id: z.string().describe('Prompt ID to inspect'),
         }),
+        // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (args: Record<string, unknown>) => {
             try {
                 const id = args.id as string
@@ -675,6 +700,7 @@ async function registerTools(
             'Reload all prompts from Git repository without restarting the server (hot-reload).',
         inputSchema: z.object({}),
         handler: async () => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             return await handleReload(server)
         },
     })
@@ -686,6 +712,7 @@ async function registerTools(
         description:
             'Get statistics about all prompts including counts by runtime state.',
         inputSchema: z.object({}),
+        // eslint-disable-next-line @typescript-eslint/require-await
         handler: async () => {
             return await handlePromptStats()
         },
@@ -713,7 +740,9 @@ async function registerTools(
             repo_url: z.string().describe('Repository URL'),
             branch: z.string().optional().describe('Branch name'),
         }),
+        // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (args: Record<string, unknown>) => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             return await handleRepoSwitch(server, {
                 repo_url: args.repo_url as string,
                 branch: args.branch as string | undefined,
@@ -732,6 +761,7 @@ async function registerTools(
             promptId: z.string().describe('The ID of the prompt to test (e.g., \'laravel:code-review\')'),
             args: z.record(z.string(), z.unknown()).describe('JSON object containing the arguments/variables for the template'),
         }),
+        // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (args: Record<string, unknown>) => {
             try {
                 const promptId = args.promptId as string
@@ -910,8 +940,10 @@ async function registerTools(
 /**
  * Register all resources
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 async function registerResources(
     transport: TransportAdapter,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     server: any, // MCP Server instance
     startTime: number
 ): Promise<void> {
@@ -922,6 +954,7 @@ async function registerResources(
         description:
             'System health status including Git info, prompts, cache, and system metrics',
         mimeType: 'application/json',
+        // eslint-disable-next-line @typescript-eslint/require-await
         handler: async () => {
             try {
                 const healthStatus = await getHealthStatus(startTime)
@@ -954,6 +987,7 @@ async function registerResources(
         description:
             'Complete list of all prompts with metadata including runtime state, version, status, tags, and use cases',
         mimeType: 'application/json',
+        // eslint-disable-next-line @typescript-eslint/require-await
         handler: async () => {
             try {
                 const runtimes = getAllPromptRuntimes()
@@ -990,4 +1024,4 @@ async function registerResources(
 }
 
 // Start the application
-main()
+void main()

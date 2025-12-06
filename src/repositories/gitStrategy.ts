@@ -38,6 +38,7 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
         return this.repoUrl
     }
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async validate(): Promise<boolean> {
         try {
             // Simple validation: check if URL format is correct
@@ -233,8 +234,10 @@ export class GitRepositoryStrategy implements RepositoryStrategy {
             })
 
         // Start polling
-        this.pollingTimer = setInterval(async () => {
-            await this.checkForUpdates()
+        this.pollingTimer = setInterval(() => {
+            void (async () => {
+                await this.checkForUpdates()
+            })()
         }, interval)
 
         logger.info({ interval }, 'Git polling started successfully')

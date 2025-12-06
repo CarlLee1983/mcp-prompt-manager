@@ -6,7 +6,7 @@ import {
     getAllPromptRuntimes,
 } from './loaders.js'
 import { syncRepo } from './git.js'
-import { setActiveRepo, getActiveRepo, STORAGE_DIR } from '../config/env.js'
+import { setActiveRepo, STORAGE_DIR } from '../config/env.js'
 
 /**
  * Handle reload prompts request
@@ -50,6 +50,7 @@ export async function handleReload(
  * Handle prompt statistics request
  * @returns MCP Tool response with prompt statistics
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function handlePromptStats(): Promise<{
     content: Array<{ type: 'text'; text: string }>
 }> {
@@ -85,6 +86,7 @@ export async function handlePromptStats(): Promise<{
  * Handle prompt list request
  * @returns MCP Tool response with all prompt runtimes
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function handlePromptList(): Promise<{
     content: Array<{ type: 'text'; text: string }>
 }> {

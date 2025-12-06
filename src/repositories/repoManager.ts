@@ -276,40 +276,42 @@ export class RepoManager {
                     'Starting file watcher for local repository'
                 )
 
-                strategy.startWatching(async (filePath: string) => {
-                    try {
-                        logger.info({ filePath }, 'File change detected, reloading single prompt')
-                        const result = await reloadSinglePrompt(server, filePath, storageDir)
-                        if (result.success) {
-                            logger.info({ filePath }, 'Single prompt reloaded successfully')
-                        } else if (result.error) {
-                            logger.info(
+                strategy.startWatching((filePath: string) => {
+                    void (async (): Promise<void> => {
+                        try {
+                            logger.info({ filePath }, 'File change detected, reloading single prompt')
+                            const result = await reloadSinglePrompt(server, filePath, storageDir)
+                            if (result.success) {
+                                logger.info({ filePath }, 'Single prompt reloaded successfully')
+                            } else if (result.error) {
+                                logger.info(
+                                    { 
+                                        filePath, 
+                                        errorMessage: result.error.message,
+                                        errorStack: result.error.stack,
+                                        errorName: result.error.name
+                                    },
+                                    `Single prompt reload failed: ${result.error.message}. Full reload may have been triggered.`
+                                )
+                            } else {
+                                logger.info(
+                                    { filePath },
+                                    'Single prompt reload failed (no error details), full reload may have been triggered'
+                                )
+                            }
+                        } catch (error) {
+                            const reloadError = error instanceof Error ? error : new Error(String(error))
+                            logger.error(
                                 { 
                                     filePath, 
-                                    errorMessage: result.error.message,
-                                    errorStack: result.error.stack,
-                                    errorName: result.error.name
-                                },
-                                `Single prompt reload failed: ${result.error.message}. Full reload may have been triggered.`
-                            )
-                        } else {
-                            logger.info(
-                                { filePath },
-                                'Single prompt reload failed (no error details), full reload may have been triggered'
+                                    errorMessage: reloadError.message,
+                                    errorStack: reloadError.stack,
+                                    errorName: reloadError.name
+                                }, 
+                                `Failed to reload single prompt: ${reloadError.message}`
                             )
                         }
-                    } catch (error) {
-                        const reloadError = error instanceof Error ? error : new Error(String(error))
-                        logger.error(
-                            { 
-                                filePath, 
-                                errorMessage: reloadError.message,
-                                errorStack: reloadError.stack,
-                                errorName: reloadError.name
-                            }, 
-                            `Failed to reload single prompt: ${reloadError.message}`
-                        )
-                    }
+                    })()
                 }, watchPath)
             } else if (strategy instanceof GitRepositoryStrategy) {
                 logger.info(

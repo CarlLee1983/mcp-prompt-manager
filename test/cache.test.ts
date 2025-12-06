@@ -184,6 +184,66 @@ describe('快取抽象層測試', () => {
             cleanupCache.destroy()
         })
 
+        it('應該在 getSync 中處理 TTL 過期', () => {
+            const cache = new LocalCache(100, 50) // TTL: 50ms
+            
+            cache.setSync('ttl-sync-key', 'ttl-sync-value', 50)
+            const value1 = cache.getSync<string>('ttl-sync-key')
+            expect(value1).toBe('ttl-sync-value')
+
+            // 等待 TTL 過期
+            return new Promise<void>((resolve) => {
+                setTimeout(() => {
+                    const value2 = cache.getSync<string>('ttl-sync-key')
+                    expect(value2).toBeNull()
+                    resolve()
+                }, 100)
+            })
+        })
+
+        it('應該在 setSync 中觸發 LRU 驅逐', () => {
+            const smallCache = new LocalCache(2) // 最大 2 個項目
+
+            // 設定 2 個項目（快取滿了）
+            smallCache.setSync('sync-key1', 'sync-value1')
+            smallCache.setSync('sync-key2', 'sync-value2')
+
+            expect(smallCache.cache.size).toBe(2)
+
+            // 設定第 3 個項目，應該驅逐最舊的
+            smallCache.setSync('sync-key3', 'sync-value3')
+
+            // key1 應該被驅逐
+            const value1 = smallCache.getSync<string>('sync-key1')
+            expect(value1).toBeNull()
+
+            // key3 應該存在
+            const value3 = smallCache.getSync<string>('sync-key3')
+            expect(value3).toBe('sync-value3')
+        })
+
+        it('應該處理 cleanup interval 的啟動和停止', async () => {
+            const cache = new LocalCache(100, 100, 200) // TTL: 100ms, cleanup: 200ms
+            
+            // 設置一些會過期的項目
+            await cache.set('ttl-key1', 'value1', 50)
+            await cache.set('ttl-key2', 'value2', 50)
+            
+            expect(await cache.size()).toBe(2)
+            
+            // 等待清理間隔觸發（200ms）
+            await new Promise((resolve) => setTimeout(resolve, 250))
+            
+            // 手動觸發清理
+            await cache.cleanup()
+            
+            // 項目應該被清理
+            const size = await cache.size()
+            expect(size).toBeLessThan(2)
+            
+            cache.destroy()
+        })
+
         it('應該改進的 LRU 策略考慮存取頻率', async () => {
             const smallCache = new LocalCache(2)
             
@@ -328,6 +388,21 @@ describe('快取抽象層測試', () => {
             delete process.env.CACHE_PROVIDER
             delete process.env.CACHE_MAX_SIZE
             delete process.env.CACHE_TTL
+        })
+
+        it('應該處理 createFromEnv 的 fallback 到 create 方法', () => {
+            // 測試 provider 不是 'local' 也不是 'redis' 的情況
+            // 這會觸發 line 74 的 fallback 路徑
+            process.env.CACHE_PROVIDER = 'local'
+            process.env.CACHE_MAX_SIZE = '500'
+            delete process.env.CACHE_TTL
+            delete process.env.CACHE_CLEANUP_INTERVAL
+
+            const cache = CacheFactory.createFromEnv()
+            expect(cache).toBeInstanceOf(LocalCache)
+
+            delete process.env.CACHE_PROVIDER
+            delete process.env.CACHE_MAX_SIZE
         })
     })
 })

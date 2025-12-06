@@ -153,6 +153,69 @@ describe('errorFormatter', () => {
             // When mark is missing, it falls back to Error handling
             expect(typeof result).toBe('string')
         })
+
+        it('should handle YAML error with only line number (no column)', () => {
+            const yamlError = {
+                name: 'YAMLException',
+                reason: 'Invalid syntax',
+                mark: {
+                    line: 5,
+                    snippet: 'key: value',
+                },
+            }
+
+            const result = formatYAMLError(yamlError)
+            expect(result).toContain('line 6')
+            expect(result).not.toContain('column')
+        })
+
+        it('should handle YAML error with snippet but no error marker', () => {
+            const yamlError = {
+                name: 'YAMLException',
+                reason: 'Invalid syntax',
+                mark: {
+                    line: 0,
+                    column: 5,
+                    snippet: 'key: value\nother: line',
+                },
+            }
+
+            const result = formatYAMLError(yamlError)
+            expect(result).toContain('Invalid syntax')
+            // Should use middle line when no error marker found
+        })
+
+        it('should handle YAML error with empty snippet lines', () => {
+            const yamlError = {
+                name: 'YAMLException',
+                reason: 'Invalid syntax',
+                mark: {
+                    line: 0,
+                    column: 5,
+                    snippet: '\n\n',
+                },
+            }
+
+            const result = formatYAMLError(yamlError)
+            expect(result).toContain('Invalid syntax')
+        })
+
+        it('should handle YAML error with cleaned context exactly 100 chars', () => {
+            const longContext = 'a'.repeat(100)
+            const yamlError = {
+                name: 'YAMLException',
+                reason: 'Invalid syntax',
+                mark: {
+                    line: 0,
+                    column: 5,
+                    snippet: `${longContext}\n     ^`,
+                },
+            }
+
+            const result = formatYAMLError(yamlError)
+            expect(result).toContain('Invalid syntax')
+            // Should include context if exactly 100 chars
+        })
     })
 
     describe('formatErrorForLogging', () => {

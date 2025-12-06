@@ -27,6 +27,19 @@ vi.mock('pino', () => ({
     default: mockPino,
 }))
 
+// Mock fs.createWriteStream to avoid actual file operations
+// This prevents ENOENT errors when pino.transport tries to create file streams
+const mockWriteStream = {
+    write: vi.fn(),
+    end: vi.fn(),
+    on: vi.fn(),
+    once: vi.fn(),
+    emit: vi.fn(),
+    pipe: vi.fn(),
+    unpipe: vi.fn(),
+    destroy: vi.fn(),
+}
+
 // Mock env config - use dynamic values from process.env
 vi.mock('../src/config/env.js', async () => {
     return {
@@ -51,6 +64,10 @@ describe('logger.ts', () => {
         // Create temporary directory for log files
         testLogDir = path.join(os.tmpdir(), `mcp-logger-test-${Date.now()}`)
         fs.mkdirSync(testLogDir, { recursive: true })
+        
+        // Mock fs.createWriteStream to avoid actual file operations
+        // This prevents ENOENT errors when pino.transport tries to create file streams
+        vi.spyOn(fs, 'createWriteStream').mockImplementation(() => mockWriteStream as any)
         
         // Reset environment
         process.env = { ...originalEnv }
@@ -119,6 +136,8 @@ describe('logger.ts', () => {
     describe('LOG_FILE 設定', () => {
         it('應該在設定 LOG_FILE 時建立檔案 logger', async () => {
             const logFile = path.join(testLogDir, 'test.log')
+            // Ensure directory exists before setting LOG_FILE
+            fs.mkdirSync(path.dirname(logFile), { recursive: true })
             process.env.LOG_FILE = logFile
             
             const { logger } = await import('../src/utils/logger.js')
@@ -129,6 +148,8 @@ describe('logger.ts', () => {
 
         it('應該在 LOG_FILE 為絕對路徑時使用該路徑', async () => {
             const logFile = path.join(testLogDir, 'absolute.log')
+            // Ensure directory exists before setting LOG_FILE
+            fs.mkdirSync(path.dirname(logFile), { recursive: true })
             process.env.LOG_FILE = logFile
             
             const { logger } = await import('../src/utils/logger.js')
@@ -138,7 +159,11 @@ describe('logger.ts', () => {
         })
 
         it('應該在 LOG_FILE 為相對路徑時解析為絕對路徑', async () => {
-            process.env.LOG_FILE = 'relative.log'
+            // For relative paths, ensure the directory exists in cwd
+            const relativeLogFile = 'relative.log'
+            const absoluteLogFile = path.resolve(process.cwd(), relativeLogFile)
+            fs.mkdirSync(path.dirname(absoluteLogFile), { recursive: true })
+            process.env.LOG_FILE = relativeLogFile
             
             const { logger } = await import('../src/utils/logger.js')
             
@@ -149,11 +174,12 @@ describe('logger.ts', () => {
         it('應該在日誌目錄不存在時自動建立', async () => {
             const newDir = path.join(testLogDir, 'new', 'nested', 'dir')
             const logFile = path.join(newDir, 'test.log')
+            // Don't create directory - let logger.ts create it
             process.env.LOG_FILE = logFile
             
             const { logger } = await import('../src/utils/logger.js')
             
-            // Directory should be created
+            // Directory should be created by logger.ts
             expect(fs.existsSync(newDir)).toBe(true)
             expect(logger).toBeDefined()
         })
@@ -193,6 +219,8 @@ describe('logger.ts', () => {
     describe('多種配置組合', () => {
         it('應該處理 LOG_FILE + PRETTY_LOG 組合', async () => {
             const logFile = path.join(testLogDir, 'pretty.log')
+            // Ensure directory exists before setting LOG_FILE
+            fs.mkdirSync(path.dirname(logFile), { recursive: true })
             process.env.LOG_FILE = logFile
             process.env.PRETTY_LOG = 'true'
             
@@ -204,6 +232,8 @@ describe('logger.ts', () => {
 
         it('應該處理 LOG_FILE + LOG_LEVEL 組合', async () => {
             const logFile = path.join(testLogDir, 'leveled.log')
+            // Ensure directory exists before setting LOG_FILE
+            fs.mkdirSync(path.dirname(logFile), { recursive: true })
             process.env.LOG_FILE = logFile
             process.env.LOG_LEVEL = 'error'
             
@@ -215,6 +245,8 @@ describe('logger.ts', () => {
 
         it('應該處理開發環境 + LOG_FILE 組合', async () => {
             const logFile = path.join(testLogDir, 'dev.log')
+            // Ensure directory exists before setting LOG_FILE
+            fs.mkdirSync(path.dirname(logFile), { recursive: true })
             process.env.LOG_FILE = logFile
             process.env.NODE_ENV = 'development'
             

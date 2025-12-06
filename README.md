@@ -7,8 +7,9 @@
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/CarlLee1983/mcp-prompt-manager)
 [![License](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-blue.svg)](https://www.typescriptlang.org/)
-[![Node](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![codecov](https://codecov.io/gh/CarlLee1983/mcp-prompt-manager/branch/main/graph/badge.svg)](https://codecov.io/gh/CarlLee1983/mcp-prompt-manager)
+[![Node](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
+[![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/CarlLee1983/mcp-prompt-manager/actions)
+[![Coverage](https://codecov.io/gh/CarlLee1983/mcp-prompt-manager/branch/main/graph/badge.svg)](https://codecov.io/gh/CarlLee1983/mcp-prompt-manager)
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
@@ -954,6 +955,83 @@ Prompts list resource.
 
 ## 💻 Development Guide
 
+### Architecture Overview
+
+The MCP Prompt Manager follows a modular architecture with clear separation of concerns:
+
+#### Core Components
+
+1. **Repository Interface** (`src/repositories/strategy.ts`)
+    - Abstract interface for different repository types (Git, Local)
+    - Supports multiple repository strategies with priority-based loading
+    - Handles repository synchronization and file watching
+
+2. **Source Manager** (`src/services/sourceManager.ts`)
+    - Singleton pattern for managing prompt lifecycle
+    - Handles prompt loading, caching, and registration
+    - Compiles Handlebars templates at load time for performance
+    - Manages prompt runtime states and metadata
+
+3. **Cache Layer** (`src/cache/`)
+    - Abstract cache provider interface supporting local and Redis (future)
+    - Local cache with LRU eviction and TTL support
+    - Automatic cleanup of expired cache items
+
+#### Prompt Storage Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Git Repository                            │
+│  (Remote URL or Local Path)                                 │
+└────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Repository Strategy                            │
+│  • GitRepositoryStrategy: Clone/Pull from remote           │
+│  • LocalRepositoryStrategy: Watch local file system         │
+└────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Local Storage (.prompts_cache)                 │
+│  • Cached repository files                                   │
+│  • File system cache (TTL-based)                             │
+└────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Source Manager                                  │
+│  1. Scan YAML files                                          │
+│  2. Parse prompt definitions                                 │
+│  3. Compile Handlebars templates                             │
+│  4. Validate with Zod schemas                                │
+│  5. Cache compiled templates                                 │
+└────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              MCP Server                                      │
+│  • Register prompts as MCP Tools                            │
+│  • Provide MCP Resources (health, list)                      │
+│  • Handle tool invocations                                   │
+└────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              MCP Clients                                     │
+│  (Cursor, Claude Desktop, etc.)                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Key Modules
+
+- **Repository Interface**: Abstract strategy pattern for Git and local repositories
+- **Source Manager**: Centralized prompt lifecycle management with caching
+- **Cache Provider**: Pluggable cache system (local memory or Redis)
+- **Loaders**: High-level API for loading prompts and partials
+- **MCP Tools**: Dynamic tool registration based on loaded prompts
+
 ### Project Structure
 
 ```
@@ -966,7 +1044,17 @@ mcp-prompt-manager/
 │   │   ├── control.ts        # MCP control tool handlers
 │   │   ├── git.ts            # Git sync service
 │   │   ├── health.ts         # Health status service
-│   │   └── loaders.ts        # Prompt and Partials loader
+│   │   ├── loaders.ts        # Prompt and Partials loader
+│   │   └── sourceManager.ts  # Core prompt lifecycle manager
+│   ├── repositories/
+│   │   ├── strategy.ts        # Repository interface
+│   │   ├── gitStrategy.ts    # Git repository strategy
+│   │   ├── localStrategy.ts  # Local file system strategy
+│   │   └── repoManager.ts    # Repository manager
+│   ├── cache/
+│   │   ├── cacheProvider.ts  # Cache interface
+│   │   ├── localCache.ts     # Local memory cache
+│   │   └── cacheFactory.ts  # Cache factory
 │   ├── types/
 │   │   ├── prompt.ts         # Prompt type definitions
 │   │   ├── promptMetadata.ts # Prompt metadata types
@@ -974,12 +1062,15 @@ mcp-prompt-manager/
 │   │   └── registry.ts       # Registry type definitions
 │   └── utils/
 │       ├── fileSystem.ts     # File system utilities (with cache)
-│       └── logger.ts         # Logging utilities
+│       ├── logger.ts         # Logging utilities
+│       ├── errorFormatter.ts # Error formatting utilities
+│       └── repoConfig.ts     # Repository configuration utilities
 ├── test/                      # Test files
 │   ├── config.test.ts
 │   ├── loaders.test.ts
-│   ├── promptMetadata.test.ts
-│   ├── utils.test.ts
+│   ├── sourceManager.test.ts
+│   ├── cache.test.ts
+│   ├── fileSystem.test.ts
 │   └── integration.test.ts  # Integration tests
 ├── dist/                      # Compiled output
 ├── package.json

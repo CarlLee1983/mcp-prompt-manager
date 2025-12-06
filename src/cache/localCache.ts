@@ -66,7 +66,10 @@ export class LocalCache implements CacheProvider {
 
     /**
      * Get cache value
+     * Note: This method is async to match CacheProvider interface,
+     * but implementation is synchronous for local cache
      */
+    // eslint-disable-next-line @typescript-eslint/require-await
     async get<T>(key: string): Promise<T | null> {
         this.stats.totalAccesses++
         const entry = this.cache.get(key) as CacheEntry<T> | undefined
@@ -95,12 +98,15 @@ export class LocalCache implements CacheProvider {
         this.cache.delete(key)
         this.cache.set(key, entry)
 
-        return entry.value as T
+        return entry.value as unknown as T
     }
 
     /**
      * Set cache value
+     * Note: This method is async to match CacheProvider interface,
+     * but implementation is synchronous for local cache
      */
+    // eslint-disable-next-line @typescript-eslint/require-await
     async set<T>(key: string, value: T, ttl?: number): Promise<void> {
         // If exceeds size limit and key doesn't exist, remove oldest item (LRU)
         if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
@@ -121,7 +127,10 @@ export class LocalCache implements CacheProvider {
 
     /**
      * Delete cache value
+     * Note: This method is async to match CacheProvider interface,
+     * but implementation is synchronous for local cache
      */
+    // eslint-disable-next-line @typescript-eslint/require-await
     async delete(key: string): Promise<void> {
         const deleted = this.cache.delete(key)
         if (deleted) {
@@ -131,7 +140,10 @@ export class LocalCache implements CacheProvider {
 
     /**
      * Check if cache exists
+     * Note: This method is async to match CacheProvider interface,
+     * but implementation is synchronous for local cache
      */
+    // eslint-disable-next-line @typescript-eslint/require-await
     async has(key: string): Promise<boolean> {
         const entry = this.cache.get(key)
         if (!entry) return false
@@ -151,7 +163,10 @@ export class LocalCache implements CacheProvider {
 
     /**
      * Clear all cache
+     * Note: This method is async to match CacheProvider interface,
+     * but implementation is synchronous for local cache
      */
+    // eslint-disable-next-line @typescript-eslint/require-await
     async clear(): Promise<void> {
         const size = this.cache.size
         this.cache.clear()
@@ -167,14 +182,20 @@ export class LocalCache implements CacheProvider {
 
     /**
      * Get cache size
+     * Note: This method is async to match CacheProvider interface,
+     * but implementation is synchronous for local cache
      */
+    // eslint-disable-next-line @typescript-eslint/require-await
     async size(): Promise<number> {
         return this.cache.size
     }
 
     /**
      * Get cache statistics
+     * Note: This method is async to match CacheProvider interface,
+     * but implementation is synchronous for local cache
      */
+    // eslint-disable-next-line @typescript-eslint/require-await
     async getStats(): Promise<CacheStats> {
         const hitRate =
             this.stats.totalAccesses > 0
@@ -259,7 +280,7 @@ export class LocalCache implements CacheProvider {
         this.cache.delete(key)
         this.cache.set(key, entry)
 
-        return entry.value as T
+        return entry.value as unknown as T
     }
 
     /**

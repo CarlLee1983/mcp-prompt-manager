@@ -23,7 +23,7 @@ export class CacheFactory {
                 )
             default:
                 throw new Error(
-                    `Unsupported cache provider: ${config.provider}`
+                    `Unsupported cache provider: ${String(config.provider)}`
                 )
         }
     }
@@ -33,9 +33,7 @@ export class CacheFactory {
      * @returns Cache provider instance
      */
     static createFromEnv(): CacheProvider {
-        const provider = (process.env.CACHE_PROVIDER || 'local') as
-            | 'local'
-            | 'redis'
+        const provider = (process.env.CACHE_PROVIDER || 'local') as 'local' | 'redis'
         const maxSize = process.env.CACHE_MAX_SIZE
             ? parseInt(process.env.CACHE_MAX_SIZE, 10)
             : 1000
@@ -65,12 +63,12 @@ export class CacheFactory {
             { provider, maxSize, ttl, cleanupIntervalMs },
             'Creating cache provider from environment'
         )
-        
+
         // For local cache, need to directly create LocalCache instance to support cleanupIntervalMs
         if (provider === 'local') {
             return new LocalCache(maxSize, ttl, cleanupIntervalMs)
         }
-        
+
         return this.create({
             provider: 'local',
             maxSize,
@@ -78,4 +76,3 @@ export class CacheFactory {
         })
     }
 }
-

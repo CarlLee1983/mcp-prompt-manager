@@ -42,6 +42,7 @@ export class StdioTransportAdapter implements TransportAdapter {
         logger.info('Stdio transport connected')
     }
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async disconnect(): Promise<void> {
         // Stdio transport usually doesn't need explicit disconnection
         // It will automatically disconnect when process ends
@@ -67,7 +68,7 @@ export class StdioTransportAdapter implements TransportAdapter {
                 return {
                     ...result,
                     structuredContent:
-                        result.structuredContent as Record<string, unknown> | undefined,
+                        result.structuredContent,
                 }
             }
         )

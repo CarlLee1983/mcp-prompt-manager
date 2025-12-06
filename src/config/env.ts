@@ -13,8 +13,8 @@ import {
  * Reads configuration from .env file or system environment variables
  */
 // Temporarily suppress stdout output to prevent dotenv from polluting MCP protocol
-const originalWrite = process.stdout.write
-// @ts-ignore
+const originalWrite = process.stdout.write.bind(process.stdout)
+// eslint-disable-next-line @typescript-eslint/unbound-method
 process.stdout.write = () => true
 dotenv.config()
 process.stdout.write = originalWrite
@@ -155,7 +155,7 @@ const ConfigSchema = z.object({
  * @returns Whether the format is valid
  * @internal
  */
-function validateGroupName(group: string): boolean {
+function _validateGroupName(group: string): boolean {
     return /^[a-zA-Z0-9_-]+$/.test(group)
 }
 
