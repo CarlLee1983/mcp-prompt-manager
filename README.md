@@ -50,6 +50,35 @@ If you're installing from an MCP marketplace (e.g., [mcp.so](https://mcp.so/)), 
 1. **Install via marketplace**: Use the marketplace's installation interface
 2. **Configure your MCP client**: Add the server configuration to your MCP client
 
+#### Prerequisites
+
+Before installing, ensure you have:
+
+-   **Node.js** installed (version 18.0.0 or higher)
+-   **pnpm** package manager (version 8.0.0 or higher)
+-   A **Git repository** containing your prompts (or a local path to prompts)
+-   An **MCP-compatible client** (Cursor, Claude Desktop, VS Code, etc.)
+
+#### Installation Steps
+
+1. **Install from Marketplace**:
+
+    - Visit your preferred MCP marketplace
+    - Search for "mcp-prompt-manager"
+    - Follow the marketplace's installation instructions
+    - Note the installation path where the server was installed
+
+2. **Locate Installation Path**:
+
+    - After marketplace installation, find where `dist/index.js` is located
+    - This is typically in a global node_modules directory or a dedicated installation folder
+    - You'll need the **absolute path** to this file for configuration
+
+3. **Configure MCP Client**:
+    - Open your MCP client's configuration file (see [Configuration](#-configuration) section for file locations)
+    - Add the server configuration (see example below)
+    - **Important**: Use absolute paths, not relative paths
+
 #### Configuration Example
 
 After installation, configure your MCP client (Cursor, Claude Desktop, etc.) with the following:
@@ -73,9 +102,41 @@ After installation, configure your MCP client (Cursor, Claude Desktop, etc.) wit
 }
 ```
 
-> **Note**: Replace `/absolute/path/to/mcp-prompt-manager/dist/index.js` with the actual path where the marketplace installed the server.
+> **Note**: Replace `/absolute/path/to/mcp-prompt-manager/dist/index.js` with the actual absolute path where the marketplace installed the server.
 
 > **Tip**: See [mcp.json.example](./mcp.json.example) for a complete configuration template.
+
+#### Finding the Installation Path
+
+If you're unsure where the marketplace installed the server:
+
+**macOS/Linux**:
+
+```bash
+# Search for the installed file
+find ~ -name "index.js" -path "*/mcp-prompt-manager/dist/index.js" 2>/dev/null
+
+# Or check common installation locations
+ls -la ~/.local/share/mcp-prompt-manager/dist/index.js
+ls -la /usr/local/lib/node_modules/mcp-prompt-manager/dist/index.js
+```
+
+**Windows**:
+
+```powershell
+# Search for the installed file
+Get-ChildItem -Path $env:USERPROFILE -Filter "index.js" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -like "*mcp-prompt-manager\dist\index.js" }
+```
+
+#### Verification
+
+After configuration:
+
+1. **Restart your MCP client** completely
+2. **Check server status**:
+    - In Cursor: Press `Cmd/Ctrl + Shift + P`, search for "MCP: Show servers"
+    - In Claude Desktop: Check the MCP servers list in settings
+3. **Verify prompts are loaded**: Use the client's MCP tools to list available prompts
 
 For detailed configuration instructions for different MCP clients, see the [Configuration](#-configuration) section below.
 
@@ -105,37 +166,41 @@ For detailed Docker deployment instructions, see [DOCKER.md](DOCKER.md).
 
 ### Option 3: Local Installation
 
-## Quick Start (Development)
+This option is recommended for development or when you want full control over the installation.
+
+#### Prerequisites
+
+-   **Node.js** 18.0.0 or higher
+-   **pnpm** 8.0.0 or higher (required, npm/yarn will fail)
+-   **Git** (for cloning the repository)
+
+#### Installation Steps
+
+1. **Clone the Repository**:
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Start development server
-pnpm dev
-
-# Run tests
-pnpm test:run
-
-# Lint code
-pnpm lint
-```
-
-### 1. Installation
-
-First, clone this project and install dependencies:
-
-```bash
-git clone <project URL>
+git clone https://github.com/CarlLee1983/mcp-prompt-manager.git
 cd mcp-prompt-manager
-npm install
-# or use pnpm (recommended)
+```
+
+2. **Install Dependencies**:
+
+```bash
+# Use pnpm (required - npm/yarn will fail)
 pnpm install
 ```
 
-> Note: Installs are enforced with pnpm; npm/yarn will fail because of the preinstall check.
+> **Note**: Installs are enforced with pnpm; npm/yarn will fail because of the preinstall check.
 
-### 2. Configure Environment Variables
+3. **Build the Project**:
+
+```bash
+pnpm run build
+```
+
+This compiles TypeScript to JavaScript in the `dist/` directory.
+
+4. **Configure Environment Variables**:
 
 Copy the example configuration file and create `.env`:
 
@@ -199,12 +264,37 @@ LOG_LEVEL=info
 LOG_FILE=logs/mcp.log
 ```
 
-### 3. Build
+5. **Configure MCP Client**:
+
+After building, you need to configure your MCP client to use the locally installed server. The path will be:
+
+```
+/path/to/mcp-prompt-manager/dist/index.js
+```
+
+Replace `/path/to/mcp-prompt-manager` with the actual absolute path where you cloned the repository.
+
+See the [Configuration](#-configuration) section below for detailed client-specific configuration instructions.
+
+#### Quick Start (Development)
+
+For development purposes, you can use these commands:
 
 ```bash
-npm run build
-# or
+# Install dependencies
+pnpm install
+
+# Build the project
 pnpm run build
+
+# Start development server with Inspector
+pnpm dev
+
+# Run tests
+pnpm test:run
+
+# Lint code
+pnpm lint
 ```
 
 ## 🛠️ Usage
@@ -1501,6 +1591,47 @@ export LOG_LEVEL=debug
 ```
 
 ## ❓ FAQ & Troubleshooting
+
+### Q: How do I install MCP Prompt Manager?
+
+**A**: There are three installation options:
+
+1. **Marketplace Installation** (Easiest): Install from an MCP marketplace like [mcp.so](https://mcp.so/)
+2. **Docker Deployment** (Recommended for production): Use Docker Compose for easy deployment
+3. **Local Installation** (For development): Clone the repository and build locally
+
+See the [Quick Start](#-quick-start) section for detailed instructions.
+
+### Q: How do I find the installation path after marketplace installation?
+
+**A**: Use these commands to locate the installed server:
+
+**macOS/Linux**:
+
+```bash
+find ~ -name "index.js" -path "*/mcp-prompt-manager/dist/index.js" 2>/dev/null
+```
+
+**Windows**:
+
+```powershell
+Get-ChildItem -Path $env:USERPROFILE -Filter "index.js" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -like "*mcp-prompt-manager\dist\index.js" }
+```
+
+### Q: Why do I need to use absolute paths in the configuration?
+
+**A**: MCP clients execute the server as a separate process and need the full path to locate the executable. Relative paths won't work because the working directory may differ.
+
+### Q: The server doesn't appear in my MCP client after configuration.
+
+**A**: Try these steps:
+
+1. **Verify the path is absolute**: Check that `args` contains a full absolute path, not a relative one
+2. **Check Node.js is installed**: Run `node --version` to ensure Node.js 18+ is installed
+3. **Verify the file exists**: Ensure `dist/index.js` exists at the specified path
+4. **Check JSON syntax**: Validate your configuration file is valid JSON (no trailing commas)
+5. **Restart completely**: Fully close and restart your MCP client (not just reload)
+6. **Check logs**: Enable `LOG_LEVEL=debug` in your configuration to see detailed error messages
 
 ### Q: How do I run the server locally?
 

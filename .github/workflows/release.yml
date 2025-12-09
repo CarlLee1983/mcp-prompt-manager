@@ -1,0 +1,135 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - "v*.*.*"
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            pull-requests: write
+
+        steps:
+            # 1️⃣ Checkout repository
+            - name: Checkout repository
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            # 2️⃣ Install pnpm (must be before Node.js setup)
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10.20.0
+
+            # 3️⃣ Setup Node.js
+            - name: Setup Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 20
+                  cache: "pnpm"
+
+            # 4️⃣ Install dependencies
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            # 5️⃣ Build
+            - name: Build
+              run: pnpm build
+
+            # 6️⃣ Run tests
+            - name: Test
+              run: pnpm test:run
+
+            # 7️⃣ Run coverage tests with thresholds (required before release)
+            - name: Test Coverage
+              run: pnpm test:coverage:ci
+
+            # 8️⃣ Extract version from tag
+            - name: Extract version from tag
+              id: version
+              run: |
+                  VERSION=${GITHUB_REF#refs/tags/v}
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+                  echo "Released version: $VERSION"
+                  echo "Note: Version is managed by npm version command, ensuring package.json, commit, and tag are always in sync"
+
+            # 9️⃣ Verify version consistency
+            - name: Verify version consistency
+              run: |
+                  VERSION="${{ steps.version.outputs.version }}"
+                  PKG_VERSION=$(node -e "console.log(require('./package.json').version)")
+                  echo "Tag version: $VERSION"
+                  echo "package.json version: $PKG_VERSION"
+                  if [ "$PKG_VERSION" != "$VERSION" ]; then
+                      echo "❌ Error: Version mismatch! package.json ($PKG_VERSION) does not match tag ($VERSION)"
+                      echo "This should not happen when using npm version command."
+                      exit 1
+                  fi
+                  echo "✅ Version consistency verified (package.json, commit, and tag are in sync)"
+
+            # 🔟 Create GitHub Release
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  name: Release ${{ steps.version.outputs.version }}
+                  body: |
+                      ## Changes in ${{ steps.version.outputs.version }}
+
+                      See [CHANGELOG.md](../../CHANGELOG.md) for details.
+                  draft: false
+                  prerelease: false
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            # 1️⃣1️⃣ Create PR to bump version
+            - name: Calculate next version
+              id: next_version
+              run: |
+                  CURRENT_VERSION="${{ steps.version.outputs.version }}"
+                  # Parse version components
+                  IFS='.' read -r -a VERSION_PARTS <<< "$CURRENT_VERSION"
+                  MAJOR="${VERSION_PARTS[0]}"
+                  MINOR="${VERSION_PARTS[1]}"
+                  PATCH="${VERSION_PARTS[2]}"
+
+                  # Increment patch version
+                  NEXT_PATCH=$((PATCH + 1))
+                  NEXT_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
+
+                  echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+                  echo "Current version: $CURRENT_VERSION"
+                  echo "Next version: $NEXT_VERSION"
+
+            - name: Update package.json version
+              run: |
+                  npm version "${{ steps.next_version.outputs.next_version }}" --no-git-tag-version
+
+            - name: Create Pull Request
+              uses: peter-evans/create-pull-request@v6
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  branch: chore/bump-version-to-${{ steps.next_version.outputs.next_version }}
+                  base: main
+                  title: "chore: bump version to ${{ steps.next_version.outputs.next_version }}"
+                  body: |
+                      ## 版本更新
+
+                      自動建立此 PR 以準備下一個版本號：**${{ steps.next_version.outputs.next_version }}**
+
+                      ### 變更內容
+                      - 更新 `package.json` 版本號：`${{ steps.version.outputs.version }}` → `${{ steps.next_version.outputs.next_version }}`
+
+                      ### 注意事項
+                      - 此 PR 由 Release workflow 自動建立
+                      - 合併此 PR 後即可開始準備下一個版本的開發
+                      - 版本號已自動增加 patch 版本（`${{ steps.version.outputs.version }}` → `${{ steps.next_version.outputs.next_version }}`）
+                  labels: |
+                      chore
+                      automated
+                  draft: false
+                  commit-message: "chore: bump version to ${{ steps.next_version.outputs.next_version }}"
