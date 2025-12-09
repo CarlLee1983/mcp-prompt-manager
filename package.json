@@ -1,6 +1,6 @@
 {
     "name": "mcp-prompt-manager",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "description": "Git-driven MCP Server for managing and providing Prompt templates with Handlebars support",
     "type": "module",
     "main": "dist/index.js",
