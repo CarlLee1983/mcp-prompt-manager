@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/CarlLee1983/mcp-prompt-manager/compare/v1.1.4...v1.2.0) (2025-12-13)
+
+
+### Features
+
+* Enhance STORAGE_DIR resolution to correctly handle root CWD and add new tests. ([1ed2252](https://github.com/CarlLee1983/mcp-prompt-manager/commit/1ed225253c63a607870d8c0641041d03c0d6efe9))
+
 ## [1.1.0] - 2025-01-XX
 
 ### Added
