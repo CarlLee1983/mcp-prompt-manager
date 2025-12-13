@@ -114,7 +114,7 @@ jobs:
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   branch: chore/bump-version-to-${{ steps.next_version.outputs.next_version }}
-                  base: main
+                  base: master
                   title: "chore: bump version to ${{ steps.next_version.outputs.next_version }}"
                   body: |
                       ## 版本更新
