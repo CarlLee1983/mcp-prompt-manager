@@ -270,13 +270,38 @@ export function getGitBranch(): string {
 // Note: These values are calculated at module load time and won't update dynamically
 // Please use getRepoUrl() and getGitBranch() to get the latest values
 export const REPO_URL = config.PROMPT_REPO_URL
-// STORAGE_DIR: Use ~/.cache/mcp-prompt-manager by default to avoid polluting project directories
-// Can be overridden via STORAGE_DIR environment variable
-export const STORAGE_DIR = config.STORAGE_DIR
-    ? path.isAbsolute(config.STORAGE_DIR)
-        ? config.STORAGE_DIR
-        : path.resolve(process.cwd(), config.STORAGE_DIR)
-    : path.join(os.homedir(), ".cache", "mcp-prompt-manager")
+/**
+ * Resolve STORAGE_DIR path
+ * Priority:
+ * 1. If STORAGE_DIR is set and is an absolute path, use it directly
+ * 2. If STORAGE_DIR is set and is a relative path:
+ *    - If process.cwd() is root '/', use home directory as base (common when launched by MCP clients)
+ *    - Otherwise, resolve relative to process.cwd()
+ * 3. If STORAGE_DIR is not set, use ~/.cache/mcp-prompt-manager as default
+ */
+function resolveStorageDir(): string {
+    if (!config.STORAGE_DIR) {
+        // Default: ~/.cache/mcp-prompt-manager
+        return path.join(os.homedir(), ".cache", "mcp-prompt-manager")
+    }
+
+    if (path.isAbsolute(config.STORAGE_DIR)) {
+        return config.STORAGE_DIR
+    }
+
+    // Relative path: check if cwd is root directory
+    const cwd = process.cwd()
+    if (cwd === "/" || cwd === "\\") {
+        // When cwd is root (common when launched by MCP clients like Claude Desktop),
+        // use home directory as base instead
+        // Note: Cannot use logger here as env.ts loads before logger is initialized
+        return path.join(os.homedir(), ".cache", "mcp-prompt-manager")
+    }
+
+    return path.resolve(cwd, config.STORAGE_DIR)
+}
+
+export const STORAGE_DIR = resolveStorageDir()
 export const LANG_SETTING = config.MCP_LANGUAGE
 
 /**

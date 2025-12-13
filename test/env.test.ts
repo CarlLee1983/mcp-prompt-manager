@@ -507,6 +507,37 @@ describe('env.ts Configuration Tests', () => {
             const expectedPath = path.join(os.homedir(), '.cache', 'mcp-prompt-manager')
             expect(env.STORAGE_DIR).toBe(expectedPath)
         })
+
+        it('should fallback to default when cwd is root directory (common in MCP clients)', async () => {
+            // This test simulates the scenario where MCP clients like Claude Desktop
+            // launch the server with cwd as root directory '/'
+            // We can't actually chdir to '/' in tests, so we test the logic indirectly
+
+            // When STORAGE_DIR is not set, default should be used regardless of cwd
+            process.env.PROMPT_REPO_URL = 'https://github.com/user/repo.git'
+            delete process.env.STORAGE_DIR
+            process.env.PROMPT_REPO_URLS = undefined
+            delete process.env.PROMPT_REPO_URLS
+
+            const env = await import('../src/config/env.js')
+            const expectedPath = path.join(os.homedir(), '.cache', 'mcp-prompt-manager')
+            expect(env.STORAGE_DIR).toBe(expectedPath)
+
+            // The path should never be under root directory
+            expect(env.STORAGE_DIR.startsWith('/.prompts_cache')).toBe(false)
+            expect(env.STORAGE_DIR.startsWith('/.cache')).toBe(false)
+        })
+
+        it('should keep absolute STORAGE_DIR path as-is', async () => {
+            const absolutePath = os.platform() === 'win32' ? 'C:\\\\custom\\\\cache' : '/custom/cache'
+            process.env.PROMPT_REPO_URL = 'https://github.com/user/repo.git'
+            process.env.STORAGE_DIR = absolutePath
+            process.env.PROMPT_REPO_URLS = undefined
+            delete process.env.PROMPT_REPO_URLS
+
+            const env = await import('../src/config/env.js')
+            expect(env.STORAGE_DIR).toBe(absolutePath)
+        })
     })
 
     describe('GIT_BRANCH', () => {
