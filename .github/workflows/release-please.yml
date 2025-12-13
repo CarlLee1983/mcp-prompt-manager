@@ -1,0 +1,89 @@
+name: Release Please
+
+on:
+    push:
+        branches:
+            - master
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    release-please:
+        runs-on: ubuntu-latest
+        outputs:
+            release_created: ${{ steps.release.outputs.release_created }}
+            tag_name: ${{ steps.release.outputs.tag_name }}
+            version: ${{ steps.release.outputs.version }}
+
+        steps:
+            - name: Release Please
+              id: release
+              uses: google-github-actions/release-please-action@v4
+              with:
+                  release-type: node
+                  # 使用 Conventional Commits 來決定版本號
+                  # feat: → minor version bump
+                  # fix: → patch version bump
+                  # feat!: 或 BREAKING CHANGE → major version bump
+
+    # 當 Release PR 被合併並創建 release 後，執行 build 和測試
+    build-and-verify:
+        needs: release-please
+        if: ${{ needs.release-please.outputs.release_created }}
+        runs-on: ubuntu-latest
+
+        steps:
+            # 1️⃣ Checkout repository
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            # 2️⃣ Install pnpm
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10.20.0
+
+            # 3️⃣ Setup Node.js
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: "pnpm"
+
+            # 4️⃣ Install dependencies
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            # 5️⃣ Build
+            - name: Build
+              run: pnpm build
+
+            # 6️⃣ Run tests
+            - name: Test
+              run: pnpm test:run
+
+            # 7️⃣ Run coverage tests
+            - name: Test Coverage
+              run: pnpm test:coverage:ci
+
+            # 8️⃣ Verify version consistency
+            - name: Verify version consistency
+              run: |
+                  VERSION="${{ needs.release-please.outputs.version }}"
+                  PKG_VERSION=$(node -e "console.log(require('./package.json').version)")
+                  echo "Release version: $VERSION"
+                  echo "package.json version: $PKG_VERSION"
+                  if [ "$PKG_VERSION" != "$VERSION" ]; then
+                      echo "❌ Error: Version mismatch!"
+                      exit 1
+                  fi
+                  echo "✅ Version consistency verified"
+
+            - name: Release successful
+              run: |
+                  echo "🎉 Release ${{ needs.release-please.outputs.tag_name }} verified successfully!"
+                  echo "Version: ${{ needs.release-please.outputs.version }}"
