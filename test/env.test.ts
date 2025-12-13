@@ -497,42 +497,15 @@ describe('env.ts Configuration Tests', () => {
         })
 
         it('should use default value when not set', async () => {
-            const testDir = path.join(os.tmpdir(), `test-env-${Date.now()}`)
-            // Create test directory
-            if (!fs.existsSync(testDir)) {
-                fs.mkdirSync(testDir, { recursive: true })
-            }
-            // Resolve real path (handle macOS symbolic links)
-            const realTestDir = fs.realpathSync(testDir)
-            process.chdir(realTestDir)
             process.env.PROMPT_REPO_URL = 'https://github.com/user/repo.git'
             delete process.env.STORAGE_DIR
             process.env.PROMPT_REPO_URLS = undefined
             delete process.env.PROMPT_REPO_URLS
 
             const env = await import('../src/config/env.js')
-            // Resolve real path to handle symbolic links (path might not exist, so try-catch needed)
-            const expectedPath = path.resolve(realTestDir, '.prompts_cache')
-            let actualPath = env.STORAGE_DIR
-            try {
-                actualPath = fs.realpathSync(actualPath)
-            } catch {
-                // If path doesn't exist, use original path
-            }
-            let expectedRealPath = expectedPath
-            try {
-                expectedRealPath = fs.realpathSync(expectedPath)
-            } catch {
-                // If path doesn't exist, use original path
-            }
-            // Compare paths (handle symbolic links)
-            expect(actualPath).toBe(expectedRealPath)
-
-            // Cleanup
-            process.chdir(originalCwd)
-            if (fs.existsSync(testDir)) {
-                fs.rmdirSync(testDir)
-            }
+            // Default should be ~/.cache/mcp-prompt-manager
+            const expectedPath = path.join(os.homedir(), '.cache', 'mcp-prompt-manager')
+            expect(env.STORAGE_DIR).toBe(expectedPath)
         })
     })
 

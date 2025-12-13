@@ -1,6 +1,7 @@
 import { z } from "zod"
 import dotenv from "dotenv"
 import path from "path"
+import os from "os"
 import {
     type RepoConfig,
     parseRepoUrls,
@@ -269,9 +270,13 @@ export function getGitBranch(): string {
 // Note: These values are calculated at module load time and won't update dynamically
 // Please use getRepoUrl() and getGitBranch() to get the latest values
 export const REPO_URL = config.PROMPT_REPO_URL
+// STORAGE_DIR: Use ~/.cache/mcp-prompt-manager by default to avoid polluting project directories
+// Can be overridden via STORAGE_DIR environment variable
 export const STORAGE_DIR = config.STORAGE_DIR
-    ? path.resolve(process.cwd(), config.STORAGE_DIR)
-    : path.resolve(process.cwd(), ".prompts_cache")
+    ? path.isAbsolute(config.STORAGE_DIR)
+        ? config.STORAGE_DIR
+        : path.resolve(process.cwd(), config.STORAGE_DIR)
+    : path.join(os.homedir(), ".cache", "mcp-prompt-manager")
 export const LANG_SETTING = config.MCP_LANGUAGE
 
 /**
