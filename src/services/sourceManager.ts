@@ -756,7 +756,6 @@ export class SourceManager {
                         inputSchema: toolInputSchema,
                     },
                     async (args: Record<string, unknown>) => {
-                        // eslint-disable-next-line @typescript-eslint/await-thenable
                         await Promise.resolve()
                         logger.info(
                             {
@@ -1274,7 +1273,6 @@ export class SourceManager {
                         inputSchema: toolInputSchema,
                     },
                     async (args: Record<string, unknown>) => {
-                        // eslint-disable-next-line @typescript-eslint/await-thenable
                         await Promise.resolve()
                         logger.info(
                             {

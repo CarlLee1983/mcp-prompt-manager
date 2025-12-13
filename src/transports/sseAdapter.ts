@@ -42,7 +42,7 @@ export class SseTransportAdapter implements TransportAdapter {
             { port: this.port, host: this.host },
             "SSE transport adapter is not fully implemented. Please add HTTP server dependency (e.g., Express or Fastify)."
         )
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+
         await Promise.reject(
             new Error(
                 "SSE transport adapter is not fully implemented. Please add HTTP server dependency."

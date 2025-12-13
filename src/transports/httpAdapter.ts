@@ -40,7 +40,7 @@ export class HttpTransportAdapter implements TransportAdapter {
             { port: this.port, host: this.host },
             "HTTP transport adapter is not fully implemented. Please add HTTP server dependency (e.g., Express or Fastify)."
         )
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+
         await Promise.reject(
             new Error(
                 "HTTP transport adapter is not fully implemented. Please add HTTP server dependency."

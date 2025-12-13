@@ -14,8 +14,8 @@
         "inspector:dev": "pnpm run build && pnpm run inspector",
         "format": "prettier --write \"src/**/*.ts\"",
         "format:check": "prettier --check \"src/**/*.ts\"",
-        "lint": "eslint src --ext .ts",
-        "lint:fix": "eslint src --ext .ts --fix",
+        "lint": "eslint src",
+        "lint:fix": "eslint src --fix",
         "typecheck": "tsc --noEmit",
         "test": "vitest",
         "test:ui": "vitest --ui",
@@ -73,6 +73,7 @@
         "zod": "^4.1.13"
     },
     "devDependencies": {
+        "@eslint/js": "^9.39.2",
         "@types/chokidar": "^2.1.3",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^24.10.1",
@@ -87,6 +88,7 @@
         "lint-staged": "^16.2.7",
         "prettier": "^3.7.4",
         "typescript": "^5.9.3",
+        "typescript-eslint": "^8.49.0",
         "vitest": "^4.0.15"
     },
     "lint-staged": {

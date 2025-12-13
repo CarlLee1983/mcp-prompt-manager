@@ -15,7 +15,7 @@ import {
  */
 // Temporarily suppress stdout output to prevent dotenv from polluting MCP protocol
 const originalWrite = process.stdout.write.bind(process.stdout)
-// eslint-disable-next-line @typescript-eslint/unbound-method
+
 process.stdout.write = () => true
 dotenv.config()
 process.stdout.write = originalWrite

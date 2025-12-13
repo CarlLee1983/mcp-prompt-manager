@@ -358,7 +358,6 @@ function checkSchemaWarnings(
                     (directDescription as string | undefined) ||
                     ""
 
-                // eslint-disable-next-line @typescript-eslint/no-base-to-string
                 const descriptionStr = String(description).toLowerCase()
 
                 if (
@@ -394,7 +393,7 @@ async function registerTools(
         description:
             "Reload all prompts from Git repository without restarting the server. This will: 1) Pull latest changes from Git, 2) Clear cache, 3) Reload all Handlebars partials, 4) Reload all prompts and tools (zero-downtime).",
         inputSchema: z.object({}),
-        // eslint-disable-next-line @typescript-eslint/require-await
+
         handler: async () => {
             try {
                 logger.info("mcp_reload tool invoked")
@@ -709,7 +708,7 @@ async function registerTools(
         description:
             "Get statistics about all prompts including counts by runtime state.",
         inputSchema: z.object({}),
-        // eslint-disable-next-line @typescript-eslint/require-await
+
         handler: async () => {
             return await handlePromptStats()
         },
@@ -737,7 +736,7 @@ async function registerTools(
             repo_url: z.string().describe("Repository URL"),
             branch: z.string().optional().describe("Branch name"),
         }),
-        // eslint-disable-next-line @typescript-eslint/require-await
+
         handler: async (args: Record<string, unknown>) => {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             return await handleRepoSwitch(server, {
@@ -968,7 +967,7 @@ async function registerResources(
         description:
             "System health status including Git info, prompts, cache, and system metrics",
         mimeType: "application/json",
-        // eslint-disable-next-line @typescript-eslint/require-await
+
         handler: async () => {
             try {
                 const healthStatus = await getHealthStatus(startTime)

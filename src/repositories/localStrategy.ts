@@ -176,7 +176,7 @@ export class LocalRepositoryStrategy implements RepositoryStrategy {
             this.watcher = chokidar.watch(pathToWatch, {
                 ignored: [
                     // Exclude common directories and files
-                    // eslint-disable-next-line no-useless-escape
+
                     /(^|[/\\])\../, // Hidden files and directories
                     "**/node_modules/**",
                     "**/.git/**",

@@ -65,7 +65,7 @@ if (LOG_FILE) {
         // Use pretty format for stderr
         streams.push({
             level: stderrLogLevel,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
             stream: pino.transport({
                 target: "pino-pretty",
                 options: {
@@ -86,7 +86,7 @@ if (LOG_FILE) {
         // Use pretty format for file too (if PRETTY_LOG is enabled)
         streams.push({
             level: logLevel,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
             stream: pino.transport({
                 target: "pino-pretty",
                 options: {
